@@ -1,12 +1,8 @@
 
 class CObject
 {
-public:
+private:
     int PrivateInt = 2;
-
-    void Func() {
-        PrivateInt = 3;
-    }
     
 protected:
     unsigned int ProtectedUint;
@@ -15,6 +11,9 @@ public:
     short PublicShort;
     char PublicCharArray[16];
 
+    void Func() {
+        PrivateInt = 3;
+    }
 };
 
 class CChild : CObject

@@ -3,89 +3,94 @@ import io;
 import clang.cindex
 from clang.cindex import CursorKind
 
-typeList = list()
+nodeList = list()
+nodeStack = []
 
-currentType = dict()
-currentScope = []
+def PushNode(cursor) :
+    global nodeStack
+    
+    node = dict()
+    node["full_name"] = node["name"] = str(cursor.spelling)
+    node["type"] = str(cursor.type.spelling)
+    node["access"] = str(cursor.access_specifier)
 
-def PushScope(scope) :
-    global currentScope
-    currentScope = currentScope + [scope]
+    node["scope"] = ""
+    for i in nodeStack :
+        node["scope"] = i["full_name"] + "::"
+    if node["scope"].endswith("::") :
+        node["scope"] = node["scope"][:-2]
+    if node["scope"] != "" :
+        node["full_name"] = node["scope"] + "::" + node["name"]
 
-def PopScope() :
-    global currentScope
-    currentScope = currentScope[:-1]
+    nodeStack = nodeStack + [node]
+    return nodeStack[-1]
 
-def ParseFunction(node) :
+def PopNode(node = None) :
+    global nodeStack, nodeList
+    if node != None :
+        nodeList = nodeList + [nodeStack[-1] | node]
+    nodeStack = nodeStack[:-1]
+
+def ParseFunction(cursor) :
+    node = PushNode(cursor)
+    node["params"] = []
+    
     # CursorKind.CONVERSION_FUNCTION = CursorKind(26)
     #CursorKind.PARM_DECL = CursorKind(10)
-    print(str(cursor.kind) + " -> " + str(cursor.displayname))
     for child in cursor.get_children() :
-        ParseCursor(child)
-    return
+        if child.kind == CursorKind.PARM_DECL:
+            param = PushNode(cursor)
+            node["params"] = node["params"] + dict(param)
+            PopNode(param)
 
-def ParseVar(node) :
-    return
-
-def ParseField(node) :
-    global currentType
-
-    newVariable = dict()
-    newVariable["full_name"] = newVariable["name"] = node.spelling
-    newVariable["scope"] = ""
-
-    if len(currentScope) > 0 :
-        newVariable["scope"] = "::".join(currentScope)
-        newVariable["full_name"] = newVariable["scope"] + "::" + newVariable["name"]
-
-    newVariable["type"] = str(node.type.spelling)
-    currentType["variables"] = currentType["variables"] + [newVariable]
+    PopNode(node)
+    nodeStack[-1]["functions"] = nodeStack[-1]["functions"] + [node]
 
     return
 
-def ParseStruct(node) :
+def ParseVar(cursor) :
+    return
+
+def ParseField(cursor) :
+    node = PushNode(cursor)
+    PopNode()
+
+    nodeStack[-1]["variables"] = nodeStack[-1]["variables"] + [node]
+
+    return
+
+def ParseStruct(cursor) :
     #CursorKind.CXX_ACCESS_SPEC_DECL
     #CursorKind.FIELD_DECL = CursorKind(6)
     #CursorKind.CXX_METHOD = CursorKind(21)
     #CursorKind.CONSTRUCTOR = CursorKind(24)
     #CursorKind.DESTRUCTOR = CursorKind(25)``
     
-    print(str(node.kind) + " -> " + str(node.spelling))
+    node = PushNode(cursor)
 
-    currentType["full_name"] = currentType["name"] = str(node.spelling)
-    currentType["scope"] = ""
-
-    if len(currentScope) > 0 :
-        currentType["scope"] = "::".join(currentScope)
-        currentType["full_name"] = currentType["scope"] + "::" + currentType["name"]
-
-    currentType["type"] = "struct"
-    currentType["variables"] = []
-    currentType["functions"] = []
-    
-    PushScope(node.spelling)
-    
-    for child in node.get_children() :
+    node["type"] = "struct"
+    node["variables"] = []
+    node["functions"] = []
+   
+    for child in cursor.get_children() :
         ParseCursor(child)
-        
-    PopScope()
+
+    PopNode(node)
 
     return
 
-def ParseEnum(node) :
+def ParseEnum(cursor) :
     # An enumerator constant.
     #CursorKind.ENUM_CONSTANT_DECL = CursorKind(7)
-    for child in node.get_children() :
-        ParseCursor(child)
+    #for child in node.get_children() :
+    #    ParseCursor(child)
     return
 
-def ParseNamespace(node) :
-
-    PushScope(node.spelling)
-    currentScope = currentScope + [node.spelling]
-    for child in node.get_children() :
+def ParseNamespace(cursor) :
+    node = PushNode(cursor)
+    for child in cursor.get_children() :
         ParseCursor(child)
-    PopScope()
+    PopNode(node)
 
 def ParseCursor(cursor) :
     print(str(cursor.kind) + " -> " + str(cursor.displayname))
@@ -140,3 +145,4 @@ ParseHeader("tests\\class.h")
 ParseHeader("tests\\function.h")
 ParseHeader("tests\\struct.h")
 
+exit(0)
