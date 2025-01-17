@@ -1,6 +1,6 @@
 
 void FuncA();
-void FuncB(int);
+void FuncB(int B);
 
 //$reflect const
 int FuncC();

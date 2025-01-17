@@ -3,61 +3,107 @@ import io;
 import clang.cindex
 from clang.cindex import CursorKind
 
-nodeList = list()
-nodeStack = []
+EName = "name"
+EFullName = "full_name"
+EType = "type"
+EUnderlyingType = "underlying_type"
+EAccess = "access"
+EScope = "scope"
+EVariables = "variables"
+EFunctions = "functions"
+EParents = "parents"
+EEnums = "enums"
+EStructs = "structs"
+ENamespaces = "namespaces"
+EParameters = "parameters"
+EValueMap = "value_map"
+
+TypeAliases = dict(
+    {
+        "int": "int32_t",
+        "unsigned int": "uint32_t",
+        "short": "int16_t",
+        "unsigned short": "uint16_t",
+        "unsigned char": "uint8_t"
+    }
+)
+
+NodeList = dict()
+NodeTree = {
+        EName : "",
+        EFullName: "",
+        EType: "",
+        EAccess: "",
+        EScope: "",
+    }
+
+NodeStack = [NodeTree]
+
+def GetScope(cursor, accum : str = "") :
+
+    if not cursor.semantic_parent.kind.is_translation_unit() :
+        if accum != "" :
+            accum = "::" + accum
+        accum = str(cursor.semantic_parent.canonical.spelling) + accum
+        return GetScope(cursor.semantic_parent.canonical, accum)
+    
+    return accum
+
+def GetFullName(cursor) :
+    accum = str(cursor.spelling)
+    if cursor.semantic_parent and not cursor.semantic_parent.kind.is_translation_unit() :
+        accum = str(cursor.semantic_parent.canonical.spelling) + "::" + accum
+        return GetScope(cursor.semantic_parent.canonical, accum)
+    
+    return accum
+
+def AppendToStackTop(node, node_type : str) :
+    if not node_type in NodeStack[-1]:
+        NodeStack[-1][node_type] = dict()
+
+    NodeStack[-1][node_type][node[EFullName]] = node
 
 def PushNode(cursor) :
-    global nodeStack
+    global NodeStack
     
     node = dict()
-    node["full_name"] = node["name"] = str(cursor.spelling)
-    node["type"] = str(cursor.type.spelling)
-    node["access"] = str(cursor.access_specifier)
+    node[EName] = str(cursor.spelling)
+    node[EFullName] = GetFullName(cursor)
+    node[EType] = str(cursor.type.spelling)
+    node[EAccess] = str(cursor.access_specifier)
+    node[EScope] = GetScope(cursor)
 
-    node["scope"] = ""
-    for i in nodeStack :
-        node["scope"] = i["full_name"] + "::"
-    if node["scope"].endswith("::") :
-        node["scope"] = node["scope"][:-2]
-    if node["scope"] != "" :
-        node["full_name"] = node["scope"] + "::" + node["name"]
+    NodeStack.append(node)
+    return NodeStack[-1]
 
-    nodeStack = nodeStack + [node]
-    return nodeStack[-1]
-
-def PopNode(node = None) :
-    global nodeStack, nodeList
-    if node != None :
-        nodeList = nodeList + [nodeStack[-1] | node]
-    nodeStack = nodeStack[:-1]
+def PopNode() :
+    global NodeStack
+    NodeStack = NodeStack[:-1]
 
 def ParseFunction(cursor) :
     node = PushNode(cursor)
-    node["params"] = []
     
-    # CursorKind.CONVERSION_FUNCTION = CursorKind(26)
-    #CursorKind.PARM_DECL = CursorKind(10)
     for child in cursor.get_children() :
         if child.kind == CursorKind.PARM_DECL:
-            param = PushNode(cursor)
-            node["params"] = node["params"] + dict(param)
-            PopNode(param)
+            param = PushNode(child)
+            PopNode()
+            AppendToStackTop(param, EParameters)
 
-    PopNode(node)
-    nodeStack[-1]["functions"] = nodeStack[-1]["functions"] + [node]
+    PopNode()
 
-    return
+    AppendToStackTop(node, EFunctions)
+    NodeList[node[EFullName]] = node
+
+    return node
 
 def ParseVar(cursor) :
-    return
-
-def ParseField(cursor) :
     node = PushNode(cursor)
     PopNode()
 
-    nodeStack[-1]["variables"] = nodeStack[-1]["variables"] + [node]
-
-    return
+    AppendToStackTop(node, EVariables)
+    NodeList[node[EFullName]] = node
+    
+    return node
 
 def ParseStruct(cursor) :
     #CursorKind.CXX_ACCESS_SPEC_DECL
@@ -67,30 +113,54 @@ def ParseStruct(cursor) :
     #CursorKind.DESTRUCTOR = CursorKind(25)``
     
     node = PushNode(cursor)
-
     node["type"] = "struct"
-    node["variables"] = []
-    node["functions"] = []
-   
+
     for child in cursor.get_children() :
+        if child.kind == CursorKind.CXX_BASE_SPECIFIER :
+            AppendToStackTop({EFullName: GetFullName(child)}, EParents)
+            continue
+
+        if child.kind == CursorKind.CXX_METHOD:
+            fn = ParseFunction(child)
+            AppendToStackTop(fn, EFunctions)
+            continue
+
+        if child.kind == CursorKind.FIELD_DECL :
+            var = ParseVar(child)
+            AppendToStackTop(var, EVariables)
+    
         ParseCursor(child)
 
-    PopNode(node)
+    PopNode()
+
+    AppendToStackTop(node, EStructs)
+    NodeList[node[EFullName]] = node
 
     return
 
 def ParseEnum(cursor) :
-    # An enumerator constant.
-    #CursorKind.ENUM_CONSTANT_DECL = CursorKind(7)
-    #for child in node.get_children() :
-    #    ParseCursor(child)
-    return
+    node = PushNode(cursor)
+
+    node[EType] = "enum"
+    node[EUnderlyingType] = str(cursor.enum_type.spelling)
+    node[EValueMap] = dict()
+
+    for child in cursor.get_children() :
+        if child.kind == CursorKind.ENUM_CONSTANT_DECL :
+            node[EValueMap][child.spelling] = str(child.enum_value)
+
+    PopNode()
+
+    AppendToStackTop(node, EEnums)
+    NodeList[node[EFullName]] = node
 
 def ParseNamespace(cursor) :
     node = PushNode(cursor)
     for child in cursor.get_children() :
         ParseCursor(child)
-    PopNode(node)
+    PopNode()
+
+    AppendToStackTop(node, ENamespaces)
 
 def ParseCursor(cursor) :
     print(str(cursor.kind) + " -> " + str(cursor.displayname))
@@ -104,10 +174,6 @@ def ParseCursor(cursor) :
         ParseStruct(cursor)
         return
 
-    if cursor.kind == CursorKind.FIELD_DECL :
-        ParseField(cursor)
-        return
-
     if cursor.kind == CursorKind.VAR_DECL :
         ParseVar(cursor)
         return
@@ -117,12 +183,14 @@ def ParseCursor(cursor) :
         return
 
     if cursor.kind == CursorKind.FUNCTION_DECL :
-        return
-    
-    if cursor.kind == CursorKind.UNION_DECL :
+        ParseFunction(cursor)
         return
     
     if cursor.kind == CursorKind.NAMESPACE :
+        ParseNamespace(cursor)
+        return
+
+    if cursor.kind == CursorKind.UNION_DECL :
         return
 
     if cursor.kind == CursorKind.TYPEDEF_DECL :
@@ -136,7 +204,7 @@ def ParseHeader(filePath : str) :
     with open(filePath) as file:
         args = ['-x', 'c++', '-std=c++17']
         idx = clang.cindex.Index.create()
-        tu = idx.parse(os.path.join(os.getcwd(), filePath), args = args) #, options = clang.cindex.TranslationUnit.PARSE_INCOMPLETE | clang.cindex.TranslationUnit.PARSE_INCLUDE_BRIEF_COMMENTS_IN_CODE_COMPLETION | clang.cindex.TranslationUnit.PARSE_SKIP_FUNCTION_BODIES)
+        tu = idx.parse(os.path.join(os.getcwd(), filePath), args = args, options = clang.cindex.TranslationUnit.PARSE_INCOMPLETE | clang.cindex.TranslationUnit.PARSE_INCLUDE_BRIEF_COMMENTS_IN_CODE_COMPLETION | clang.cindex.TranslationUnit.PARSE_SKIP_FUNCTION_BODIES)
 
         ParseCursor(tu.cursor)
 
@@ -144,5 +212,6 @@ ParseHeader("tests\\enum.h")
 ParseHeader("tests\\class.h")
 ParseHeader("tests\\function.h")
 ParseHeader("tests\\struct.h")
+ParseHeader("tests\\namespace.h")
 
 exit(0)
