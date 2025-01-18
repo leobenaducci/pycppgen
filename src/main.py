@@ -1,11 +1,13 @@
-import os;
-import io;
+import os
+import io
+import pathlib
 import clang.cindex
 from clang.cindex import CursorKind
 
 EName = "name"
 EFullName = "full_name"
 EType = "type"
+EKind = "kind"
 EUnderlyingType = "underlying_type"
 EAccess = "access"
 EScope = "scope"
@@ -15,6 +17,7 @@ EParents = "parents"
 EEnums = "enums"
 EStructs = "structs"
 ENamespaces = "namespaces"
+ENamespace = "namespace"
 EParameters = "parameters"
 EValueMap = "value_map"
 EAlias = "alias"
@@ -22,6 +25,7 @@ EEnum = "enum"
 EClassTemplate = "class_template"
 EClass = "class"
 EStruct = "struct"
+EMetaTemplateDecl = "meta_template_decl"
 
 TypeAliases = dict(
     {
@@ -45,7 +49,7 @@ NodeTree = {
 NodeStack = [NodeTree]
 
 def GetScope(cursor, accum : str = "") :
-    if not cursor.semantic_parent.kind.is_translation_unit() :
+    if cursor.semantic_parent and not cursor.semantic_parent.kind.is_translation_unit() :
         if accum != "" :
             accum = "::" + accum
         accum = str(cursor.semantic_parent.canonical.spelling) + accum
@@ -54,16 +58,20 @@ def GetScope(cursor, accum : str = "") :
     return accum
 
 def GetFullName(cursor) :
-    accum = str(cursor.spelling)
+    accum = str(cursor.displayname)
     return GetScope(cursor, accum)
 
 def AppendToStackTop(node, node_type : str) :
+    global NodeList, NodeTree, NodeStack
+
     if not node_type in NodeStack[-1]:
         NodeStack[-1][node_type] = dict()
 
     NodeStack[-1][node_type][node[EFullName]] = node
 
 def CopyNode(full_name) :
+    global NodeList, NodeTree, NodeStack
+
     if full_name in NodeList :
         return dict(NodeList[full_name])
     return None
@@ -86,6 +94,8 @@ def PopNode() :
     NodeStack = NodeStack[:-1]
 
 def ParseFunction(cursor) :
+    global NodeList, NodeTree, NodeStack
+
     node = PushNode(cursor)
     
     for child in cursor.get_children() :
@@ -102,6 +112,8 @@ def ParseFunction(cursor) :
     return node
 
 def ParseVar(cursor) :
+    global NodeList, NodeTree, NodeStack
+
     node = PushNode(cursor)
     PopNode()
 
@@ -111,10 +123,12 @@ def ParseVar(cursor) :
     return node
 
 def ParseStruct(cursor) :
+    global NodeList, NodeTree, NodeStack
     node = PushNode(cursor)
 
     if cursor.kind == CursorKind.CLASS_TEMPLATE :
         node[EType] = EClassTemplate
+        node[EMetaTemplateDecl] = ""
     elif cursor.kind == CursorKind.CLASS_DECL :
         node[EType] = EClass
     else :
@@ -139,8 +153,10 @@ def ParseStruct(cursor) :
             PopNode()
 
             if child.kind == CursorKind.TEMPLATE_TYPE_PARAMETER :
+                node[EMetaTemplateDecl] += "typename " + param[EName] + ", "
                 param[EType] = "template_type_parameter"
             elif child.kind == CursorKind.TEMPLATE_NON_TYPE_PARAMETER :
+                node[EMetaTemplateDecl] += param[EType] + " " + param[EName] + ", "
                 param[EType] = "template_non_type_parameter"
             elif child.kind == CursorKind.TEMPLATE_PARAMETER :
                 param[EType] = "template_template_parameter"
@@ -149,6 +165,10 @@ def ParseStruct(cursor) :
 
             continue
 
+        if EMetaTemplateDecl in node :
+            if node[EMetaTemplateDecl].endswith(", ") :
+                node[EMetaTemplateDecl] = node[EMetaTemplateDecl][:-2]
+
         ParseCursor(child)
 
     PopNode()
@@ -156,6 +176,8 @@ def ParseStruct(cursor) :
     return node
 
 def ParseEnum(cursor) :
+    global NodeList, NodeTree, NodeStack
+
     node = PushNode(cursor)
 
     node[EType] = EEnum
@@ -172,29 +194,26 @@ def ParseEnum(cursor) :
     NodeList[node[EFullName]] = node
 
 def ParseNamespace(cursor) :
+    global NodeList, NodeTree, NodeStack
+
     node = PushNode(cursor)
     for child in cursor.get_children() :
         ParseCursor(child)
     PopNode()
+    node[EType] = ENamespace
 
     AppendToStackTop(node, ENamespaces)
 
 def ParseTypeAlias(cursor) :
-    typeName = "::".join(map(lambda x: x.spelling, cursor.get_children()))
-    node = CopyNode(typeName)
-    if node == None : 
-        return
-    
-    nodeType = node[EType]
-    node[EName] = str(cursor.spelling)
-    node[EFullName] = GetFullName(cursor)
-    node[EType] = EAlias
-    node[EAccess] = str(cursor.access_specifier)
-    node[EScope] = GetScope(cursor)
-    node[EUnderlyingType] = str(cursor.underlying_typedef_type.spelling)
+    global NodeList, NodeTree, NodeStack
 
-    if nodeType == EStruct or nodeType == EClass or nodeType == EClassTemplate :
-        AppendToStackTop(node, EStructs)        
+    node = PushNode(cursor)
+    node[EUnderlyingType] = str(cursor.underlying_typedef_type.spelling)
+    PopNode()
+
+    AppendToStackTop(node, EVariables)
+    NodeList[node[EFullName]] = node
+
 
 def ParseCursor(cursor) :
     if cursor.kind.is_translation_unit() :
@@ -204,6 +223,9 @@ def ParseCursor(cursor) :
 
     if cursor.kind == CursorKind.NAMESPACE :
         ParseNamespace(cursor)
+        return
+
+    if cursor.kind == CursorKind.TYPE_REF or cursor.kind == CursorKind.TEMPLATE_REF or cursor.kind == CursorKind.NAMESPACE_REF:
         return
 
     if GetFullName(cursor) in NodeList :
@@ -242,6 +264,18 @@ def ParseCursor(cursor) :
         return
 
 def ParseHeader(filePath : str) :
+    global NodeList, NodeTree, NodeStack
+
+    NodeList = dict()
+    NodeTree = {
+        EName : "",
+        EFullName: "",
+        EType: "",
+        EAccess: "",
+        EScope: "",
+    }
+    NodeStack = [NodeTree]
+
     with open(filePath) as file:
         args = ['-x', 'c++', '-std=c++17']
         idx = clang.cindex.Index.create()
@@ -250,21 +284,50 @@ def ParseHeader(filePath : str) :
         for cursor in tu.cursor.walk_preorder():
             ParseCursor(cursor)
 
-def CodeGen() :
-    code = ""
+        CodeGen(filePath)
 
-    for node in NodeList :
-        meta_decl = ""
-        meta_decl.append("struct SMeta {\n")
-        meta_decl.append()
-        meta_decl.append("}meta;\n")
-        code = code + "template<> constexpr auto meta<{node[EFullName]}>() { " + meta_decl + "return meta;}"
+def CodeGenOutputNode(code, node) :
+    
+    if node[EType] == EClass or node[EType] == EClassTemplate or node[EType] == EStruct or node[EType] == ENamespace :
+        code += "template<"
+        if EMetaTemplateDecl in node :
+            code += node[EMetaTemplateDecl]
+        code += ">\nstruct meta<" 
+        code += node[EFullName]
+        code += ">{\n "
+        if EVariables in node and len(node[EVariables]) > 0 :
+            code += "\tvoid for_each_var(auto&& fn) const {\n"
+            for k, v in node[EVariables].items() :
+                code += "\t\tfn(&" + v[EFullName] + ");\n"
+            code += "\t}\n"
+        code += "};\n\n"
 
-ParseHeader("tests\\template.h")
-#ParseHeader("tests\\enum.h")
+    return code
+
+def CodeGen(filePath : str) :
+    global NodeList, NodeTree, NodeStack
+
+    fileName = str(pathlib.Path(filePath).relative_to(pathlib.Path(filePath).parent))
+    extStart = filePath.rfind(".")
+    ext = filePath[extStart:]
+    outputPath = filePath[:extStart]
+    outputPath += ".gen.h"
+
+    code = "#include \"" + fileName + "\"\n\n"
+    code += "template<typename T> struct meta {};\n\n"
+
+    for key in NodeList :
+        code = CodeGenOutputNode(code, NodeList[key])
+
+    with open(outputPath, mode="wt") as output :
+        output.write(code)
+
+ParseHeader("tests\\enum.h")
+#ParseHeader("tests\\template.h")
 #ParseHeader("tests\\class.h")
 #ParseHeader("tests\\function.h")
 #ParseHeader("tests\\struct.h")
 #ParseHeader("tests\\namespace.h")
+
 
 exit(0)
