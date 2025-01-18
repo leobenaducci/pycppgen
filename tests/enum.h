@@ -5,3 +5,5 @@ enum class EEnum : unsigned
     Value,
     Test = 10,
 };
+
+struct SVector;

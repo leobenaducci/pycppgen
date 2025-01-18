@@ -48,27 +48,14 @@ def GetScope(cursor, accum : str = "") :
     if not cursor.semantic_parent.kind.is_translation_unit() :
         if accum != "" :
             accum = "::" + accum
-        accum = str(cursor.semantic_parent.canonical.displayname) + accum
+        accum = str(cursor.semantic_parent.canonical.spelling) + accum
         return GetScope(cursor.semantic_parent.canonical, accum)
-    
-    return accum
-
-def GetTypeName(type) :
-    accum = str(type.spelling)
-    if type.semantic_parent and not type.semantic_parent.kind.is_translation_unit() :
-        accum = str(type.semantic_parent.canonical.displayname) + "::" + accum
-        return GetTypeName(type.semantic_parent.canonical, accum)
     
     return accum
 
 def GetFullName(cursor) :
-    accum = str(cursor.displayname)
-
-    if cursor.semantic_parent and not cursor.semantic_parent.kind.is_translation_unit() :
-        accum = str(cursor.semantic_parent.canonical.displayname) + "::" + accum
-        return GetScope(cursor.semantic_parent.canonical, accum)
-    
-    return accum
+    accum = str(cursor.spelling)
+    return GetScope(cursor, accum)
 
 def AppendToStackTop(node, node_type : str) :
     if not node_type in NodeStack[-1]:
@@ -78,7 +65,7 @@ def AppendToStackTop(node, node_type : str) :
 
 def CopyNode(full_name) :
     if full_name in NodeList :
-        return NodeList[full_name]
+        return dict(NodeList[full_name])
     return None
 
 def PushNode(cursor) :
@@ -128,7 +115,6 @@ def ParseStruct(cursor) :
 
     if cursor.kind == CursorKind.CLASS_TEMPLATE :
         node[EType] = EClassTemplate
-        node[EName] = cursor.displayname
     elif cursor.kind == CursorKind.CLASS_DECL :
         node[EType] = EClass
     else :
@@ -167,10 +153,7 @@ def ParseStruct(cursor) :
 
     PopNode()
 
-    AppendToStackTop(node, EStructs)
-    NodeList[node[EFullName]] = node
-
-    return
+    return node
 
 def ParseEnum(cursor) :
     node = PushNode(cursor)
@@ -197,7 +180,8 @@ def ParseNamespace(cursor) :
     AppendToStackTop(node, ENamespaces)
 
 def ParseTypeAlias(cursor) :
-    node = CopyNode(str(cursor.underlying_typedef_type.spelling))
+    typeName = "::".join(map(lambda x: x.spelling, cursor.get_children()))
+    node = CopyNode(typeName)
     if node == None : 
         return
     
@@ -218,24 +202,31 @@ def ParseCursor(cursor) :
             ParseCursor(child)
         return
 
+    if cursor.kind == CursorKind.NAMESPACE :
+        ParseNamespace(cursor)
+        return
+
+    if GetFullName(cursor) in NodeList :
+        return
+
     if cursor.kind == CursorKind.STRUCT_DECL or cursor.kind == CursorKind.CLASS_DECL or cursor.kind == CursorKind.CLASS_TEMPLATE :
-        ParseStruct(cursor)
+        if cursor.is_definition() :
+            node = ParseStruct(cursor)   
+            AppendToStackTop(node, EStructs)
+            NodeList[node[EFullName]] = node
+        return
+
+    if cursor.kind == CursorKind.ENUM_DECL :
+        if cursor.is_definition() :
+            ParseEnum(cursor)
         return
 
     if cursor.kind == CursorKind.VAR_DECL :
         ParseVar(cursor)
         return
 
-    if cursor.kind == CursorKind.ENUM_DECL :
-        ParseEnum(cursor)
-        return
-
     if cursor.kind == CursorKind.FUNCTION_DECL :
         ParseFunction(cursor)
-        return
-    
-    if cursor.kind == CursorKind.NAMESPACE :
-        ParseNamespace(cursor)
         return
 
     if cursor.kind == CursorKind.UNION_DECL :
@@ -256,13 +247,24 @@ def ParseHeader(filePath : str) :
         idx = clang.cindex.Index.create()
         tu = idx.parse(os.path.join(os.getcwd(), filePath), args = args, options = clang.cindex.TranslationUnit.PARSE_INCOMPLETE | clang.cindex.TranslationUnit.PARSE_INCLUDE_BRIEF_COMMENTS_IN_CODE_COMPLETION | clang.cindex.TranslationUnit.PARSE_SKIP_FUNCTION_BODIES)
 
-        ParseCursor(tu.cursor)
+        for cursor in tu.cursor.walk_preorder():
+            ParseCursor(cursor)
 
-ParseHeader("tests\\enum.h")
-ParseHeader("tests\\class.h")
-ParseHeader("tests\\function.h")
-ParseHeader("tests\\struct.h")
-ParseHeader("tests\\namespace.h")
+def CodeGen() :
+    code = ""
+
+    for node in NodeList :
+        meta_decl = ""
+        meta_decl.append("struct SMeta {\n")
+        meta_decl.append()
+        meta_decl.append("}meta;\n")
+        code = code + "template<> constexpr auto meta<{node[EFullName]}>() { " + meta_decl + "return meta;}"
+
 ParseHeader("tests\\template.h")
+#ParseHeader("tests\\enum.h")
+#ParseHeader("tests\\class.h")
+#ParseHeader("tests\\function.h")
+#ParseHeader("tests\\struct.h")
+#ParseHeader("tests\\namespace.h")
 
 exit(0)
