@@ -1,6 +1,7 @@
 import os
 import io
 import pathlib
+import sys
 import clang.cindex
 from clang.cindex import CursorKind
 from clang.cindex import AccessSpecifier
@@ -274,7 +275,7 @@ def ParseCursor(cursor) :
         ParseTypeAlias(cursor)
         return
 
-def ParseHeader(filePath : str) :
+def ParseFile(filePath : str, sysArgs = []) :
     global NodeList, NodeTree, NodeStack
 
     NodeList = {}
@@ -282,7 +283,7 @@ def ParseHeader(filePath : str) :
     NodeStack = [NodeTree]
 
     with open(filePath) as file:
-        args = ['-x', 'c++', '-std=c++17']
+        args = ['-x', 'c++', '-std=c++17'] + sysArgs
         idx = clang.cindex.Index.create()
         tu = idx.parse(os.path.join(os.getcwd(), filePath), args = args, options = clang.cindex.TranslationUnit.PARSE_INCOMPLETE | clang.cindex.TranslationUnit.PARSE_INCLUDE_BRIEF_COMMENTS_IN_CODE_COMPLETION | clang.cindex.TranslationUnit.PARSE_SKIP_FUNCTION_BODIES)
 
@@ -291,27 +292,67 @@ def ParseHeader(filePath : str) :
 
         CodeGen(filePath)
 
+def CodeGenOutputMetaHeader(code, node) :
+    if ENodeMetaTemplateDecl in node :
+        code += "template<"
+        code += node[ENodeMetaTemplateDecl]
+        code += ">\nstruct meta<"
+    else :
+        code += "template<> struct meta<"
+    code += node[ENodeFullName]
+    code += ">{\n"
+    return code
+
+def CodeGenOutputMetaFooter(code, node) :
+    code += "};\n\n"
+    return code
+
 def CodeGenOutputNode(code, node) :
     
     if node[ENodeKind] == EKindClass or node[ENodeKind] == EKindClassTemplate or node[ENodeKind] == EKindStruct :
-        code += "template<"
-        if ENodeMetaTemplateDecl in node :
-            code += node[ENodeMetaTemplateDecl]
-        code += ">\nstruct meta<" 
-        code += node[ENodeFullName]
-        code += ">{\n "
+        code = CodeGenOutputMetaHeader(code, node)
+
         if ENodeVariables in node and len(node[ENodeVariables]) > 0 :
-            code += "\ttemplate<typename FN> void for_each_var(FN&& fn) const {\n"
+            code += "\tstatic void for_each_var(std::function<void(const member_variable_info&)> fn) {\n"
             code += "\t\tstruct access_helper : " + node[ENodeFullName] + " {\n"
             for k, v in node[ENodeVariables].items() :
                 if v[ENodeAccess] == str(AccessSpecifier.PUBLIC) or v[ENodeAccess] == str(AccessSpecifier.PROTECTED) :
-                    code += "\t\t\tdecltype(" + v[ENodeName] + ") " + node[ENodeFullName] + "::* access_helper_" + v[ENodeName] + " = &" + node[ENodeFullName] + "::" + v[ENodeName] + ";\n" 
+                    code += "\t\t\tconst size_t " + v[ENodeName] + "_Offset = offsetof(access_helper, " + node[ENodeFullName] + "::" + v[ENodeName] + ");\n"
             code += "\t\t};\n"
             for k, v in node[ENodeVariables].items() :
                 if v[ENodeAccess] == str(AccessSpecifier.PUBLIC) or v[ENodeAccess] == str(AccessSpecifier.PROTECTED) :
-                    code += "\t\tfn(&access_helper::access_helper_" + v[ENodeName] + ");\n"
+                    code += "\t\tmember_variable_info " + v[ENodeName] + "_info;\n"
+                    code += "\t\t" + v[ENodeName] + "_info.Name = \"" + v[ENodeName] + "\";\n"
+                    code += "\t\t" + v[ENodeName] + "_info.Type = typeid(" + v[ENodeType] + ").name();\n"
+                    code += "\t\t" + v[ENodeName] + "_info.Offset = access_helper()." + v[ENodeName] + "_Offset;\n"
+                    code += "\t\t" + v[ENodeName] + "_info.Size = sizeof(" + v[ENodeType] + ");\n"
+                    code += "\t\tfn(" + v[ENodeName] + "_info);\n"
             code += "\t}\n"
-        code += "};\n\n"
+        code = CodeGenOutputMetaFooter(code, node)
+
+    elif node[ENodeKind] == EKindEnum :
+        code = CodeGenOutputMetaHeader(code, node)
+
+        if ENodeEnumValues in node :
+            code += "\ttemplate<typename FN> static void for_each_enum(FN&& fn) {\n"
+            for k, v in node[ENodeEnumValues].items() :
+                code += "\t\tfn( " + node[ENodeFullName] + "::" + k + " );\n"
+            code += "\t}\n"
+
+            code += "\tstatic constexpr std::string_view enum_to_string(" + node[ENodeFullName] + " value) {\n"
+            for k, v in node[ENodeEnumValues].items() :
+                code += "\t\tif (value == " + node[ENodeFullName] + "::" + k + " ) return \"" + k + "\";\n"
+            code += "\t\treturn \"\";\n"
+            code += "\t}\n"
+
+            code += "\tstatic constexpr " + node[ENodeFullName] + " string_to_enum(std::string_view value) {\n"
+            for k, v in node[ENodeEnumValues].items() :
+                code += "\t\tif (value == \"" + k + "\") return " + node[ENodeFullName] + "::" + k + ";\n"
+            code += "\t\treturn static_cast<" + node[ENodeFullName] + ">(-1);\n"
+            code += "\t}\n"
+
+        code = CodeGenOutputMetaFooter(code, node)
+
 
     return code
 
@@ -325,7 +366,18 @@ def CodeGen(filePath : str) :
     outputPath += ".gen.h"
 
     code = "#include \"" + fileName + "\"\n\n"
+
+    code += "#ifndef _PYCPPGEN_DECLARATIONS\n"
+    code += "#define _PYCPPGEN_DECLARATIONS\n\n"
+    code += "struct member_variable_info {\n"
+    code += "\tstd::string_view Name;\n"
+    code += "\tstd::string_view Type;\n"
+    code += "\tsize_t Offset = 0;\n"
+    code += "\tsize_t Size = 0;\n"
+    code += "\tsize_t ArrayLength = 0;\n"
+    code += "};\n\n"
     code += "template<typename T> struct meta {};\n\n"
+    code += "#endif //_PYCPPGEN_DECLARATIONS\n\n"
 
     for key in NodeList :
         code = CodeGenOutputNode(code, NodeList[key])
@@ -333,12 +385,14 @@ def CodeGen(filePath : str) :
     with open(outputPath, mode="wt") as output :
         output.write(code)
 
-ParseHeader("tests\\enum.h")
-ParseHeader("tests\\template.h")
-ParseHeader("tests\\class.h")
-ParseHeader("tests\\function.h")
-ParseHeader("tests\\struct.h")
-ParseHeader("tests\\namespace.h")
+if __name__ == "__main__":
+    if len(sys.argv) == 0 :
+        print("usage py main.py <filename> <clang_args>")
+        exit(-1)
 
+    sysArgs = []
+    if len(sys.argv) > 1 :
+        sysArgs = sys.argv[1:]
+    ParseFile(sys.argv[0], sysArgs)
 
-exit(0)
+    exit(0)

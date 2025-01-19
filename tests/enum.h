@@ -1,3 +1,5 @@
+#pragma once
+
 enum class EEnum : unsigned
 {
     None = 0,
@@ -5,5 +7,3 @@ enum class EEnum : unsigned
     Value,
     Test = 10,
 };
-
-struct SVector;

@@ -1,3 +1,5 @@
+#pragma once
+
 #include "class.h"
 
 namespace TestNameSpace
