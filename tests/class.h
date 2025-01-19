@@ -1,5 +1,6 @@
 #pragma once
 
+//$reflect
 class CObject
 {
 private:

@@ -16,8 +16,7 @@ template<typename T> struct meta {};
 
 #endif //_PYCPPGEN_DECLARATIONS
 
-template<>
-struct meta<SVector>{
+template<> struct meta<SVector>{
 	static void for_each_var(std::function<void(const member_variable_info&)> fn) {
 		struct access_helper : SVector {
 			const size_t x_Offset = offsetof(access_helper, SVector::x);
@@ -29,6 +28,7 @@ struct meta<SVector>{
 		x_info.Type = typeid(float).name();
 		x_info.Offset = access_helper().x_Offset;
 		x_info.ElementSize = sizeof(std::remove_all_extents_t<float>);
+		x_info.TotalSize = sizeof(float);
 		x_info.ArrayRank = std::rank_v<float>;
 		fn(x_info);
 		member_variable_info y_info;
@@ -36,6 +36,7 @@ struct meta<SVector>{
 		y_info.Type = typeid(float).name();
 		y_info.Offset = access_helper().y_Offset;
 		y_info.ElementSize = sizeof(std::remove_all_extents_t<float>);
+		y_info.TotalSize = sizeof(float);
 		y_info.ArrayRank = std::rank_v<float>;
 		fn(y_info);
 		member_variable_info z_info;
@@ -43,6 +44,7 @@ struct meta<SVector>{
 		z_info.Type = typeid(float).name();
 		z_info.Offset = access_helper().z_Offset;
 		z_info.ElementSize = sizeof(std::remove_all_extents_t<float>);
+		z_info.TotalSize = sizeof(float);
 		z_info.ArrayRank = std::rank_v<float>;
 		fn(z_info);
 	}

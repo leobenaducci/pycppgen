@@ -169,7 +169,7 @@ def ParseStruct(cursor) :
                 kind = EKindTemplateTypeParameter
             elif child.kind == CursorKind.TEMPLATE_NON_TYPE_PARAMETER :
                 kind = EKindTemplateNonTypeParameter
-            elif child.kind == CursorKind.TEMPLATE_PARAMETER :
+            elif child.kind == CursorKind.TEMPLATE_TEMPLATE_PARAMETER :
                 kind = EKindTemplateTemplateParameter
 
             param = PushNode(child, kind)
@@ -179,8 +179,8 @@ def ParseStruct(cursor) :
                 node[ENodeMetaTemplateDecl] += "typename " + param[ENodeName] + ", "
             elif child.kind == CursorKind.TEMPLATE_NON_TYPE_PARAMETER :
                 node[ENodeMetaTemplateDecl] += param[ENodeType] + " " + param[ENodeName] + ", "
-            elif child.kind == CursorKind.TEMPLATE_PARAMETER :
-                '''noop'''
+            elif child.kind == CursorKind.TEMPLATE_TEMPLATE_PARAMETER :
+                node[ENodeMetaTemplateDecl] += "template " + param[ENodeName] + ", "
 
             AppendToStackTop(param, ENodeParameters)
 
@@ -443,13 +443,13 @@ def CodeGen(filePath : str) :
         output.write(code)
 
 if __name__ == "__main__":
-    if len(sys.argv) == 0 :
+    if len(sys.argv) < 2 :
         print("usage py main.py <filename> <clang_args>")
         exit(-1)
 
     sysArgs = []
-    if len(sys.argv) > 1 :
-        sysArgs = sys.argv[1:]
-    ParseFile(sys.argv[0], sysArgs)
+    if len(sys.argv) > 2 :
+        sysArgs = sys.argv[2:]
+    ParseFile(sys.argv[1], sysArgs)
 
     exit(0)

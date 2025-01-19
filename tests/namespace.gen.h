@@ -16,8 +16,7 @@ template<typename T> struct meta {};
 
 #endif //_PYCPPGEN_DECLARATIONS
 
-template<>
-struct meta<CObject>{
+template<> struct meta<CObject>{
 	static void for_each_var(std::function<void(const member_variable_info&)> fn) {
 		struct access_helper : CObject {
 			const size_t ProtectedUint_Offset = offsetof(access_helper, CObject::ProtectedUint);
@@ -29,6 +28,7 @@ struct meta<CObject>{
 		ProtectedUint_info.Type = typeid(unsigned int).name();
 		ProtectedUint_info.Offset = access_helper().ProtectedUint_Offset;
 		ProtectedUint_info.ElementSize = sizeof(std::remove_all_extents_t<unsigned int>);
+		ProtectedUint_info.TotalSize = sizeof(unsigned int);
 		ProtectedUint_info.ArrayRank = std::rank_v<unsigned int>;
 		fn(ProtectedUint_info);
 		member_variable_info PublicShort_info;
@@ -36,6 +36,7 @@ struct meta<CObject>{
 		PublicShort_info.Type = typeid(short).name();
 		PublicShort_info.Offset = access_helper().PublicShort_Offset;
 		PublicShort_info.ElementSize = sizeof(std::remove_all_extents_t<short>);
+		PublicShort_info.TotalSize = sizeof(short);
 		PublicShort_info.ArrayRank = std::rank_v<short>;
 		fn(PublicShort_info);
 		member_variable_info PublicCharArray_info;
@@ -43,6 +44,7 @@ struct meta<CObject>{
 		PublicCharArray_info.Type = typeid(char[16]).name();
 		PublicCharArray_info.Offset = access_helper().PublicCharArray_Offset;
 		PublicCharArray_info.ElementSize = sizeof(std::remove_all_extents_t<char[16]>);
+		PublicCharArray_info.TotalSize = sizeof(char[16]);
 		PublicCharArray_info.ArrayRank = std::rank_v<char[16]>;
 		PublicCharArray_info.ArrayExtents.push_back(std::extent_v<char[16], 0>);
 		fn(PublicCharArray_info);
@@ -74,8 +76,7 @@ struct meta<CObject>{
 	}
 };
 
-template<>
-struct meta<CChild>{
+template<> struct meta<CChild>{
 	static void for_each_var(std::function<void(const member_variable_info&)> fn) {
 		struct access_helper : CChild {
 			const size_t Matrix_Offset = offsetof(access_helper, CChild::Matrix);
@@ -85,6 +86,7 @@ struct meta<CChild>{
 		Matrix_info.Type = typeid(float[4][4]).name();
 		Matrix_info.Offset = access_helper().Matrix_Offset;
 		Matrix_info.ElementSize = sizeof(std::remove_all_extents_t<float[4][4]>);
+		Matrix_info.TotalSize = sizeof(float[4][4]);
 		Matrix_info.ArrayRank = std::rank_v<float[4][4]>;
 		Matrix_info.ArrayExtents.push_back(std::extent_v<float[4][4], 0>);
 		Matrix_info.ArrayExtents.push_back(std::extent_v<float[4][4], 1>);
@@ -92,8 +94,7 @@ struct meta<CChild>{
 	}
 };
 
-template<>
-struct meta<TestNameSpace::CChild>{
+template<> struct meta<TestNameSpace::CChild>{
 	static void for_each_var(std::function<void(const member_variable_info&)> fn) {
 		struct access_helper : TestNameSpace::CChild {
 			const size_t Matrix_Offset = offsetof(access_helper, TestNameSpace::CChild::Matrix);
@@ -103,6 +104,7 @@ struct meta<TestNameSpace::CChild>{
 		Matrix_info.Type = typeid(float[4][4]).name();
 		Matrix_info.Offset = access_helper().Matrix_Offset;
 		Matrix_info.ElementSize = sizeof(std::remove_all_extents_t<float[4][4]>);
+		Matrix_info.TotalSize = sizeof(float[4][4]);
 		Matrix_info.ArrayRank = std::rank_v<float[4][4]>;
 		Matrix_info.ArrayExtents.push_back(std::extent_v<float[4][4], 0>);
 		Matrix_info.ArrayExtents.push_back(std::extent_v<float[4][4], 1>);
