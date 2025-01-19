@@ -3,29 +3,39 @@ import io
 import pathlib
 import clang.cindex
 from clang.cindex import CursorKind
+from clang.cindex import AccessSpecifier
 
-EName = "name"
-EFullName = "full_name"
-EType = "type"
-EKind = "kind"
-EUnderlyingType = "underlying_type"
-EAccess = "access"
-EScope = "scope"
-EVariables = "variables"
-EFunctions = "functions"
-EParents = "parents"
-EEnums = "enums"
-EStructs = "structs"
-ENamespaces = "namespaces"
-ENamespace = "namespace"
-EParameters = "parameters"
-EValueMap = "value_map"
-EAlias = "alias"
-EEnum = "enum"
-EClassTemplate = "class_template"
-EClass = "class"
-EStruct = "struct"
-EMetaTemplateDecl = "meta_template_decl"
+ENodeName = "name"
+ENodeFullName = "full_name"
+ENodeKind = "kind"
+ENodeType = "type"
+ENodeUnderlyingType = "underlying_type"
+ENodeAccess = "access"
+ENodeScope = "scope"
+ENodeVariables = "variables"
+ENodeFunctions = "functions"
+ENodeParents = "parents"
+ENodeEnums = "enums"
+ENodeStructs = "structs"
+ENodeNamespaces = "namespaces"
+ENodeParameters = "parameters"
+ENodeEnumValues = "enum_values"
+ENodeMetaTemplateDecl = "meta_template_decl"
+
+EKindNamespace = "kind_namespace"
+EKindAlias = "kind_alias"
+EKindEnum = "kind_enum"
+EKindClassTemplate = "kind_class_template"
+EKindClass = "kind_class"
+EKindStruct = "kind_struct"
+EKindFunction = "kind_function"
+EKindParameter = "kind_parameter"
+EKindVariable = "kind_variable"
+EKindTemplateTypeParameter = "kind_template_type_parameter"
+EKindTemplateNonTypeParameter = "kind_template_non_type_parameter"
+EKindTemplateTemplateParameter = "kind_template_template_parameter"
+
+EInvalid = "invalid"
 
 TypeAliases = dict(
     {
@@ -37,15 +47,8 @@ TypeAliases = dict(
     }
 )
 
-NodeList = dict()
-NodeTree = {
-        EName : "",
-        EFullName: "",
-        EType: "",
-        EAccess: "",
-        EScope: "",
-    }
-
+NodeList = {}
+NodeTree = {}
 NodeStack = [NodeTree]
 
 def GetScope(cursor, accum : str = "") :
@@ -61,13 +64,16 @@ def GetFullName(cursor) :
     accum = str(cursor.displayname)
     return GetScope(cursor, accum)
 
-def AppendToStackTop(node, node_type : str) :
+def AppendToStackTop(node, node_type : str, appendToList : bool = False) :
     global NodeList, NodeTree, NodeStack
 
     if not node_type in NodeStack[-1]:
         NodeStack[-1][node_type] = dict()
 
-    NodeStack[-1][node_type][node[EFullName]] = node
+    NodeStack[-1][node_type][node[ENodeFullName]] = node
+
+    if appendToList :
+        NodeList[node[ENodeFullName]] = node
 
 def CopyNode(full_name) :
     global NodeList, NodeTree, NodeStack
@@ -76,15 +82,16 @@ def CopyNode(full_name) :
         return dict(NodeList[full_name])
     return None
 
-def PushNode(cursor) :
+def PushNode(cursor, kind : str = EInvalid) :
     global NodeStack
     
     node = dict()
-    node[EName] = str(cursor.spelling)
-    node[EFullName] = GetFullName(cursor)
-    node[EType] = str(cursor.type.spelling)
-    node[EAccess] = str(cursor.access_specifier)
-    node[EScope] = GetScope(cursor)
+    node[ENodeName] = str(cursor.spelling)
+    node[ENodeFullName] = GetFullName(cursor)
+    node[ENodeKind] = kind
+    node[ENodeType] = str(cursor.type.spelling)
+    node[ENodeAccess] = str(cursor.access_specifier)
+    node[ENodeScope] = GetScope(cursor)
 
     NodeStack.append(node)
     return NodeStack[-1]
@@ -93,81 +100,90 @@ def PopNode() :
     global NodeStack
     NodeStack = NodeStack[:-1]
 
-def ParseFunction(cursor) :
+def ParseFunction(cursor, isGlobal : bool = False) :
     global NodeList, NodeTree, NodeStack
 
     node = PushNode(cursor)
     
     for child in cursor.get_children() :
         if child.kind == CursorKind.PARM_DECL:
-            param = PushNode(child)
+            param = PushNode(child, EKindParameter)
             PopNode()
-            AppendToStackTop(param, EParameters)
+
+            AppendToStackTop(param, ENodeParameters)
 
     PopNode()
 
-    AppendToStackTop(node, EFunctions)
-    NodeList[node[EFullName]] = node
+    AppendToStackTop(node, ENodeFunctions, isGlobal)
 
     return node
 
 def ParseVar(cursor) :
     global NodeList, NodeTree, NodeStack
 
-    node = PushNode(cursor)
+    node = PushNode(cursor, EKindVariable)
     PopNode()
 
-    AppendToStackTop(node, EVariables)
-    NodeList[node[EFullName]] = node
+    AppendToStackTop(node, ENodeVariables)
+    NodeList[node[ENodeFullName]] = node
     
     return node
 
 def ParseStruct(cursor) :
     global NodeList, NodeTree, NodeStack
-    node = PushNode(cursor)
 
+    kind = EInvalid
     if cursor.kind == CursorKind.CLASS_TEMPLATE :
-        node[EType] = EClassTemplate
-        node[EMetaTemplateDecl] = ""
+        kind = EKindClassTemplate
     elif cursor.kind == CursorKind.CLASS_DECL :
-        node[EType] = EClass
+        kind = EKindClass
     else :
-        node[EType] = EStruct
+        kind = EKindStruct
+
+    node = PushNode(cursor, kind)
+    node[ENodeMetaTemplateDecl] = ""
 
     for child in cursor.get_children() :
         if child.kind == CursorKind.CXX_BASE_SPECIFIER :
-            AppendToStackTop({EFullName: GetFullName(child)}, EParents)
+            AppendToStackTop({ENodeFullName: GetFullName(child)}, ENodeParents)
             continue
 
         if child.kind == CursorKind.CXX_METHOD:
             fn = ParseFunction(child)
-            AppendToStackTop(fn, EFunctions)
+            AppendToStackTop(fn, ENodeFunctions)
             continue
 
         if child.kind == CursorKind.FIELD_DECL :
             var = ParseVar(child)
-            AppendToStackTop(var, EVariables)
+            AppendToStackTop(var, ENodeVariables)
 
         if child.kind == CursorKind.TEMPLATE_TYPE_PARAMETER or child.kind == CursorKind.TEMPLATE_NON_TYPE_PARAMETER or child.kind == CursorKind.TEMPLATE_TEMPLATE_PARAMETER:
-            param = PushNode(child)
+            
+            kind = EInvalid
+            if child.kind == CursorKind.TEMPLATE_TYPE_PARAMETER :
+                kind = EKindTemplateTypeParameter
+            elif child.kind == CursorKind.TEMPLATE_NON_TYPE_PARAMETER :
+                kind = EKindTemplateNonTypeParameter
+            elif child.kind == CursorKind.TEMPLATE_PARAMETER :
+                kind = EKindTemplateTemplateParameter
+
+            param = PushNode(child, kind)
             PopNode()
 
             if child.kind == CursorKind.TEMPLATE_TYPE_PARAMETER :
-                node[EMetaTemplateDecl] += "typename " + param[EName] + ", "
-                param[EType] = "template_type_parameter"
+                node[ENodeMetaTemplateDecl] += "typename " + param[ENodeName] + ", "
             elif child.kind == CursorKind.TEMPLATE_NON_TYPE_PARAMETER :
-                node[EMetaTemplateDecl] += param[EType] + " " + param[EName] + ", "
-                param[EType] = "template_non_type_parameter"
+                node[ENodeMetaTemplateDecl] += param[ENodeType] + " " + param[ENodeName] + ", "
             elif child.kind == CursorKind.TEMPLATE_PARAMETER :
-                param[EType] = "template_template_parameter"
+                '''noop'''
 
-            AppendToStackTop(param, EParameters)
+            AppendToStackTop(param, ENodeParameters)
 
             continue
 
-        if EMetaTemplateDecl in node :
-            if node[EMetaTemplateDecl].endswith(", ") :
-                node[EMetaTemplateDecl] = node[EMetaTemplateDecl][:-2]
+        if ENodeMetaTemplateDecl in node :
+            if node[ENodeMetaTemplateDecl].endswith(", ") :
+                node[ENodeMetaTemplateDecl] = node[ENodeMetaTemplateDecl][:-2]
 
         ParseCursor(child)
 
@@ -178,42 +194,37 @@ def ParseStruct(cursor) :
 def ParseEnum(cursor) :
     global NodeList, NodeTree, NodeStack
 
-    node = PushNode(cursor)
+    node = PushNode(cursor, EKindEnum)
 
-    node[EType] = EEnum
-    node[EUnderlyingType] = str(cursor.enum_type.spelling)
-    node[EValueMap] = dict()
+    node[ENodeUnderlyingType] = str(cursor.enum_type.spelling)
+    node[ENodeEnumValues] = dict()
 
     for child in cursor.get_children() :
         if child.kind == CursorKind.ENUM_CONSTANT_DECL :
-            node[EValueMap][child.spelling] = str(child.enum_value)
+            node[ENodeEnumValues][child.spelling] = str(child.enum_value)
 
     PopNode()
 
-    AppendToStackTop(node, EEnums)
-    NodeList[node[EFullName]] = node
+    AppendToStackTop(node, ENodeEnums, True)
 
 def ParseNamespace(cursor) :
     global NodeList, NodeTree, NodeStack
 
-    node = PushNode(cursor)
+    node = PushNode(cursor, EKindNamespace)
     for child in cursor.get_children() :
         ParseCursor(child)
     PopNode()
-    node[EType] = ENamespace
 
-    AppendToStackTop(node, ENamespaces)
+    AppendToStackTop(node, ENodeNamespaces, True)
 
 def ParseTypeAlias(cursor) :
     global NodeList, NodeTree, NodeStack
 
-    node = PushNode(cursor)
-    node[EUnderlyingType] = str(cursor.underlying_typedef_type.spelling)
+    node = PushNode(cursor, EKindAlias)
+    node[ENodeUnderlyingType] = str(cursor.underlying_typedef_type.spelling)
     PopNode()
 
-    AppendToStackTop(node, EVariables)
-    NodeList[node[EFullName]] = node
-
+    AppendToStackTop(node, ENodeVariables, True)
 
 def ParseCursor(cursor) :
     if cursor.kind.is_translation_unit() :
@@ -234,8 +245,8 @@ def ParseCursor(cursor) :
     if cursor.kind == CursorKind.STRUCT_DECL or cursor.kind == CursorKind.CLASS_DECL or cursor.kind == CursorKind.CLASS_TEMPLATE :
         if cursor.is_definition() :
             node = ParseStruct(cursor)   
-            AppendToStackTop(node, EStructs)
-            NodeList[node[EFullName]] = node
+            AppendToStackTop(node, ENodeStructs)
+            NodeList[node[ENodeFullName]] = node
         return
 
     if cursor.kind == CursorKind.ENUM_DECL :
@@ -266,14 +277,8 @@ def ParseCursor(cursor) :
 def ParseHeader(filePath : str) :
     global NodeList, NodeTree, NodeStack
 
-    NodeList = dict()
-    NodeTree = {
-        EName : "",
-        EFullName: "",
-        EType: "",
-        EAccess: "",
-        EScope: "",
-    }
+    NodeList = {}
+    NodeTree = {}
     NodeStack = [NodeTree]
 
     with open(filePath) as file:
@@ -288,17 +293,23 @@ def ParseHeader(filePath : str) :
 
 def CodeGenOutputNode(code, node) :
     
-    if node[EType] == EClass or node[EType] == EClassTemplate or node[EType] == EStruct or node[EType] == ENamespace :
+    if node[ENodeKind] == EKindClass or node[ENodeKind] == EKindClassTemplate or node[ENodeKind] == EKindStruct :
         code += "template<"
-        if EMetaTemplateDecl in node :
-            code += node[EMetaTemplateDecl]
+        if ENodeMetaTemplateDecl in node :
+            code += node[ENodeMetaTemplateDecl]
         code += ">\nstruct meta<" 
-        code += node[EFullName]
+        code += node[ENodeFullName]
         code += ">{\n "
-        if EVariables in node and len(node[EVariables]) > 0 :
-            code += "\tvoid for_each_var(auto&& fn) const {\n"
-            for k, v in node[EVariables].items() :
-                code += "\t\tfn(&" + v[EFullName] + ");\n"
+        if ENodeVariables in node and len(node[ENodeVariables]) > 0 :
+            code += "\ttemplate<typename FN> void for_each_var(FN&& fn) const {\n"
+            code += "\t\tstruct access_helper : " + node[ENodeFullName] + " {\n"
+            for k, v in node[ENodeVariables].items() :
+                if v[ENodeAccess] == str(AccessSpecifier.PUBLIC) or v[ENodeAccess] == str(AccessSpecifier.PROTECTED) :
+                    code += "\t\t\tdecltype(" + v[ENodeName] + ") " + node[ENodeFullName] + "::* access_helper_" + v[ENodeName] + " = &" + node[ENodeFullName] + "::" + v[ENodeName] + ";\n" 
+            code += "\t\t};\n"
+            for k, v in node[ENodeVariables].items() :
+                if v[ENodeAccess] == str(AccessSpecifier.PUBLIC) or v[ENodeAccess] == str(AccessSpecifier.PROTECTED) :
+                    code += "\t\tfn(&access_helper::access_helper_" + v[ENodeName] + ");\n"
             code += "\t}\n"
         code += "};\n\n"
 
@@ -323,11 +334,11 @@ def CodeGen(filePath : str) :
         output.write(code)
 
 ParseHeader("tests\\enum.h")
-#ParseHeader("tests\\template.h")
-#ParseHeader("tests\\class.h")
-#ParseHeader("tests\\function.h")
-#ParseHeader("tests\\struct.h")
-#ParseHeader("tests\\namespace.h")
+ParseHeader("tests\\template.h")
+ParseHeader("tests\\class.h")
+ParseHeader("tests\\function.h")
+ParseHeader("tests\\struct.h")
+ParseHeader("tests\\namespace.h")
 
 
 exit(0)

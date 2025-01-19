@@ -19,8 +19,6 @@ public:
 class CChild : CObject
 {
 public:
-
-    //simd
     float Matrix[4][4];
 };
 
