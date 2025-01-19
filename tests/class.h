@@ -15,6 +15,21 @@ public:
     void Func() {
         PrivateInt = 3;
     }
+
+    float Add(float A, double B)
+    {
+        return A + float(B);
+    }
+
+    float Sub(float A, double B)
+    {
+        return A + float(B);
+    }
+
+    short Get() const
+    {
+        return PublicShort;
+    }
 };
 
 class CChild : CObject

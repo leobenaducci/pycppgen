@@ -22,6 +22,7 @@ ENodeNamespaces = "namespaces"
 ENodeParameters = "parameters"
 ENodeEnumValues = "enum_values"
 ENodeMetaTemplateDecl = "meta_template_decl"
+ENodeReturnType = "return_type"
 
 EKindNamespace = "kind_namespace"
 EKindAlias = "kind_alias"
@@ -104,8 +105,11 @@ def PopNode() :
 def ParseFunction(cursor, isGlobal : bool = False) :
     global NodeList, NodeTree, NodeStack
 
-    node = PushNode(cursor)
+    node = PushNode(cursor, EKindFunction)
     
+    node[ENodeReturnType] = cursor.result_type.spelling
+    node[ENodeParameters] = dict()
+
     for child in cursor.get_children() :
         if child.kind == CursorKind.PARM_DECL:
             param = PushNode(child, EKindParameter)
@@ -312,8 +316,8 @@ def CodeGenOutputNode(code, node) :
     if node[ENodeKind] == EKindClass or node[ENodeKind] == EKindClassTemplate or node[ENodeKind] == EKindStruct :
         code = CodeGenOutputMetaHeader(code, node)
 
+        code += "\tstatic void for_each_var(std::function<void(const member_variable_info&)> fn) {\n"
         if ENodeVariables in node and len(node[ENodeVariables]) > 0 :
-            code += "\tstatic void for_each_var(std::function<void(const member_variable_info&)> fn) {\n"
             code += "\t\tstruct access_helper : " + node[ENodeFullName] + " {\n"
             for k, v in node[ENodeVariables].items() :
                 if v[ENodeAccess] == str(AccessSpecifier.PUBLIC) or v[ENodeAccess] == str(AccessSpecifier.PROTECTED) :
@@ -327,7 +331,52 @@ def CodeGenOutputNode(code, node) :
                     code += "\t\t" + v[ENodeName] + "_info.Offset = access_helper()." + v[ENodeName] + "_Offset;\n"
                     code += "\t\t" + v[ENodeName] + "_info.Size = sizeof(" + v[ENodeType] + ");\n"
                     code += "\t\tfn(" + v[ENodeName] + "_info);\n"
-            code += "\t}\n"
+        code += "\t}\n"
+
+        if ENodeFunctions in node :
+            declarations = dict()
+            for k, v in node[ENodeFunctions].items() :
+                if len(node[ENodeType]) == 0:
+                    continue
+
+                decl = v[ENodeType]
+                numParams = len(v[ENodeParameters])
+                isConst = decl.endswith("const")
+
+                if not decl in declarations :
+                    declarations[decl] = "\tstatic void call_function(std::string_view name, " 
+                    if isConst :
+                        declarations[decl] += "const " 
+                    declarations[decl] += node[ENodeType] + "* object, "
+
+                    if v[ENodeReturnType] != "void" :
+                        declarations[decl] += v[ENodeReturnType] + "& result, "
+
+                    paramNum = 1
+                    for pk, pv in v[ENodeParameters].items() :
+                        declarations[decl] += pv[ENodeType] + " _" + str(paramNum) + ", "
+                        paramNum += 1
+                    declarations[decl] = declarations[decl][:-2] + ") {\n"
+                
+                declarations[decl] += "\t\tif (name == \"" + v[ENodeName] + "\") {\n"
+                declarations[decl] += "\t\t\t"
+                if v[ENodeReturnType] != "void" :
+                    declarations[decl] += "result = "
+                declarations[decl] += "object->" + v[ENodeName] + "("
+
+                if numParams > 0 :
+                    paramNum = 1
+                    for pk, pv in v[ENodeParameters].items() :
+                        declarations[decl] += " _" + str(paramNum) + ", "
+                        paramNum += 1
+                    declarations[decl] = declarations[decl][:-2] + ");\n"
+                else :
+                    declarations[decl] += ");\n"
+                declarations[decl] += "\t\t\treturn;\n\t\t}\n"
+
+            for k, v in declarations.items() :
+                code += declarations[k] + "\t\t__debugbreak();\n\t}\n"
+
         code = CodeGenOutputMetaFooter(code, node)
 
     elif node[ENodeKind] == EKindEnum :

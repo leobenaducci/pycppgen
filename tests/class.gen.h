@@ -42,6 +42,31 @@ struct meta<CObject>{
 		PublicCharArray_info.Size = sizeof(char[16]);
 		fn(PublicCharArray_info);
 	}
+	static void call_function(std::string_view name, CObject* object) {
+		if (name == "Func") {
+			object->Func();
+			return;
+		}
+		__debugbreak();
+	}
+	static void call_function(std::string_view name, CObject* object, float& result, float _1, double _2) {
+		if (name == "Add") {
+			result = object->Add( _1,  _2);
+			return;
+		}
+		if (name == "Sub") {
+			result = object->Sub( _1,  _2);
+			return;
+		}
+		__debugbreak();
+	}
+	static void call_function(std::string_view name, const CObject* object, short& result) {
+		if (name == "Get") {
+			result = object->Get();
+			return;
+		}
+		__debugbreak();
+	}
 };
 
 template<>
