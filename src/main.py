@@ -319,18 +319,25 @@ def CodeGenOutputNode(code, node) :
         code += "\tstatic void for_each_var(std::function<void(const member_variable_info&)> fn) {\n"
         if ENodeVariables in node and len(node[ENodeVariables]) > 0 :
             code += "\t\tstruct access_helper : " + node[ENodeFullName] + " {\n"
-            for k, v in node[ENodeVariables].items() :
-                if v[ENodeAccess] == str(AccessSpecifier.PUBLIC) or v[ENodeAccess] == str(AccessSpecifier.PROTECTED) :
-                    code += "\t\t\tconst size_t " + v[ENodeName] + "_Offset = offsetof(access_helper, " + node[ENodeFullName] + "::" + v[ENodeName] + ");\n"
+            for _, var in node[ENodeVariables].items() :
+                if var[ENodeAccess] == str(AccessSpecifier.PUBLIC) or var[ENodeAccess] == str(AccessSpecifier.PROTECTED) :
+                    code += "\t\t\tconst size_t " + var[ENodeName] + "_Offset = offsetof(access_helper, " + node[ENodeFullName] + "::" + var[ENodeName] + ");\n"
             code += "\t\t};\n"
-            for k, v in node[ENodeVariables].items() :
-                if v[ENodeAccess] == str(AccessSpecifier.PUBLIC) or v[ENodeAccess] == str(AccessSpecifier.PROTECTED) :
-                    code += "\t\tmember_variable_info " + v[ENodeName] + "_info;\n"
-                    code += "\t\t" + v[ENodeName] + "_info.Name = \"" + v[ENodeName] + "\";\n"
-                    code += "\t\t" + v[ENodeName] + "_info.Type = typeid(" + v[ENodeType] + ").name();\n"
-                    code += "\t\t" + v[ENodeName] + "_info.Offset = access_helper()." + v[ENodeName] + "_Offset;\n"
-                    code += "\t\t" + v[ENodeName] + "_info.Size = sizeof(" + v[ENodeType] + ");\n"
-                    code += "\t\tfn(" + v[ENodeName] + "_info);\n"
+            for _, var in node[ENodeVariables].items() :
+                if var[ENodeAccess] == str(AccessSpecifier.PUBLIC) or var[ENodeAccess] == str(AccessSpecifier.PROTECTED) :
+                    varName = var[ENodeName]
+                    varType = var[ENodeType]
+                    infoName = f"{varName}_info"
+                    code += f"\t\tmember_variable_info {infoName};\n"
+                    code += f"\t\t{infoName}.Name = \"{varName}\";\n"
+                    code += f"\t\t{infoName}.Type = typeid({varType}).name();\n"
+                    code += f"\t\t{infoName}.Offset = access_helper().{varName}_Offset;\n"
+                    code += f"\t\t{infoName}.ElementSize = sizeof(std::remove_all_extents_t<{varType}>);\n"
+                    code += f"\t\t{infoName}.TotalSize = sizeof({varType});\n"
+                    code += f"\t\t{infoName}.ArrayRank = std::rank_v<{varType}>;\n"
+                    for i in range(0, varType.count("[")) :
+                        code += f"\t\t{infoName}.ArrayExtents.push_back(std::extent_v<{varType}, {i}>);\n"
+                    code += f"\t\tfn(" + infoName + ");\n"
         code += "\t}\n"
 
         if ENodeFunctions in node :
@@ -422,8 +429,9 @@ def CodeGen(filePath : str) :
     code += "\tstd::string_view Name;\n"
     code += "\tstd::string_view Type;\n"
     code += "\tsize_t Offset = 0;\n"
-    code += "\tsize_t Size = 0;\n"
-    code += "\tsize_t ArrayLength = 0;\n"
+    code += "\tsize_t ElementSize = 0;\n"
+    code += "\tsize_t ArrayRank = 0;\n"
+    code += "\tstd::vector<size_t> ArrayExtents;\n"
     code += "};\n\n"
     code += "template<typename T> struct meta {};\n\n"
     code += "#endif //_PYCPPGEN_DECLARATIONS\n\n"

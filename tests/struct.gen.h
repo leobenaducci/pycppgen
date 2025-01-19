@@ -7,8 +7,9 @@ struct member_variable_info {
 	std::string_view Name;
 	std::string_view Type;
 	size_t Offset = 0;
-	size_t Size = 0;
-	size_t ArrayLength = 0;
+	size_t ElementSize = 0;
+	size_t ArrayRank = 0;
+	std::vector<size_t> ArrayExtents;
 };
 
 template<typename T> struct meta {};
@@ -27,19 +28,22 @@ struct meta<SVector>{
 		x_info.Name = "x";
 		x_info.Type = typeid(float).name();
 		x_info.Offset = access_helper().x_Offset;
-		x_info.Size = sizeof(float);
+		x_info.ElementSize = sizeof(std::remove_all_extents_t<float>);
+		x_info.ArrayRank = std::rank_v<float>;
 		fn(x_info);
 		member_variable_info y_info;
 		y_info.Name = "y";
 		y_info.Type = typeid(float).name();
 		y_info.Offset = access_helper().y_Offset;
-		y_info.Size = sizeof(float);
+		y_info.ElementSize = sizeof(std::remove_all_extents_t<float>);
+		y_info.ArrayRank = std::rank_v<float>;
 		fn(y_info);
 		member_variable_info z_info;
 		z_info.Name = "z";
 		z_info.Type = typeid(float).name();
 		z_info.Offset = access_helper().z_Offset;
-		z_info.Size = sizeof(float);
+		z_info.ElementSize = sizeof(std::remove_all_extents_t<float>);
+		z_info.ArrayRank = std::rank_v<float>;
 		fn(z_info);
 	}
 };

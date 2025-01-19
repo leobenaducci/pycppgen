@@ -20,14 +20,14 @@ int main()
 	meta<CObject>::for_each_var(
           [&](const member_variable_info& v)
           {
-              printf("%s CObject::%s -> Offset: %llu Size: %llu\n", v.Type.data(), v.Name.data(), v.Offset, v.Size);
+              printf("%s CObject::%s -> Offset: %llu Size: %llu\n", v.Type.data(), v.Name.data(), v.Offset, v.ElementSize);
           }
       );
     
     meta<FVector>::for_each_var(
           [&](const member_variable_info& v)
           {
-              printf("%s FVector::%s -> Offset: %llu Size: %llu\n", v.Type.data(), v.Name.data(), v.Offset, v.Size);
+              printf("%s FVector::%s -> Offset: %llu Size: %llu\n", v.Type.data(), v.Name.data(), v.Offset, v.ElementSize);
           }
       );
 
