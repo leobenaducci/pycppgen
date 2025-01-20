@@ -15,16 +15,23 @@ This project was created as:
 ## Examples
 
 Call function by name Iterate over members and enum values
+
 ![image](https://github.com/user-attachments/assets/d371a087-d21b-46ee-8402-6f585a83f96f)
 
+
 Enum attributes
+
 ![image](https://github.com/user-attachments/assets/465ed9d8-33de-4e57-8c84-0ff174ca24d3)
 
+
 Class generated code
+
 ![image](https://github.com/user-attachments/assets/5dc67e0c-e3d4-44a6-87e6-8604aa061f4b)
 
 Optimized build
+
 ![image](https://github.com/user-attachments/assets/8624073f-2448-4aea-9cde-f8179bc301ac)
+
 
 ## Planned Features
 The project is a work in progress, and additional features are planned for future updates:
