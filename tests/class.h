@@ -12,7 +12,7 @@ protected:
     unsigned int ProtectedUint; //$[[pycppgen min=3;max=15]]
 
 public:
-    short PublicShort; //$[[pycppgen readonly]]
+    short PublicShort = 123; //$[[pycppgen readonly]]
 
     char PublicCharArray[16];
 
