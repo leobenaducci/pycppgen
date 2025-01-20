@@ -2,7 +2,7 @@
 namespace Template
 {
     template<typename T>
-    struct TVector
+    struct TVector //$[[pycppgen]]
     {
         T x,y,z;
 
@@ -11,4 +11,4 @@ namespace Template
     };
 }
 
-using FVector = Template::TVector<float>;
+using FVector = Template::TVector<float>; //$[[pycppgen]]

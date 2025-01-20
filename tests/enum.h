@@ -1,10 +1,9 @@
 #pragma once
 
-//$[[pycppgen]]
-enum class EEnum : unsigned
+enum class EEnum : unsigned //$[[pycppgen bitmask]]
 {
     None = 0,
-    Something,
-    Value,
+    Something, //$[[pycppgen disabled;visible=True]]
+    Value,  //$[[pycppgen hidden;selectable]]
     Test = 10,
 };

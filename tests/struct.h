@@ -1,6 +1,5 @@
 
-//$[[pycppgen visible]]
-struct SVector
+struct SVector //$[[pycppgen visible]]
 {
     float x,y,z;
 };

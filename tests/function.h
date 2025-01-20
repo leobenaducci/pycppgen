@@ -3,5 +3,4 @@
 void FuncA();
 void FuncB(int B);
 
-//$[[pycppgen]]
-int FuncC();
+int FuncC(); //$[[pycppgen]]

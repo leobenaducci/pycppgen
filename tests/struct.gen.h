@@ -20,7 +20,9 @@ template<typename T> struct meta {};
 
 template<>
 struct meta<SVector>{
-	std::string_view Attributes = "visible;include=True";
+	std::map<std::string, std::string> Attributes = {
+		{ "visible", "" }
+	};
 
 	static void for_each_var(std::function<void(const member_variable_info&)> fn) {
 		struct access_helper : SVector {
@@ -35,6 +37,10 @@ struct meta<SVector>{
 		x_info.ElementSize = sizeof(std::remove_all_extents_t<float>);
 		x_info.TotalSize = sizeof(float);
 		x_info.ArrayRank = std::rank_v<float>;
+		x_info.Attributes = {
+			{ "visible", "" }
+		};
+
 		fn(x_info);
 		member_variable_info y_info;
 		y_info.Name = "y";
@@ -43,6 +49,10 @@ struct meta<SVector>{
 		y_info.ElementSize = sizeof(std::remove_all_extents_t<float>);
 		y_info.TotalSize = sizeof(float);
 		y_info.ArrayRank = std::rank_v<float>;
+		y_info.Attributes = {
+			{ "visible", "" }
+		};
+
 		fn(y_info);
 		member_variable_info z_info;
 		z_info.Name = "z";
@@ -51,6 +61,10 @@ struct meta<SVector>{
 		z_info.ElementSize = sizeof(std::remove_all_extents_t<float>);
 		z_info.TotalSize = sizeof(float);
 		z_info.ArrayRank = std::rank_v<float>;
+		z_info.Attributes = {
+			{ "visible", "" }
+		};
+
 		fn(z_info);
 	}
 };

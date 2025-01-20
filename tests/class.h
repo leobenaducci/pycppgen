@@ -2,19 +2,22 @@
 
 //$[[pycppgen-include CObject CChild]]
 
-class CObject
+class CObject //$[[pycppgen pure]]
 {
 private:
     int PrivateInt = 2;
     
 protected:
-    unsigned int ProtectedUint;
+
+    unsigned int ProtectedUint; //$[[pycppgen min=3;max=15]]
 
 public:
-    short PublicShort;
+    short PublicShort; //$[[pycppgen readonly]]
+
     char PublicCharArray[16];
 
-    void Func() {
+    void Func() //$[[pycppgen callable]]
+    {
         PrivateInt = 3;
     }
 
@@ -28,6 +31,7 @@ public:
         return A + float(B);
     }
 
+    //$[[pycppgen pure]
     short Get() const
     {
         return PublicShort;

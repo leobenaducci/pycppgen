@@ -20,7 +20,9 @@ template<typename T> struct meta {};
 
 template<>
 struct meta<CObject>{
-	std::string_view Attributes = "";
+	std::map<std::string, std::string> Attributes = {
+		{ "pure", "" }
+	};
 
 	static void for_each_var(std::function<void(const member_variable_info&)> fn) {
 		struct access_helper : CObject {
@@ -35,6 +37,10 @@ struct meta<CObject>{
 		ProtectedUint_info.ElementSize = sizeof(std::remove_all_extents_t<unsigned int>);
 		ProtectedUint_info.TotalSize = sizeof(unsigned int);
 		ProtectedUint_info.ArrayRank = std::rank_v<unsigned int>;
+		ProtectedUint_info.Attributes = {
+			{ "pure", "" }
+		};
+
 		fn(ProtectedUint_info);
 		member_variable_info PublicShort_info;
 		PublicShort_info.Name = "PublicShort";
@@ -43,6 +49,10 @@ struct meta<CObject>{
 		PublicShort_info.ElementSize = sizeof(std::remove_all_extents_t<short>);
 		PublicShort_info.TotalSize = sizeof(short);
 		PublicShort_info.ArrayRank = std::rank_v<short>;
+		PublicShort_info.Attributes = {
+			{ "pure", "" }
+		};
+
 		fn(PublicShort_info);
 		member_variable_info PublicCharArray_info;
 		PublicCharArray_info.Name = "PublicCharArray";
@@ -52,6 +62,10 @@ struct meta<CObject>{
 		PublicCharArray_info.TotalSize = sizeof(char[16]);
 		PublicCharArray_info.ArrayRank = std::rank_v<char[16]>;
 		PublicCharArray_info.ArrayExtents.push_back(std::extent_v<char[16], 0>);
+		PublicCharArray_info.Attributes = {
+			{ "pure", "" }
+		};
+
 		fn(PublicCharArray_info);
 	}
 	static void call_function(std::string_view name, CObject* object) {
@@ -83,7 +97,7 @@ struct meta<CObject>{
 
 template<>
 struct meta<CChild>{
-	std::string_view Attributes = "";
+	std::map<std::string, std::string> Attributes = {};
 
 	static void for_each_var(std::function<void(const member_variable_info&)> fn) {
 		struct access_helper : CChild {
@@ -98,6 +112,8 @@ struct meta<CChild>{
 		Matrix_info.ArrayRank = std::rank_v<float[4][4]>;
 		Matrix_info.ArrayExtents.push_back(std::extent_v<float[4][4], 0>);
 		Matrix_info.ArrayExtents.push_back(std::extent_v<float[4][4], 1>);
+		Matrix_info.Attributes = {};
+
 		fn(Matrix_info);
 	}
 };

@@ -3,6 +3,8 @@
 #include <string_view>
 #include <functional>
 #include <typeinfo>
+#include <map>
+#include <string>
 
 #include "enum.gen.h"
 #include "class.gen.h"
@@ -14,6 +16,14 @@ int main()
           [](EEnum v)
           {
               printf("EEnum::%s = %d\n", meta<EEnum>::enum_to_string(v).data(), (uint32_t)v);
+
+              for (auto it : meta<decltype(v)>::enum_attributes(v))
+              {
+                  if(it.second.length() > 0)
+                      printf("\t%s = %s\n", it.first.c_str(), it.second.c_str());
+                  else
+                      printf("\t%s\n", it.first.c_str());
+              }
           }
       );
     
@@ -24,13 +34,6 @@ int main()
           }
       );
     
-    meta<FVector>::for_each_var(
-          [&](const member_variable_info& v)
-          {
-              printf("%s FVector::%s -> Offset: %llu Size: %llu\n", v.Type.data(), v.Name.data(), v.Offset, v.ElementSize);
-          }
-      );
-
 	CObject o;
     float rf;
     meta<CObject>::call_function("Add", &o, rf, 1.f, 2.f);

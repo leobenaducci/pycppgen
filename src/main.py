@@ -55,28 +55,34 @@ NodeList = {}
 NodeTree = {}
 NodeStack = [NodeTree]
 
-def ParseComments(cursor) :
+def ParseComments(cursor, preDeclComments = False) :
    
     try :
         parent = cursor.semantic_parent
 
-        parentTokens = list(parent.get_tokens())
-        cursorTokens = list(cursor.get_tokens())
-        firstToken = cursorTokens[0]
-        lastToken = cursorTokens[-1]
+        tokens = list(parent.get_tokens())
+        firstToken = list(cursor.get_tokens())[0]
 
-        firstTokenIndex = parentTokens.index(next(x for x in parentTokens if x.location.line == firstToken.location.line))
-        while firstTokenIndex > 0 and parentTokens[firstTokenIndex - 1].kind == clang.cindex.TokenKind.COMMENT :
-            firstTokenIndex -= 1
+        firstTokenIndex = tokens.index(next(x for x in tokens if x.location.line == firstToken.location.line))
+        lastTokenIndex = tokens.index(next(x for x in tokens[firstTokenIndex:] if x.location.line != firstToken.location.line))
 
-        lastTokenIndex = parentTokens.index(next(x for x in parentTokens if x.location.line == lastToken.location.line))
+        if preDeclComments :
+            lastTokenIndex = firstTokenIndex
+            while firstTokenIndex > 0 and tokens[firstTokenIndex - 1].kind == clang.cindex.TokenKind.COMMENT :
+                firstTokenIndex -= 1
+        else :
+            while firstTokenIndex < lastTokenIndex and tokens[firstTokenIndex].kind != clang.cindex.TokenKind.COMMENT :
+                firstTokenIndex += 1
+            lastTokenIndex = firstTokenIndex
+            while lastTokenIndex < len(tokens) and tokens[lastTokenIndex].kind == clang.cindex.TokenKind.COMMENT :
+                lastTokenIndex += 1
 
     except :
         return {}
     
     attribs = ""
     if firstTokenIndex != -1 and lastTokenIndex != -1 :
-        for t in parentTokens[firstTokenIndex:lastTokenIndex] :
+        for t in tokens[firstTokenIndex:lastTokenIndex] :
             if t.kind == clang.cindex.TokenKind.COMMENT :
                 attribs += t.spelling + "\n"
 
@@ -255,7 +261,7 @@ def ParseStruct(cursor) :
             if node[ENodeMetaTemplateDecl].endswith(", ") :
                 node[ENodeMetaTemplateDecl] = node[ENodeMetaTemplateDecl][:-2]
 
-        ParseCursor(child, True)
+        ParseCursor(child)
 
     PopNode()
 
@@ -271,7 +277,9 @@ def ParseEnum(cursor) :
 
     for child in cursor.get_children() :
         if child.kind == CursorKind.ENUM_CONSTANT_DECL :
-            node[ENodeEnumValues][child.spelling] = str(child.enum_value)
+            node[ENodeEnumValues][child.spelling] = dict()
+            node[ENodeEnumValues][child.spelling]["value"] = str(child.enum_value)
+            node[ENodeEnumValues][child.spelling][ENodeAttributes] = ParseComments(child)
 
     PopNode()
 
@@ -396,21 +404,38 @@ def CodeGenOutputMetaFooter(code, node) :
     code += "};\n\n"
     return code
 
+def CodeGenOutputAttributes(node, depth = 0) :
+    if ENodeAttributes in node and len(node[ENodeAttributes]) > 0 :
+        depth += 1
+        result = "{\n"
+
+        for k, v in node[ENodeAttributes].items() :
+            if k == "include" : continue
+            result += "\t" * depth
+            result += "{ \"" + k + "\", "
+            if len(str(v)) > 0 :
+                result += "\"" + v + "\" "
+            else :
+                result += "\"\" "
+            result += "},\n"
+        if result.endswith(",\n") : 
+            result = result[:-2]
+        result += "\n" 
+        depth -= 1
+        result += "\t" * depth + "}"
+    else :
+        result = "{}"
+
+    return result
+
 def CodeGenOutputNode(code, node) :
     
     if node[ENodeKind] == EKindClass or node[ENodeKind] == EKindClassTemplate or node[ENodeKind] == EKindStruct :
         code = CodeGenOutputMetaHeader(code, node)
 
-        code += "\tstd::string_view Attributes = \""
-        if ENodeAttributes in node :
-            for k, v in node[ENodeAttributes].items() :
-                if len(str(v)) > 0 :
-                    code += f"{k}={v};"
-                else :
-                    code += f"{k};"
-            if code.endswith(";") : 
-                code = code[:-1]
-        code += "\";\n\n"
+        code += "\tstd::map<std::string, std::string> Attributes = "
+        code += CodeGenOutputAttributes(node, 1) 
+        code += ";\n\n"
 
         code += "\tstatic void for_each_var(std::function<void(const member_variable_info&)> fn) {\n"
         if ENodeVariables in node and len(node[ENodeVariables]) > 0 :
@@ -433,9 +458,15 @@ def CodeGenOutputNode(code, node) :
                     code += f"\t\t{infoName}.ArrayRank = std::rank_v<{varType}>;\n"
                     for i in range(0, varType.count("[")) :
                         code += f"\t\t{infoName}.ArrayExtents.push_back(std::extent_v<{varType}, {i}>);\n"
-                    if ENodeAttributes in var :
-                        for k, v in var[ENodeAttributes].items() :
-                            code += f"\t\t{infoName}.Attributes[\"{k}\"] = \"{v}\";\n"
+
+                    code += f"\t\t{infoName}.Attributes = "
+                    code += CodeGenOutputAttributes(node, 2)
+                    code += ";\n\n"
+
+                    #if ENodeAttributes in var :
+                    #    for k, v in var[ENodeAttributes].items() :
+                    #        code += f"\t\t{infoName}.Attributes[\"{k}\"] = \"{v}\";\n"
+                    
                     code += f"\t\tfn(" + infoName + ");\n"
         code += "\t}\n"
 
@@ -488,6 +519,10 @@ def CodeGenOutputNode(code, node) :
     elif node[ENodeKind] == EKindEnum :
         code = CodeGenOutputMetaHeader(code, node)
 
+        code += "\tstd::map<std::string, std::string> Attributes = "
+        code += CodeGenOutputAttributes(node, 1) 
+        code += ";\n\n"
+
         if ENodeEnumValues in node :
             code += "\ttemplate<typename FN> static void for_each_enum(FN&& fn) {\n"
             for k, v in node[ENodeEnumValues].items() :
@@ -504,6 +539,12 @@ def CodeGenOutputNode(code, node) :
             for k, v in node[ENodeEnumValues].items() :
                 code += "\t\tif (value == \"" + k + "\") return " + node[ENodeFullName] + "::" + k + ";\n"
             code += "\t\treturn static_cast<" + node[ENodeFullName] + ">(-1);\n"
+            code += "\t}\n"
+
+            code += "\tstatic std::map<std::string, std::string> enum_attributes(" + node[ENodeFullName] + " value) {\n"
+            for k, v in node[ENodeEnumValues].items() :
+                code += "\t\tif (value == " + node[ENodeFullName] + "::" + k + " ) {\n\t\t\treturn " + CodeGenOutputAttributes(v, 3) + ";\n\t\t}\n"
+            code += "\t\treturn {};\n"
             code += "\t}\n"
 
         code = CodeGenOutputMetaFooter(code, node)

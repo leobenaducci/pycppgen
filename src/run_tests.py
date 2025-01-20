@@ -9,8 +9,8 @@ path = os.getcwd()
 if not path.endswith("tests") :
     exit(-1)
 
-ParseFile(path + "\\enum.h")
 ParseFile(path + "\\class.h")
+ParseFile(path + "\\enum.h")
 ParseFile(path + "\\function.h")
 ParseFile(path + "\\namespace.h")
 ParseFile(path + "\\struct.h")

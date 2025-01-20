@@ -19,6 +19,10 @@ template<typename T> struct meta {};
 #endif //_PYCPPGEN_DECLARATIONS
 
 template<> struct meta<EEnum>{
+	std::map<std::string, std::string> Attributes = {
+		{ "bitmask", "" }
+	};
+
 	template<typename FN> static void for_each_enum(FN&& fn) {
 		fn( EEnum::None );
 		fn( EEnum::Something );
@@ -38,6 +42,27 @@ template<> struct meta<EEnum>{
 		if (value == "Value") return EEnum::Value;
 		if (value == "Test") return EEnum::Test;
 		return static_cast<EEnum>(-1);
+	}
+	static std::map<std::string, std::string> enum_attributes(EEnum value) {
+		if (value == EEnum::None ) {
+			return {};
+		}
+		if (value == EEnum::Something ) {
+			return {
+				{ "disabled", "" },
+				{ "visible", "true" }
+			};
+		}
+		if (value == EEnum::Value ) {
+			return {
+				{ "hidden", "" },
+				{ "selectable", "" }
+			};
+		}
+		if (value == EEnum::Test ) {
+			return {};
+		}
+		return {};
 	}
 };
 
