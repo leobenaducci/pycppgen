@@ -3,5 +3,5 @@
 void FuncA();
 void FuncB(int B);
 
-//$reflect const
+//$[[pycppgen]]
 int FuncC();

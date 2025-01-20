@@ -2,19 +2,19 @@
 
 #include "class.h"
 
+//$[[pycppgen]]
 namespace TestNameSpace
 {
     void FuncA();
     void FuncB(int paramB);
 
-    //$reflect const
+    //$[[pycppgen]]
     int FuncC();
 
+    //$[[pycppgen exclude]]
     class CChild : CObject
     {
     public:
-
-        //simd
         float Matrix[4][4];
     };
 

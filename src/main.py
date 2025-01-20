@@ -24,6 +24,7 @@ ENodeParameters = "parameters"
 ENodeEnumValues = "enum_values"
 ENodeMetaTemplateDecl = "meta_template_decl"
 ENodeReturnType = "return_type"
+ENodeAttributes = "attributes"
 
 EKindNamespace = "kind_namespace"
 EKindAlias = "kind_alias"
@@ -54,6 +55,68 @@ NodeList = {}
 NodeTree = {}
 NodeStack = [NodeTree]
 
+def ParseComments(cursor) :
+   
+    try :
+        parent = cursor.semantic_parent
+
+        parentTokens = list(parent.get_tokens())
+        cursorTokens = list(cursor.get_tokens())
+        firstToken = cursorTokens[0]
+        lastToken = cursorTokens[-1]
+
+        firstTokenIndex = parentTokens.index(next(x for x in parentTokens if x.location.line == firstToken.location.line))
+        while firstTokenIndex > 0 and parentTokens[firstTokenIndex - 1].kind == clang.cindex.TokenKind.COMMENT :
+            firstTokenIndex -= 1
+
+        lastTokenIndex = parentTokens.index(next(x for x in parentTokens if x.location.line == lastToken.location.line))
+
+    except :
+        return {}
+    
+    attribs = ""
+    if firstTokenIndex != -1 and lastTokenIndex != -1 :
+        for t in parentTokens[firstTokenIndex:lastTokenIndex] :
+            if t.kind == clang.cindex.TokenKind.COMMENT :
+                attribs += t.spelling + "\n"
+
+    result = {}
+    oneMatch = False
+
+    for line in attribs.splitlines() :
+        m = re.match(r".*\$\[\[pycppgen(?>(?>\s+((?>\s|\w|\W)*)\]\])|(?>\]\]))", line, flags=re.IGNORECASE|re.MULTILINE)
+        if m == None : continue
+        oneMatch = True
+
+        if m.groups() == None : continue
+
+        comments = ""
+        for g in m.groups() :
+            if g != None and len(g) > 0:
+                comments += g
+
+        if len(comments) == 0 : continue
+
+        comments = comments.replace(" ", "").split(";")
+        for g in comments :
+            if len(g) == 0 : continue
+
+            key = ""
+            value = ""
+
+            kv = g.split("=")
+            if len(kv) == 0 : continue
+            if len(kv) > 0 : key = kv[0].casefold()
+            if len(kv) > 1 : value = kv[1].casefold()
+
+            if key == "exclude" : result["include"] = str(bool(value != None and value == True))
+            else : result[key] = value
+
+    if oneMatch and not "include" in result :
+        result["include"] = True
+
+    return result
+    
 def GetScope(cursor, accum : str = "") :
     if cursor.semantic_parent and not cursor.semantic_parent.kind.is_translation_unit() :
         if accum != "" :
@@ -95,6 +158,7 @@ def PushNode(cursor, kind : str = EInvalid) :
     node[ENodeType] = str(cursor.type.spelling)
     node[ENodeAccess] = str(cursor.access_specifier)
     node[ENodeScope] = GetScope(cursor)
+    node[ENodeAttributes] = ParseComments(cursor)
 
     NodeStack.append(node)
     return NodeStack[-1]
@@ -221,7 +285,7 @@ def ParseNamespace(cursor) :
         ParseCursor(child)
     PopNode()
 
-    AppendToStackTop(node, ENodeNamespaces, True)
+    AppendToStackTop(node, ENodeNamespaces)
 
 def ParseTypeAlias(cursor) :
     global NodeList, NodeTree, NodeStack
@@ -242,11 +306,19 @@ def ParseCursor(cursor, forceInclude = False) :
         ParseNamespace(cursor)
         return
 
-    #print(cursor.raw_comment)
-
     fullName = GetFullName(cursor)
-    if not forceInclude and not fullName in NodesToInclude or fullName in NodeList :
+
+    #already added
+    if fullName in NodeList :
         return
+    
+    if not forceInclude :
+        flags = ParseComments(cursor)
+        if "include" in flags : 
+            if str(flags["include"]) == "False" :
+                return
+        elif not fullName in NodesToInclude :
+            return
 
     if cursor.kind == CursorKind.TYPE_REF or cursor.kind == CursorKind.TEMPLATE_REF or cursor.kind == CursorKind.NAMESPACE_REF:
         return
@@ -295,11 +367,10 @@ def ParseFile(filePath : str, sysArgs = []) :
 
     with open(filePath) as file:
         for line in file.readlines() :
-            m = re.match(r"//\s*\$\[\[pycppgen-include\s((?>\w|\W)*)\]\]", line, flags=re.MULTILINE|re.IGNORECASE)
-            if not m :
-                continue
+            m = re.match(r"\s*\/\/\s*\$\[\[pycppgen-include\s+((?>\w|\W)*)\]\]", line, flags=re.MULTILINE|re.IGNORECASE)
+            if not m : continue
             for g in m.groups() :
-                NodesToInclude += g.replace(" ", "").split(",")
+                NodesToInclude += g.replace(" ", ";").replace(",", ";").split(";")
 
     args = ['-x', 'c++', '-std=c++17'] + sysArgs
     idx = clang.cindex.Index.create()
@@ -330,6 +401,17 @@ def CodeGenOutputNode(code, node) :
     if node[ENodeKind] == EKindClass or node[ENodeKind] == EKindClassTemplate or node[ENodeKind] == EKindStruct :
         code = CodeGenOutputMetaHeader(code, node)
 
+        code += "\tstd::string_view Attributes = \""
+        if ENodeAttributes in node :
+            for k, v in node[ENodeAttributes].items() :
+                if len(str(v)) > 0 :
+                    code += f"{k}={v};"
+                else :
+                    code += f"{k};"
+            if code.endswith(";") : 
+                code = code[:-1]
+        code += "\";\n\n"
+
         code += "\tstatic void for_each_var(std::function<void(const member_variable_info&)> fn) {\n"
         if ENodeVariables in node and len(node[ENodeVariables]) > 0 :
             code += "\t\tstruct access_helper : " + node[ENodeFullName] + " {\n"
@@ -351,6 +433,9 @@ def CodeGenOutputNode(code, node) :
                     code += f"\t\t{infoName}.ArrayRank = std::rank_v<{varType}>;\n"
                     for i in range(0, varType.count("[")) :
                         code += f"\t\t{infoName}.ArrayExtents.push_back(std::extent_v<{varType}, {i}>);\n"
+                    if ENodeAttributes in var :
+                        for k, v in var[ENodeAttributes].items() :
+                            code += f"\t\t{infoName}.Attributes[\"{k}\"] = \"{v}\";\n"
                     code += f"\t\tfn(" + infoName + ");\n"
         code += "\t}\n"
 
@@ -447,6 +532,7 @@ def CodeGen(filePath : str) :
     code += "\tsize_t TotalSize = 0;\n"
     code += "\tsize_t ArrayRank = 0;\n"
     code += "\tstd::vector<size_t> ArrayExtents;\n"
+    code += "\tstd::map<std::string, std::string> Attributes;\n"
     code += "};\n\n"
     code += "template<typename T> struct meta {};\n\n"
     code += "#endif //_PYCPPGEN_DECLARATIONS\n\n"

@@ -1,6 +1,7 @@
 #pragma once
 
-//$reflect
+//$[[pycppgen-include CObject CChild]]
+
 class CObject
 {
 private:

@@ -11,6 +11,7 @@ struct member_variable_info {
 	size_t TotalSize = 0;
 	size_t ArrayRank = 0;
 	std::vector<size_t> ArrayExtents;
+	std::map<std::string, std::string> Attributes;
 };
 
 template<typename T> struct meta {};

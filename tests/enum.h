@@ -1,6 +1,6 @@
 #pragma once
 
-//$[[pygencpp]]
+//$[[pycppgen]]
 enum class EEnum : unsigned
 {
     None = 0,
