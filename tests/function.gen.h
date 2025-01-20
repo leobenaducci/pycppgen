@@ -8,6 +8,7 @@ struct member_variable_info {
 	std::string_view Type;
 	size_t Offset = 0;
 	size_t ElementSize = 0;
+	size_t TotalSize = 0;
 	size_t ArrayRank = 0;
 	std::vector<size_t> ArrayExtents;
 };

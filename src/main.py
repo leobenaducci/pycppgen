@@ -3,6 +3,7 @@ import io
 import pathlib
 import sys
 import clang.cindex
+import re
 from clang.cindex import CursorKind
 from clang.cindex import AccessSpecifier
 
@@ -190,7 +191,7 @@ def ParseStruct(cursor) :
             if node[ENodeMetaTemplateDecl].endswith(", ") :
                 node[ENodeMetaTemplateDecl] = node[ENodeMetaTemplateDecl][:-2]
 
-        ParseCursor(child)
+        ParseCursor(child, True)
 
     PopNode()
 
@@ -231,7 +232,7 @@ def ParseTypeAlias(cursor) :
 
     AppendToStackTop(node, ENodeVariables, True)
 
-def ParseCursor(cursor) :
+def ParseCursor(cursor, forceInclude = False) :
     if cursor.kind.is_translation_unit() :
         for child in cursor.get_children() :
             ParseCursor(child)
@@ -241,13 +242,18 @@ def ParseCursor(cursor) :
         ParseNamespace(cursor)
         return
 
+    #print(cursor.raw_comment)
+
+    fullName = GetFullName(cursor)
+    if not forceInclude and not fullName in NodesToInclude or fullName in NodeList :
+        return
+
     if cursor.kind == CursorKind.TYPE_REF or cursor.kind == CursorKind.TEMPLATE_REF or cursor.kind == CursorKind.NAMESPACE_REF:
         return
 
-    if GetFullName(cursor) in NodeList :
-        return
-
-    if cursor.kind == CursorKind.STRUCT_DECL or cursor.kind == CursorKind.CLASS_DECL or cursor.kind == CursorKind.CLASS_TEMPLATE :
+    isStruct = cursor.kind == CursorKind.STRUCT_DECL or cursor.kind == CursorKind.CLASS_DECL
+    isStruct |= cursor.kind == CursorKind.CLASS_TEMPLATE or cursor.kind == CursorKind.CLASS_TEMPLATE_PARTIAL_SPECIALIZATION
+    if isStruct :
         if cursor.is_definition() :
             node = ParseStruct(cursor)   
             AppendToStackTop(node, ENodeStructs)
@@ -280,21 +286,29 @@ def ParseCursor(cursor) :
         return
 
 def ParseFile(filePath : str, sysArgs = []) :
-    global NodeList, NodeTree, NodeStack
+    global NodesToInclude, NodeList, NodeTree, NodeStack
 
+    NodesToInclude = []
     NodeList = {}
     NodeTree = {}
     NodeStack = [NodeTree]
 
     with open(filePath) as file:
-        args = ['-x', 'c++', '-std=c++17'] + sysArgs
-        idx = clang.cindex.Index.create()
-        tu = idx.parse(os.path.join(os.getcwd(), filePath), args = args, options = clang.cindex.TranslationUnit.PARSE_INCOMPLETE | clang.cindex.TranslationUnit.PARSE_INCLUDE_BRIEF_COMMENTS_IN_CODE_COMPLETION | clang.cindex.TranslationUnit.PARSE_SKIP_FUNCTION_BODIES)
+        for line in file.readlines() :
+            m = re.match(r"//\s*\$\[\[pycppgen-include\s((?>\w|\W)*)\]\]", line, flags=re.MULTILINE|re.IGNORECASE)
+            if not m :
+                continue
+            for g in m.groups() :
+                NodesToInclude += g.replace(" ", "").split(",")
 
-        for cursor in tu.cursor.walk_preorder():
-            ParseCursor(cursor)
+    args = ['-x', 'c++', '-std=c++17'] + sysArgs
+    idx = clang.cindex.Index.create()
+    tu = idx.parse(os.path.join(os.getcwd(), filePath), args = args, options = clang.cindex.TranslationUnit.PARSE_INCOMPLETE | clang.cindex.TranslationUnit.PARSE_SKIP_FUNCTION_BODIES)
 
-        CodeGen(filePath)
+    for cursor in tu.cursor.walk_preorder():
+        ParseCursor(cursor)
+
+    CodeGen(filePath)
 
 def CodeGenOutputMetaHeader(code, node) :
     if ENodeMetaTemplateDecl in node :
@@ -430,6 +444,7 @@ def CodeGen(filePath : str) :
     code += "\tstd::string_view Type;\n"
     code += "\tsize_t Offset = 0;\n"
     code += "\tsize_t ElementSize = 0;\n"
+    code += "\tsize_t TotalSize = 0;\n"
     code += "\tsize_t ArrayRank = 0;\n"
     code += "\tstd::vector<size_t> ArrayExtents;\n"
     code += "};\n\n"
