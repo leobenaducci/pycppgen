@@ -73,6 +73,7 @@ ParseCommentsMode = {
     EKindTemplateTemplateParameter : EParseCommentsBeforeDecl,
 }
 
+#unused
 TypeAliases = dict(
     {
         "int": "int32_t",
@@ -87,6 +88,7 @@ NodeList = {}
 NodeTree = {}
 NodeStack = [NodeTree]
 
+#try to parse the comments before or after the cursor (hacky but, cursor.raw_comments isn't working as expected)
 def ParseComments(cursor, kind : str = EParseCommentsBeforeDecl) :
    
     try :
@@ -167,10 +169,12 @@ def GetScope(cursor, accum : str = "") :
     
     return accum
 
+#scoped cursor name
 def GetFullName(cursor) :
     accum = str(cursor.displayname)
     return GetScope(cursor, accum)
 
+#append the current node to it's parent and optionally (appendToList) to the global list
 def AppendToStackTop(node, node_type : str, appendToList : bool = False) :
     global NodeList, NodeTree, NodeStack
 
@@ -182,13 +186,7 @@ def AppendToStackTop(node, node_type : str, appendToList : bool = False) :
     if appendToList :
         NodeList[node[ENodeFullName]] = node
 
-def CopyNode(full_name) :
-    global NodeList, NodeTree, NodeStack
-
-    if full_name in NodeList :
-        return dict(NodeList[full_name])
-    return None
-
+#common node push code
 def PushNode(cursor, kind : str = EInvalid) :
     global NodeStack
     
@@ -204,18 +202,22 @@ def PushNode(cursor, kind : str = EInvalid) :
     NodeStack.append(node)
     return NodeStack[-1]
 
+#common node pop code
 def PopNode() :
     global NodeStack
     NodeStack = NodeStack[:-1]
 
+#parse a function cursor
 def ParseFunction(cursor, isFreeFunction : bool = False) :
-    global NodeList, NodeTree, NodeStack
 
+    #TODO: support operators and functions with special characters
     if re.fullmatch("[a-zA-Z0-9_-_]+", cursor.spelling) == None:
         return
 
+    #push this function to it's parent
     node = PushNode(cursor, EKindFunction)
     
+    #get the return type and parameters
     node[ENodeReturnType] = cursor.result_type.spelling
     node[ENodeParameters] = dict()
 
@@ -225,10 +227,12 @@ def ParseFunction(cursor, isFreeFunction : bool = False) :
             param[ENodeDefaultValue] = ""
             PopNode()
 
+            #append parameter to parent (function)
             AppendToStackTop(param, ENodeParameters)
 
     PopNode()
 
+    #append function to parent (struct/class/namespace/translation_unit)
     if isFreeFunction : 
         node[ENodeKind] = EKindFreeFunction
         AppendToStackTop(node, ENodeFreeFunctions, True)
@@ -239,8 +243,8 @@ def ParseFunction(cursor, isFreeFunction : bool = False) :
 
     return node
 
+#parse variable or class/struct field
 def ParseVar(cursor, isFreeVariable : bool = False) :
-    global NodeList, NodeTree, NodeStack
 
     node = PushNode(cursor, EKindVariable)
     PopNode()
@@ -249,16 +253,14 @@ def ParseVar(cursor, isFreeVariable : bool = False) :
         node[ENodeKind] = EKindFreeVariable
         AppendToStackTop(node, ENodeFreeVariables, True)
     elif cursor.storage_class == clang.cindex.StorageClass.STATIC :
-        AppendToStackTop(node, ENodeStaticVariables)
+        AppendToStackTop(node, ENodeStaticVariables, True)
     else :
-        AppendToStackTop(node, ENodeVariables)
-
-    NodeList[node[ENodeFullName]] = node
+        AppendToStackTop(node, ENodeVariables, True)
     
     return node
 
+#parse struct/class
 def ParseStruct(cursor) :
-    global NodeList, NodeTree, NodeStack
 
     kind = EInvalid
     if cursor.kind == CursorKind.CLASS_TEMPLATE :
@@ -272,27 +274,34 @@ def ParseStruct(cursor) :
     node[ENodeMetaTemplateDecl] = ""
 
     for child in cursor.get_children() :
+        
+        #inheritance
         if child.kind == CursorKind.CXX_BASE_SPECIFIER :
             AppendToStackTop({ENodeFullName: GetFullName(child)}, ENodeParents)
             continue
 
+        #class functions
         if child.kind == CursorKind.CXX_METHOD:
             fn = ParseFunction(child, False)
             continue
 
+        #static variables?
         if child.kind == CursorKind.VAR_DECL :
             var = ParseVar(child, False)
             continue
 
+        #member variables (field)
         if child.kind == CursorKind.FIELD_DECL :
             var = ParseVar(child, False)
             continue
 
+        #member enum definitions
         if cursor.kind == CursorKind.ENUM_DECL :
             if cursor.is_definition() :
                 ParseEnum(cursor, False)
             continue
 
+        #template parameters
         if child.kind == CursorKind.TEMPLATE_TYPE_PARAMETER or child.kind == CursorKind.TEMPLATE_NON_TYPE_PARAMETER or child.kind == CursorKind.TEMPLATE_TEMPLATE_PARAMETER:
             
             kind = EInvalid
@@ -317,8 +326,10 @@ def ParseStruct(cursor) :
 
             continue
 
+        #generic parse (shouldn't do anything)
         ParseCursor(child)
 
+    #fixup template declaration string
     if ENodeMetaTemplateDecl in node :
         if node[ENodeMetaTemplateDecl].endswith(", ") :
             node[ENodeMetaTemplateDecl] = node[ENodeMetaTemplateDecl][:-2]
@@ -327,14 +338,16 @@ def ParseStruct(cursor) :
 
     return node
 
+#Parse enum definitions
 def ParseEnum(cursor, isGlobal : bool = False) :
-    global NodeList, NodeTree, NodeStack
 
     node = PushNode(cursor, EKindEnum)
 
+    #underlying type
     node[ENodeUnderlyingType] = str(cursor.enum_type.spelling)
-    node[ENodeEnumValues] = dict()
 
+    #values
+    node[ENodeEnumValues] = dict()
     for child in cursor.get_children() :
         if child.kind == CursorKind.ENUM_CONSTANT_DECL :
             node[ENodeEnumValues][child.spelling] = dict()
@@ -345,6 +358,7 @@ def ParseEnum(cursor, isGlobal : bool = False) :
 
     AppendToStackTop(node, ENodeEnums, isGlobal)
 
+#append to list and recurse
 def ParseNamespace(cursor) :
     global NodeList, NodeTree, NodeStack
 
@@ -353,17 +367,17 @@ def ParseNamespace(cursor) :
         ParseCursor(child)
     PopNode()
 
-    AppendToStackTop(node, ENodeNamespaces)
+    AppendToStackTop(node, ENodeNamespaces, True)
 
+#using/typedef
 def ParseTypeAlias(cursor) :
-    global NodeList, NodeTree, NodeStack
-
     node = PushNode(cursor, EKindAlias)
     node[ENodeUnderlyingType] = str(cursor.underlying_typedef_type.spelling)
     PopNode()
 
-    AppendToStackTop(node, ENodeVariables)
+    AppendToStackTop(node, ENodeVariables, True)
 
+#generic parse call
 def ParseCursor(cursor, forceInclude = False) :
     if cursor.kind.is_translation_unit() :
         for child in cursor.get_children() :
@@ -376,10 +390,11 @@ def ParseCursor(cursor, forceInclude = False) :
 
     fullName = GetFullName(cursor)
 
-    #already added
+    #ignore already added
     if fullName in NodeList :
         return
     
+    #check if it should be parsed
     if not forceInclude :
         flags = ParseComments(cursor, EKindUnknown)
         if "include" in flags : 
@@ -388,6 +403,7 @@ def ParseCursor(cursor, forceInclude = False) :
         elif not fullName in NodesToInclude :
             return
 
+    #ignore this kind for now
     if cursor.kind == CursorKind.TYPE_REF or cursor.kind == CursorKind.TEMPLATE_REF or cursor.kind == CursorKind.NAMESPACE_REF:
         return
 
@@ -426,15 +442,14 @@ def ParseCursor(cursor, forceInclude = False) :
         return
 
 def GetOutputFilePath(filePath : str) :
-    fileName = str(pathlib.Path(filePath).relative_to(pathlib.Path(filePath).parent))
     extStart = filePath.rfind(".")
-    ext = filePath[extStart:]
     outputPath = filePath[:extStart]
     outputPath += ".gen.h"
     return outputPath
 
+#parse a header file
 def ParseFile(filePath : str, options : list) :
-    global NodesToInclude, NodeList, NodeTree, NodeStack
+    global NodesToInclude
 
     with open(filePath) as file:
         for line in file.readlines() :
@@ -450,6 +465,7 @@ def ParseFile(filePath : str, options : list) :
     for cursor in tu.cursor.walk_preorder():
         ParseCursor(cursor)
 
+#codegen: common type header 
 def CodeGenOutputMetaHeader(code, node) :
     global pycppdefine
     pycppdefine = "pycppgen_" + node[ENodeFullName].replace("::", "_").replace("<","_").replace(">","_")
@@ -467,6 +483,7 @@ def CodeGenOutputMetaHeader(code, node) :
     code += ">{\n"
     return code
 
+#codegen: common type footer
 def CodeGenOutputMetaFooter(code, node) :
     global pycppdefine
 
@@ -478,6 +495,7 @@ def CodeGenOutputMetaFooter(code, node) :
 
     return code
 
+#codegen: emit attributes as array of pairs
 def CodeGenOutputAttributes(node, depth = 0) :
     if ENodeAttributes in node and len(node[ENodeAttributes]) > 0 :
         depth += 1
@@ -502,6 +520,7 @@ def CodeGenOutputAttributes(node, depth = 0) :
 
     return result
 
+#codegen: emit call_function definitions
 def CodeGenOutputAddFunctionDeclaration(declarations, node, funcNode, isStatic : bool) :
     decl = f"static_{isStatic}__{funcNode[ENodeType]}"
     numParams = len(funcNode[ENodeParameters])
@@ -543,8 +562,8 @@ def CodeGenOutputAddFunctionDeclaration(declarations, node, funcNode, isStatic :
         declarations[decl] += ");\n"
     declarations[decl] += "\t\t\treturn true;\n\t\t}\n"
 
+#codegen: emit a node
 def CodeGenOutputNode(code, node) :
-    
     if node[ENodeKind] == EKindClass or node[ENodeKind] == EKindClassTemplate or node[ENodeKind] == EKindStruct :
         code = CodeGenOutputMetaHeader(code, node)
 
@@ -659,6 +678,7 @@ def CodeGenOutputNode(code, node) :
 
     return code
 
+#codegen: output file
 def CodeGen(filePath : str) :
     global NodeList, NodeTree, NodeStack
 
@@ -719,11 +739,13 @@ def CodeGen(filePath : str) :
 
     global FilesToParse
 
+#codegen: emit for each type call
 def CodeGenGlobalAddForEachTypeCall(code, node) :
     if node[ENodeKind] == EKindClass or node[ENodeKind] == EKindStruct : #or node[ENodeKind] == EKindClassTemplate:
         code += f"\t\tfn(*({node[ENodeFullName]}*)0);\n"
     return code
 
+#codegen: output global file
 def CodeGenGlobal(path : str) :
     global PerFileData
     
@@ -740,6 +762,7 @@ def CodeGenGlobal(path : str) :
         code = CodeGenGlobalAddForEachTypeCall(code, node)
     code += "\t}\n\n"
 
+    #static function call by name
     code += "\tstatic void for_each_type_static_call_by_name(std::string_view funcName) {\n"
     for _, node in NodeList.items() :
         if (node[ENodeKind] == EKindClass or node[ENodeKind] == EKindStruct) and ENodeStaticFunctions in node:
