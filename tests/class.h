@@ -28,7 +28,8 @@ public:
         PrivateInt = 3;
     }
 
-    float Add(float A, double B)
+    //$[[pycppgen callable]]
+    float Add(float A /*$[[pycppgen clamp]]*/, double B /*$[[pycppgen auto_cast;enum]]*/)
     {
         return A + float(B);
     }

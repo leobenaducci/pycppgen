@@ -29,6 +29,7 @@ ENodeEnumValues = "enum_values"
 ENodeMetaTemplateDecl = "meta_template_decl"
 ENodeReturnType = "return_type"
 ENodeAttributes = "attributes"
+ENodeDefaultValue = "default_value"
 
 EKindUnknown = "kind_unknown"
 EKindNamespace = "kind_namespace"
@@ -94,7 +95,7 @@ def ParseComments(cursor, kind : str = EParseCommentsBeforeDecl) :
         tokens = list(parent.get_tokens())
         firstToken = list(cursor.get_tokens())[0]
 
-        firstTokenIndex = tokens.index(next(x for x in tokens if x.location.line == firstToken.location.line))
+        firstTokenIndex = tokens.index(next(x for x in tokens if x.ptr_data == firstToken.ptr_data))
         lastTokenIndex = firstTokenIndex
         while lastTokenIndex < len(tokens) and tokens[lastTokenIndex].location.line == firstToken.location.line :
             lastTokenIndex += 1
@@ -217,6 +218,7 @@ def ParseFunction(cursor, isFreeFunction : bool = False) :
     for child in cursor.get_children() :
         if child.kind == CursorKind.PARM_DECL:
             param = PushNode(child, EKindParameter)
+            param[ENodeDefaultValue] = ""
             PopNode()
 
             AppendToStackTop(param, ENodeParameters)
@@ -505,6 +507,47 @@ def CodeGenOutputAttributes(node, depth = 0) :
 
     return result
 
+def CodeGenOutputAddFunctionDeclaration(declarations, node, funcNode, isStatic : bool) :
+    decl = funcNode[ENodeType]
+    numParams = len(funcNode[ENodeParameters])
+    isConst = decl.endswith("const")
+      
+    if not decl in declarations :
+        declarations[decl] = "\tstatic void call_function(std::string_view name, " 
+        if not isStatic :
+            if isConst :
+                declarations[decl] += "const " 
+            declarations[decl] += node[ENodeType] + "* object, "
+
+        if funcNode[ENodeReturnType] != "void" :
+            declarations[decl] += funcNode[ENodeReturnType] + "& result, "
+
+        paramNum = 1
+        for _, pv in funcNode[ENodeParameters].items() :
+            declarations[decl] += pv[ENodeType] + " _" + str(paramNum) + ", "
+            paramNum += 1
+        declarations[decl] = declarations[decl][:-2] + ") {\n"
+    
+    declarations[decl] += "\t\tif (name == \"" + funcNode[ENodeName] + "\") {\n"
+    declarations[decl] += "\t\t\t"
+    if funcNode[ENodeReturnType] != "void" :
+        declarations[decl] += "result = "
+
+    if isStatic :
+        declarations[decl] += f"{node[ENodeType]}::{funcNode[ENodeName]}("
+    else :
+        declarations[decl] += f"object->{funcNode[ENodeName]}("
+
+    if numParams > 0 :
+        paramNum = 1
+        for _, pv in funcNode[ENodeParameters].items() :
+            declarations[decl] += " _" + str(paramNum) + ", "
+            paramNum += 1
+        declarations[decl] = declarations[decl][:-2] + ");\n"
+    else :
+        declarations[decl] += ");\n"
+    declarations[decl] += "\t\t\treturn;\n\t\t}\n"
+
 def CodeGenOutputNode(code, node) :
     
     if node[ENodeKind] == EKindClass or node[ENodeKind] == EKindClassTemplate or node[ENodeKind] == EKindStruct :
@@ -514,6 +557,7 @@ def CodeGenOutputNode(code, node) :
         code += CodeGenOutputAttributes(node, 1) 
         code += ";\n\n"
 
+        #variables
         code += "\tstatic void for_each_var(std::function<void(const member_variable_info&)> fn) {\n"
         if ENodeVariables in node and len(node[ENodeVariables]) > 0 :
             code += "\t\tstruct access_helper : " + node[ENodeFullName] + " {\n"
@@ -525,7 +569,7 @@ def CodeGenOutputNode(code, node) :
                 if var[ENodeAccess] == str(AccessSpecifier.PUBLIC) or var[ENodeAccess] == str(AccessSpecifier.PROTECTED) :
                     varName = var[ENodeName]
                     varType = var[ENodeType]
-                    infoName = f"{varName}_info"
+                    infoName = f"{varName}_info_" + str(code.count('\n'))
                     code += f"\t\tmember_variable_info {infoName};\n"
                     code += f"\t\t{infoName}.Name = \"{varName}\";\n"
                     code += f"\t\t{infoName}.Type = typeid({varType}).name();\n"
@@ -535,56 +579,43 @@ def CodeGenOutputNode(code, node) :
                     code += f"\t\t{infoName}.ArrayRank = std::rank_v<{varType}>;\n"
                     for i in range(0, varType.count("[")) :
                         code += f"\t\t{infoName}.ArrayExtents.push_back(std::extent_v<{varType}, {i}>);\n"
-
-                    code += f"\t\t{infoName}.Attributes = "
-                    code += CodeGenOutputAttributes(node, 2)
-                    code += ";\n"
+                    code += f"\t\t{infoName}.Attributes = {CodeGenOutputAttributes(node, 2)};\n"
                     code += f"\t\tfn(" + infoName + ");\n\n"
+        code += "\t}\n"
+
+        #functions
+        code += "\tstatic void for_each_function(std::function<void(const member_function_info&)> fn) {\n"
+        if ENodeFunctions in node and len(node[ENodeFunctions]) > 0 :
+            for _, func in node[ENodeFunctions].items() :
+                if var[ENodeAccess] == str(AccessSpecifier.PUBLIC) or var[ENodeAccess] == str(AccessSpecifier.PROTECTED) :
+                    funcName = func[ENodeName]
+                    infoName = f"{funcName}_info_" + str(code.count('\n'))
+                    code += f"\t\tmember_function_info {infoName};\n"
+                    code += f"\t\t{infoName}.Name = \"{funcName}\";\n"
+                    code += f"\t\t{infoName}.Declaration = \"{func[ENodeType]}\";\n"
+                    code += f"\t\t{infoName}.Attributes = {CodeGenOutputAttributes(func, 3)};\n"
+                    code += f"\t\t{infoName}.ReturnType = \"{func[ENodeReturnType]}\";\n"
+                    code += "\t\t//parameters\n"
+                    code += "\t\t{\n"
+                    for _, pv in func[ENodeParameters].items() :
+                        paramInfoName = f"{pv[ENodeName]}_info_" + str(code.count('\n'))
+                        code += f"\t\t\tfunction_parameter_info {paramInfoName};\n"
+                        code += f"\t\t\t{paramInfoName}.Name = \"{pv[ENodeName]}\";\n"
+                        code += f"\t\t\t{paramInfoName}.Type = \"{pv[ENodeType]}\";\n"
+                        code += f"\t\t\t{paramInfoName}.DefaultValue = \"{pv[ENodeDefaultValue]}\";\n"
+                        code += f"\t\t\t{paramInfoName}.Attributes = {CodeGenOutputAttributes(pv, 3)};\n"
+                        code += f"\t\t\t{infoName}.Parameters.push_back({paramInfoName});\n"
+                    code += "\t\t}\n"
         code += "\t}\n"
 
         if ENodeFunctions in node :
             declarations = dict()
-            for k, v in node[ENodeFunctions].items() :
-                if len(node[ENodeType]) == 0:
-                    continue
 
-                decl = v[ENodeType]
-                numParams = len(v[ENodeParameters])
-                isConst = decl.endswith("const")
+            for _, v in node[ENodeFunctions].items() :
+                CodeGenOutputAddFunctionDeclaration(declarations, node, v, False)
 
-                if not decl in declarations :
-                    declarations[decl] = "\tstatic void call_function(std::string_view name, " 
-                    if isConst :
-                        declarations[decl] += "const " 
-                    declarations[decl] += node[ENodeType] + "* object, "
-
-                    if v[ENodeReturnType] != "void" :
-                        declarations[decl] += v[ENodeReturnType] + "& result, "
-
-                    paramNum = 1
-                    for pk, pv in v[ENodeParameters].items() :
-                        declarations[decl] += pv[ENodeType] + " _" + str(paramNum) + ", "
-                        paramNum += 1
-                    declarations[decl] = declarations[decl][:-2] + ") {\n"
-                
-                declarations[decl] += "\t\tif (name == \"" + v[ENodeName] + "\") {\n"
-                declarations[decl] += "\t\t\t"
-                if v[ENodeReturnType] != "void" :
-                    declarations[decl] += "result = "
-                declarations[decl] += "object->" + v[ENodeName] + "("
-
-                if numParams > 0 :
-                    paramNum = 1
-                    for pk, pv in v[ENodeParameters].items() :
-                        declarations[decl] += " _" + str(paramNum) + ", "
-                        paramNum += 1
-                    declarations[decl] = declarations[decl][:-2] + ");\n"
-                else :
-                    declarations[decl] += ");\n"
-                declarations[decl] += "\t\t\treturn;\n\t\t}\n"
-
-            for k, v in declarations.items() :
-                code += declarations[k] + "\t\t__debugbreak();\n\t}\n"
+            for _, v in declarations.items() :
+                code += v + "\t\t__debugbreak();\n\t}\n"
 
         code += "\tstatic void for_each_static_var(std::function<void(std::string_view name)> fn) {\n"
         if ENodeStaticVariables in node and len(node[ENodeStaticVariables]) > 0 :
@@ -592,10 +623,15 @@ def CodeGenOutputNode(code, node) :
                 code += f"\t\tfn(\"{var[ENodeName]}\");\n"
         code += "\t}\n"
 
-        code += "\tstatic void for_each_static_function(std::function<void(std::string_view name)> fn) {\n"
         if ENodeStaticFunctions in node and len(node[ENodeStaticFunctions]) > 0 :
             for _, var in node[ENodeStaticFunctions].items() :
-                code += f"\t\tfn(\"{var[ENodeName]}\");\n"
+                declarations = dict()
+
+                for _, v in node[ENodeStaticFunctions].items() :
+                    CodeGenOutputAddFunctionDeclaration(declarations, node, v, True)
+
+                for _, v in declarations.items() :
+                    code += v + "\t\t__debugbreak();\n\t}\n"
         code += "\t}\n"
 
         code = CodeGenOutputMetaFooter(code, node)
@@ -655,6 +691,22 @@ def CodeGen(filePath : str) :
     code += "\tstd::vector<size_t> ArrayExtents;\n"
     code += "\tstd::map<std::string, std::string> Attributes;\n"
     code += "};\n\n"
+    
+    code += "struct function_parameter_info {\n"
+    code += "\tstd::string_view Name;\n"
+    code += "\tstd::string_view Type;\n"
+    code += "\tstd::string_view DefaultValue;\n"
+    code += "\tstd::map<std::string, std::string> Attributes;\n"
+    code += "};\n\n"
+
+    code += "struct member_function_info {\n"
+    code += "\tstd::string_view Name;\n"
+    code += "\tstd::string_view Declaration;\n"
+    code += "\tstd::string_view ReturnType;\n"
+    code += "\tstd::vector<function_parameter_info> Parameters;\n"
+    code += "\tstd::map<std::string, std::string> Attributes;\n"
+    code += "};\n\n"
+
     code += "template<typename T> struct pycppgen {};\n\n"
     code += "#endif //_PYCPPGEN_DECLARATIONS\n\n"
 

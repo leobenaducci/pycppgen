@@ -16,10 +16,24 @@ struct member_variable_info {
 	std::map<std::string, std::string> Attributes;
 };
 
+struct function_parameter_info {
+	std::string_view Name;
+	std::string_view Type;
+	std::string_view DefaultValue;
+	std::map<std::string, std::string> Attributes;
+};
+
+struct member_function_info {
+	std::string_view Name;
+	std::string_view Declaration;
+	std::string_view ReturnType;
+	std::vector<function_parameter_info> Parameters;
+	std::map<std::string, std::string> Attributes;
+};
+
 template<typename T> struct pycppgen {};
 
 #endif //_PYCPPGEN_DECLARATIONS
 
 namespace pycppgen_globals {
-//FuncC()
 }
