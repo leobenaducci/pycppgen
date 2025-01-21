@@ -35,6 +35,35 @@ template<typename T> struct pycppgen {};
 
 #endif //_PYCPPGEN_DECLARATIONS
 
+//<autogen_pycppgen_CObject_SSubObject>
+
+#ifndef pycppgen_CObject_SSubObject
+#define pycppgen_CObject_SSubObject
+
+template<>
+struct pycppgen<CObject::SSubObject>{
+	static std::map<std::string_view, std::string_view> Attributes = {
+
+	};
+
+	static void for_each_var(std::function<void(const member_variable_info&)> fn) {
+	}
+	static void for_each_static_var(std::function<void(std::string_view name)> fn) {
+	}
+	static void for_each_function(std::function<void(const member_function_info&)> fn) {
+	}
+	static bool call_function(std::string_view name) {
+		if (name == "OnRegister") {
+			CObject::SSubObject::OnRegister();
+			return true;
+		}
+		return false;
+	}
+};
+
+#endif //pycppgen_CObject_SSubObject
+//</autogen_pycppgen_CObject_SSubObject>
+
 namespace pycppgen_globals {
 //TestNameSpace::FuncA()
 //TestNameSpace::FuncB(int)

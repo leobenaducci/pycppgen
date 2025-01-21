@@ -14,6 +14,13 @@ protected:
     unsigned int ProtectedUint;
 
 public:
+
+    //$[[pycppgen]]
+    struct SSubObject
+    {
+        static void OnRegister() {}
+    };
+
     //$[[pycppgen readonly]]
     short PublicShort = 123;
 
@@ -44,6 +51,9 @@ public:
     {
         return PublicShort;
     }
+
+    //$[[pycppgen pure]
+    static void OnRegister();
 };
 
 class CChild : CObject

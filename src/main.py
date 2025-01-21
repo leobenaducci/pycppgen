@@ -4,6 +4,7 @@ import pathlib
 import sys
 import clang.cindex
 import re
+import argparse
 from clang.cindex import CursorKind
 from clang.cindex import AccessSpecifier
 
@@ -313,11 +314,11 @@ def ParseStruct(cursor) :
 
             continue
 
-        if ENodeMetaTemplateDecl in node :
-            if node[ENodeMetaTemplateDecl].endswith(", ") :
-                node[ENodeMetaTemplateDecl] = node[ENodeMetaTemplateDecl][:-2]
-
         ParseCursor(child)
+
+    if ENodeMetaTemplateDecl in node :
+        if node[ENodeMetaTemplateDecl].endswith(", ") :
+            node[ENodeMetaTemplateDecl] = node[ENodeMetaTemplateDecl][:-2]
 
     PopNode()
 
@@ -429,17 +430,8 @@ def GetOutputFilePath(filePath : str) :
     outputPath += ".gen.h"
     return outputPath
 
-def ParseFile(filePath : str, sysArgs = []) :
+def ParseFile(filePath : str, options : list) :
     global NodesToInclude, NodeList, NodeTree, NodeStack
-
-    outputFile = GetOutputFilePath(filePath)
-    if os.path.exists(outputFile) :
-        os.remove(GetOutputFilePath(filePath))
-
-    NodesToInclude = []
-    NodeList = {}
-    NodeTree = {}
-    NodeStack = [NodeTree]
 
     with open(filePath) as file:
         for line in file.readlines() :
@@ -448,19 +440,18 @@ def ParseFile(filePath : str, sysArgs = []) :
             for g in m.groups() :
                 NodesToInclude += g.replace(" ", ";").replace(",", ";").split(";")
 
-    args = ['-x', 'c++', '-std=c++17'] + sysArgs
+    args = ['-x', 'c++', '-std=c++17'] + options
     idx = clang.cindex.Index.create()
     tu = idx.parse(os.path.join(os.getcwd(), filePath), args = args, options = clang.cindex.TranslationUnit.PARSE_INCOMPLETE | clang.cindex.TranslationUnit.PARSE_SKIP_FUNCTION_BODIES)
 
     for cursor in tu.cursor.walk_preorder():
         ParseCursor(cursor)
 
-    CodeGen(filePath)
-
 def CodeGenOutputMetaHeader(code, node) :
     global pycppdefine
     pycppdefine = "pycppgen_" + node[ENodeFullName].replace("::", "_").replace("<","_").replace(">","_")
 
+    code += f"//<autogen_{pycppdefine}>\n\n"
     code += f"#ifndef {pycppdefine}\n"
     code += f"#define {pycppdefine}\n\n"
     if ENodeMetaTemplateDecl in node :
@@ -478,6 +469,7 @@ def CodeGenOutputMetaFooter(code, node) :
 
     code += "};\n\n"
     code += f"#endif //{pycppdefine}\n"
+    code += f"//</autogen_{pycppdefine}>\n\n"
 
     pycppdefine = None
 
@@ -508,12 +500,12 @@ def CodeGenOutputAttributes(node, depth = 0) :
     return result
 
 def CodeGenOutputAddFunctionDeclaration(declarations, node, funcNode, isStatic : bool) :
-    decl = funcNode[ENodeType]
+    decl = f"static_{isStatic}__{funcNode[ENodeType]}"
     numParams = len(funcNode[ENodeParameters])
     isConst = decl.endswith("const")
       
     if not decl in declarations :
-        declarations[decl] = "\tstatic void call_function(std::string_view name, " 
+        declarations[decl] = "\tstatic bool call_function(std::string_view name, " 
         if not isStatic :
             if isConst :
                 declarations[decl] += "const " 
@@ -546,7 +538,7 @@ def CodeGenOutputAddFunctionDeclaration(declarations, node, funcNode, isStatic :
         declarations[decl] = declarations[decl][:-2] + ");\n"
     else :
         declarations[decl] += ");\n"
-    declarations[decl] += "\t\t\treturn;\n\t\t}\n"
+    declarations[decl] += "\t\t\treturn true;\n\t\t}\n"
 
 def CodeGenOutputNode(code, node) :
     
@@ -583,6 +575,12 @@ def CodeGenOutputNode(code, node) :
                     code += f"\t\tfn(" + infoName + ");\n\n"
         code += "\t}\n"
 
+        code += "\tstatic void for_each_static_var(std::function<void(std::string_view name)> fn) {\n"
+        if ENodeStaticVariables in node and len(node[ENodeStaticVariables]) > 0 :
+            for _, var in node[ENodeStaticVariables].items() :
+                code += f"\t\tfn(\"{var[ENodeName]}\");\n"
+        code += "\t}\n"
+
         #functions
         code += "\tstatic void for_each_function(std::function<void(const member_function_info&)> fn) {\n"
         if ENodeFunctions in node and len(node[ENodeFunctions]) > 0 :
@@ -608,31 +606,18 @@ def CodeGenOutputNode(code, node) :
                     code += "\t\t}\n"
         code += "\t}\n"
 
-        if ENodeFunctions in node :
-            declarations = dict()
+        declarations = dict()
 
+        if ENodeFunctions in node :
             for _, v in node[ENodeFunctions].items() :
                 CodeGenOutputAddFunctionDeclaration(declarations, node, v, False)
 
-            for _, v in declarations.items() :
-                code += v + "\t\t__debugbreak();\n\t}\n"
-
-        code += "\tstatic void for_each_static_var(std::function<void(std::string_view name)> fn) {\n"
-        if ENodeStaticVariables in node and len(node[ENodeStaticVariables]) > 0 :
-            for _, var in node[ENodeStaticVariables].items() :
-                code += f"\t\tfn(\"{var[ENodeName]}\");\n"
-        code += "\t}\n"
-
         if ENodeStaticFunctions in node and len(node[ENodeStaticFunctions]) > 0 :
-            for _, var in node[ENodeStaticFunctions].items() :
-                declarations = dict()
+            for _, v in node[ENodeStaticFunctions].items() :
+                CodeGenOutputAddFunctionDeclaration(declarations, node, v, True)
 
-                for _, v in node[ENodeStaticFunctions].items() :
-                    CodeGenOutputAddFunctionDeclaration(declarations, node, v, True)
-
-                for _, v in declarations.items() :
-                    code += v + "\t\t__debugbreak();\n\t}\n"
-        code += "\t}\n"
+        for _, v in declarations.items() :
+            code += v + "\t\treturn false;\n\t}\n"
 
         code = CodeGenOutputMetaFooter(code, node)
 
@@ -728,14 +713,109 @@ def CodeGen(filePath : str) :
     with open(outputPath, mode="wt") as output :
         output.write(code)
 
-if __name__ == "__main__":
-    if len(sys.argv) < 2 :
-        print("usage py main.py <filename> <clang_args>")
+    global FilesToParse
+
+def CodeGenGlobalAddForEachTypeCall(code, node) :
+    if node[ENodeKind] == EKindClass or node[ENodeKind] == EKindStruct : #or node[ENodeKind] == EKindClassTemplate:
+        code += f"\t\tfn<{node[ENodeFullName]}>();\n"
+    return code
+
+def CodeGenGlobal(path : str) :
+    global PerFileData
+    
+    code = ""
+    code += "#pragma once\n\n"
+    code += ""
+    for k in PerFileData :
+        code += f"#include \"{GetOutputFilePath(k)}\"\n"
+    code += "\nnamespace pycppgen_globals {\n"
+
+    code += "\ttemplate<typename T> static void for_each_type_call(T fn) {\n"
+    for _, node in NodeList.items() :
+        code = CodeGenGlobalAddForEachTypeCall(code, node)
+    code += "\t}\n\n"
+
+    code += "\tstatic void for_each_type_static_call_by_name(std::string_view funcName) {\n"
+    for _, node in NodeList.items() :
+        if (node[ENodeKind] == EKindClass or node[ENodeKind] == EKindStruct) and ENodeStaticFunctions in node:
+            for _, func in node[ENodeStaticFunctions].items() :
+                if (not ENodeParameters in func or len(func[ENodeParameters]) == 0) and (not ENodeReturnType in func or func[ENodeReturnType] == "void"):
+                    code += f"\t\tpycppgen<{node[ENodeFullName]}>::call_function(funcName);\n"
+    code += "\t}\n\n"
+
+    code += ""
+    code += "}\n"
+
+    with open(path + "\\pycppgen.gen.h", mode="wt") as file :
+        file.write(code)
+
+def main(args : list) :
+    global FilesToParse, NodesToInclude, NodeList, NodeTree, NodeStack, PerFileData
+
+    if len(args) < 1 :
+        print("usage py main.py <directory> <options>")
         exit(-1)
 
-    sysArgs = []
-    if len(sys.argv) > 2 :
-        sysArgs = sys.argv[2:]
-    ParseFile(sys.argv[1], sysArgs)
+    FilesToParse = []
+    for root, _, files in os.walk(args[0]):
+        for file in files:
+            if re.match(".*\.h", file) and not re.match(".*\.gen.h", file) :
+                filePath = os.path.join(root, file)
+                with open(filePath) as f :
+                    if f.read().find("$[[pycppgen") != -1:
+                        FilesToParse.append(os.path.join(root, file))
+    
+    compilerOptions = []
+    if len(args) > 1 :
+        compilerOptions = args[1:]
 
-    exit(0)
+    #remove old files
+    for file in FilesToParse :
+        outputFile = GetOutputFilePath(file)
+        if os.path.exists(outputFile) :
+            os.remove(GetOutputFilePath(file))
+
+    PerFileData = {}
+
+    for file in FilesToParse :
+        
+        #initialize data
+        NodesToInclude = []
+        NodeList = {}
+        NodeTree = {}
+        NodeStack = [NodeTree]        
+
+        ParseFile(file, compilerOptions)
+
+        PerFileData[file] = {
+            "NodeList": NodeList,
+            "NodesToInclude": NodesToInclude,
+            "NodeTree": NodeTree,
+            "NodeStack": NodeStack
+            }
+
+    for file in FilesToParse :
+        NodesToInclude = PerFileData[file]["NodesToInclude"]
+        NodeList = PerFileData[file]["NodeList"]
+        NodeTree = PerFileData[file]["NodeTree"]
+        NodeStack = PerFileData[file]["NodeStack"]
+    
+        CodeGen(file)
+
+    #clear data
+    NodesToInclude = []
+    NodeList = {}
+    NodeTree = {}
+    NodeStack = [NodeTree]   
+
+    for _, v in PerFileData.items() : 
+        NodeList.update(v["NodeList"])
+
+    CodeGenGlobal(args[0])
+
+if __name__ == "__main__":
+    if len(sys.argv) < 2 :
+        exit(-1)
+
+    main(sys.argv[1:])
+

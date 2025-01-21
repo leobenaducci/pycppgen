@@ -9,4 +9,7 @@ struct SVector
     
     //$[[pycppgen visible]]
     float x,y,z;
+
+    //$[[pycppgen pure]
+    static void OnRegister();
 };

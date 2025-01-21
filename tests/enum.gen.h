@@ -35,6 +35,8 @@ template<typename T> struct pycppgen {};
 
 #endif //_PYCPPGEN_DECLARATIONS
 
+//<autogen_pycppgen_EEnum>
+
 #ifndef pycppgen_EEnum
 #define pycppgen_EEnum
 
@@ -87,5 +89,7 @@ template<> struct pycppgen<EEnum>{
 };
 
 #endif //pycppgen_EEnum
+//</autogen_pycppgen_EEnum>
+
 namespace pycppgen_globals {
 }

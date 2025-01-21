@@ -35,6 +35,8 @@ template<typename T> struct pycppgen {};
 
 #endif //_PYCPPGEN_DECLARATIONS
 
+//<autogen_pycppgen_SVector>
+
 #ifndef pycppgen_SVector
 #define pycppgen_SVector
 
@@ -50,51 +52,59 @@ struct pycppgen<SVector>{
 			const size_t y_Offset = offsetof(access_helper, SVector::y);
 			const size_t z_Offset = offsetof(access_helper, SVector::z);
 		};
-		member_variable_info x_info_52;
-		x_info_52.Name = "x";
-		x_info_52.Type = typeid(float).name();
-		x_info_52.Offset = access_helper().x_Offset;
-		x_info_52.ElementSize = sizeof(std::remove_all_extents_t<float>);
-		x_info_52.TotalSize = sizeof(float);
-		x_info_52.ArrayRank = std::rank_v<float>;
-		x_info_52.Attributes = {
+		member_variable_info x_info_54;
+		x_info_54.Name = "x";
+		x_info_54.Type = typeid(float).name();
+		x_info_54.Offset = access_helper().x_Offset;
+		x_info_54.ElementSize = sizeof(std::remove_all_extents_t<float>);
+		x_info_54.TotalSize = sizeof(float);
+		x_info_54.ArrayRank = std::rank_v<float>;
+		x_info_54.Attributes = {
 			{ "visible", "" }
 		};
-		fn(x_info_52);
+		fn(x_info_54);
 
-		member_variable_info y_info_64;
-		y_info_64.Name = "y";
-		y_info_64.Type = typeid(float).name();
-		y_info_64.Offset = access_helper().y_Offset;
-		y_info_64.ElementSize = sizeof(std::remove_all_extents_t<float>);
-		y_info_64.TotalSize = sizeof(float);
-		y_info_64.ArrayRank = std::rank_v<float>;
-		y_info_64.Attributes = {
+		member_variable_info y_info_66;
+		y_info_66.Name = "y";
+		y_info_66.Type = typeid(float).name();
+		y_info_66.Offset = access_helper().y_Offset;
+		y_info_66.ElementSize = sizeof(std::remove_all_extents_t<float>);
+		y_info_66.TotalSize = sizeof(float);
+		y_info_66.ArrayRank = std::rank_v<float>;
+		y_info_66.Attributes = {
 			{ "visible", "" }
 		};
-		fn(y_info_64);
+		fn(y_info_66);
 
-		member_variable_info z_info_76;
-		z_info_76.Name = "z";
-		z_info_76.Type = typeid(float).name();
-		z_info_76.Offset = access_helper().z_Offset;
-		z_info_76.ElementSize = sizeof(std::remove_all_extents_t<float>);
-		z_info_76.TotalSize = sizeof(float);
-		z_info_76.ArrayRank = std::rank_v<float>;
-		z_info_76.Attributes = {
+		member_variable_info z_info_78;
+		z_info_78.Name = "z";
+		z_info_78.Type = typeid(float).name();
+		z_info_78.Offset = access_helper().z_Offset;
+		z_info_78.ElementSize = sizeof(std::remove_all_extents_t<float>);
+		z_info_78.TotalSize = sizeof(float);
+		z_info_78.ArrayRank = std::rank_v<float>;
+		z_info_78.Attributes = {
 			{ "visible", "" }
 		};
-		fn(z_info_76);
+		fn(z_info_78);
 
-	}
-	static void for_each_function(std::function<void(const member_function_info&)> fn) {
 	}
 	static void for_each_static_var(std::function<void(std::string_view name)> fn) {
 		fn("size");
 	}
+	static void for_each_function(std::function<void(const member_function_info&)> fn) {
+	}
+	static bool call_function(std::string_view name) {
+		if (name == "OnRegister") {
+			SVector::OnRegister();
+			return true;
+		}
+		return false;
 	}
 };
 
 #endif //pycppgen_SVector
+//</autogen_pycppgen_SVector>
+
 namespace pycppgen_globals {
 }
