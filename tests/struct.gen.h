@@ -33,6 +33,8 @@ struct member_function_info {
 
 template<typename T> struct pycppgen {};
 
+template<typename T> auto pycppgen_typeof(T&& t) { return pycppgen<std::decay_t<decltype(t)>>(); }
+
 #endif //_PYCPPGEN_DECLARATIONS
 
 //<autogen_pycppgen_SVector>
@@ -42,7 +44,7 @@ template<typename T> struct pycppgen {};
 
 template<>
 struct pycppgen<SVector>{
-	static std::map<std::string_view, std::string_view> Attributes = {
+	std::map<std::string_view, std::string_view> Attributes = {
 		{ "visible", "" }
 	};
 
@@ -52,41 +54,41 @@ struct pycppgen<SVector>{
 			const size_t y_Offset = offsetof(access_helper, SVector::y);
 			const size_t z_Offset = offsetof(access_helper, SVector::z);
 		};
-		member_variable_info x_info_54;
-		x_info_54.Name = "x";
-		x_info_54.Type = typeid(float).name();
-		x_info_54.Offset = access_helper().x_Offset;
-		x_info_54.ElementSize = sizeof(std::remove_all_extents_t<float>);
-		x_info_54.TotalSize = sizeof(float);
-		x_info_54.ArrayRank = std::rank_v<float>;
-		x_info_54.Attributes = {
+		member_variable_info x_info_56;
+		x_info_56.Name = "x";
+		x_info_56.Type = typeid(float).name();
+		x_info_56.Offset = access_helper().x_Offset;
+		x_info_56.ElementSize = sizeof(std::remove_all_extents_t<float>);
+		x_info_56.TotalSize = sizeof(float);
+		x_info_56.ArrayRank = std::rank_v<float>;
+		x_info_56.Attributes = {
 			{ "visible", "" }
 		};
-		fn(x_info_54);
+		fn(x_info_56);
 
-		member_variable_info y_info_66;
-		y_info_66.Name = "y";
-		y_info_66.Type = typeid(float).name();
-		y_info_66.Offset = access_helper().y_Offset;
-		y_info_66.ElementSize = sizeof(std::remove_all_extents_t<float>);
-		y_info_66.TotalSize = sizeof(float);
-		y_info_66.ArrayRank = std::rank_v<float>;
-		y_info_66.Attributes = {
+		member_variable_info y_info_68;
+		y_info_68.Name = "y";
+		y_info_68.Type = typeid(float).name();
+		y_info_68.Offset = access_helper().y_Offset;
+		y_info_68.ElementSize = sizeof(std::remove_all_extents_t<float>);
+		y_info_68.TotalSize = sizeof(float);
+		y_info_68.ArrayRank = std::rank_v<float>;
+		y_info_68.Attributes = {
 			{ "visible", "" }
 		};
-		fn(y_info_66);
+		fn(y_info_68);
 
-		member_variable_info z_info_78;
-		z_info_78.Name = "z";
-		z_info_78.Type = typeid(float).name();
-		z_info_78.Offset = access_helper().z_Offset;
-		z_info_78.ElementSize = sizeof(std::remove_all_extents_t<float>);
-		z_info_78.TotalSize = sizeof(float);
-		z_info_78.ArrayRank = std::rank_v<float>;
-		z_info_78.Attributes = {
+		member_variable_info z_info_80;
+		z_info_80.Name = "z";
+		z_info_80.Type = typeid(float).name();
+		z_info_80.Offset = access_helper().z_Offset;
+		z_info_80.ElementSize = sizeof(std::remove_all_extents_t<float>);
+		z_info_80.TotalSize = sizeof(float);
+		z_info_80.ArrayRank = std::rank_v<float>;
+		z_info_80.Attributes = {
 			{ "visible", "" }
 		};
-		fn(z_info_78);
+		fn(z_info_80);
 
 	}
 	static void for_each_static_var(std::function<void(std::string_view name)> fn) {

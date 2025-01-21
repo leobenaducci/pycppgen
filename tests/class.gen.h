@@ -33,6 +33,8 @@ struct member_function_info {
 
 template<typename T> struct pycppgen {};
 
+template<typename T> auto pycppgen_typeof(T&& t) { return pycppgen<std::decay_t<decltype(t)>>(); }
+
 #endif //_PYCPPGEN_DECLARATIONS
 
 //<autogen_pycppgen_CObject_SSubObject>
@@ -42,7 +44,7 @@ template<typename T> struct pycppgen {};
 
 template<>
 struct pycppgen<CObject::SSubObject>{
-	static std::map<std::string_view, std::string_view> Attributes = {
+	std::map<std::string_view, std::string_view> Attributes = {
 
 	};
 
@@ -71,7 +73,7 @@ struct pycppgen<CObject::SSubObject>{
 
 template<>
 struct pycppgen<CObject>{
-	static std::map<std::string_view, std::string_view> Attributes = {
+	std::map<std::string_view, std::string_view> Attributes = {
 		{ "pure", "" }
 	};
 
@@ -81,111 +83,111 @@ struct pycppgen<CObject>{
 			const size_t PublicShort_Offset = offsetof(access_helper, CObject::PublicShort);
 			const size_t PublicCharArray_Offset = offsetof(access_helper, CObject::PublicCharArray);
 		};
-		member_variable_info ProtectedUint_info_83;
-		ProtectedUint_info_83.Name = "ProtectedUint";
-		ProtectedUint_info_83.Type = typeid(unsigned int).name();
-		ProtectedUint_info_83.Offset = access_helper().ProtectedUint_Offset;
-		ProtectedUint_info_83.ElementSize = sizeof(std::remove_all_extents_t<unsigned int>);
-		ProtectedUint_info_83.TotalSize = sizeof(unsigned int);
-		ProtectedUint_info_83.ArrayRank = std::rank_v<unsigned int>;
-		ProtectedUint_info_83.Attributes = {
+		member_variable_info ProtectedUint_info_85;
+		ProtectedUint_info_85.Name = "ProtectedUint";
+		ProtectedUint_info_85.Type = typeid(unsigned int).name();
+		ProtectedUint_info_85.Offset = access_helper().ProtectedUint_Offset;
+		ProtectedUint_info_85.ElementSize = sizeof(std::remove_all_extents_t<unsigned int>);
+		ProtectedUint_info_85.TotalSize = sizeof(unsigned int);
+		ProtectedUint_info_85.ArrayRank = std::rank_v<unsigned int>;
+		ProtectedUint_info_85.Attributes = {
 			{ "pure", "" }
 		};
-		fn(ProtectedUint_info_83);
+		fn(ProtectedUint_info_85);
 
-		member_variable_info PublicShort_info_95;
-		PublicShort_info_95.Name = "PublicShort";
-		PublicShort_info_95.Type = typeid(short).name();
-		PublicShort_info_95.Offset = access_helper().PublicShort_Offset;
-		PublicShort_info_95.ElementSize = sizeof(std::remove_all_extents_t<short>);
-		PublicShort_info_95.TotalSize = sizeof(short);
-		PublicShort_info_95.ArrayRank = std::rank_v<short>;
-		PublicShort_info_95.Attributes = {
+		member_variable_info PublicShort_info_97;
+		PublicShort_info_97.Name = "PublicShort";
+		PublicShort_info_97.Type = typeid(short).name();
+		PublicShort_info_97.Offset = access_helper().PublicShort_Offset;
+		PublicShort_info_97.ElementSize = sizeof(std::remove_all_extents_t<short>);
+		PublicShort_info_97.TotalSize = sizeof(short);
+		PublicShort_info_97.ArrayRank = std::rank_v<short>;
+		PublicShort_info_97.Attributes = {
 			{ "pure", "" }
 		};
-		fn(PublicShort_info_95);
+		fn(PublicShort_info_97);
 
-		member_variable_info PublicCharArray_info_107;
-		PublicCharArray_info_107.Name = "PublicCharArray";
-		PublicCharArray_info_107.Type = typeid(char[16]).name();
-		PublicCharArray_info_107.Offset = access_helper().PublicCharArray_Offset;
-		PublicCharArray_info_107.ElementSize = sizeof(std::remove_all_extents_t<char[16]>);
-		PublicCharArray_info_107.TotalSize = sizeof(char[16]);
-		PublicCharArray_info_107.ArrayRank = std::rank_v<char[16]>;
-		PublicCharArray_info_107.ArrayExtents.push_back(std::extent_v<char[16], 0>);
-		PublicCharArray_info_107.Attributes = {
+		member_variable_info PublicCharArray_info_109;
+		PublicCharArray_info_109.Name = "PublicCharArray";
+		PublicCharArray_info_109.Type = typeid(char[16]).name();
+		PublicCharArray_info_109.Offset = access_helper().PublicCharArray_Offset;
+		PublicCharArray_info_109.ElementSize = sizeof(std::remove_all_extents_t<char[16]>);
+		PublicCharArray_info_109.TotalSize = sizeof(char[16]);
+		PublicCharArray_info_109.ArrayRank = std::rank_v<char[16]>;
+		PublicCharArray_info_109.ArrayExtents.push_back(std::extent_v<char[16], 0>);
+		PublicCharArray_info_109.Attributes = {
 			{ "pure", "" }
 		};
-		fn(PublicCharArray_info_107);
+		fn(PublicCharArray_info_109);
 
 	}
 	static void for_each_static_var(std::function<void(std::string_view name)> fn) {
 	}
 	static void for_each_function(std::function<void(const member_function_info&)> fn) {
-		member_function_info Func_info_124;
-		Func_info_124.Name = "Func";
-		Func_info_124.Declaration = "void ()";
-		Func_info_124.Attributes = {};
-		Func_info_124.ReturnType = "void";
+		member_function_info Func_info_126;
+		Func_info_126.Name = "Func";
+		Func_info_126.Declaration = "void ()";
+		Func_info_126.Attributes = {};
+		Func_info_126.ReturnType = "void";
 		//parameters
 		{
 		}
-		member_function_info Add_info_132;
-		Add_info_132.Name = "Add";
-		Add_info_132.Declaration = "float (float, double)";
-		Add_info_132.Attributes = {
+		member_function_info Add_info_134;
+		Add_info_134.Name = "Add";
+		Add_info_134.Declaration = "float (float, double)";
+		Add_info_134.Attributes = {
 				{ "callable", "" }
 			};
-		Add_info_132.ReturnType = "float";
+		Add_info_134.ReturnType = "float";
 		//parameters
 		{
-			function_parameter_info A_info_141;
-			A_info_141.Name = "A";
-			A_info_141.Type = "float";
-			A_info_141.DefaultValue = "";
-			A_info_141.Attributes = {
+			function_parameter_info A_info_143;
+			A_info_143.Name = "A";
+			A_info_143.Type = "float";
+			A_info_143.DefaultValue = "";
+			A_info_143.Attributes = {
 				{ "clamp", "" }
 			};
-			Add_info_132.Parameters.push_back(A_info_141);
-			function_parameter_info B_info_149;
-			B_info_149.Name = "B";
-			B_info_149.Type = "double";
-			B_info_149.DefaultValue = "";
-			B_info_149.Attributes = {
+			Add_info_134.Parameters.push_back(A_info_143);
+			function_parameter_info B_info_151;
+			B_info_151.Name = "B";
+			B_info_151.Type = "double";
+			B_info_151.DefaultValue = "";
+			B_info_151.Attributes = {
 				{ "auto_cast", "" },
 				{ "enum", "" }
 			};
-			Add_info_132.Parameters.push_back(B_info_149);
+			Add_info_134.Parameters.push_back(B_info_151);
 		}
-		member_function_info Sub_info_159;
-		Sub_info_159.Name = "Sub";
-		Sub_info_159.Declaration = "float (float, double)";
-		Sub_info_159.Attributes = {
+		member_function_info Sub_info_161;
+		Sub_info_161.Name = "Sub";
+		Sub_info_161.Declaration = "float (float, double)";
+		Sub_info_161.Attributes = {
 				{ "callable", "" }
 			};
-		Sub_info_159.ReturnType = "float";
+		Sub_info_161.ReturnType = "float";
 		//parameters
 		{
-			function_parameter_info A_info_168;
-			A_info_168.Name = "A";
-			A_info_168.Type = "float";
-			A_info_168.DefaultValue = "";
-			A_info_168.Attributes = {};
-			Sub_info_159.Parameters.push_back(A_info_168);
-			function_parameter_info B_info_174;
-			B_info_174.Name = "B";
-			B_info_174.Type = "double";
-			B_info_174.DefaultValue = "";
-			B_info_174.Attributes = {};
-			Sub_info_159.Parameters.push_back(B_info_174);
+			function_parameter_info A_info_170;
+			A_info_170.Name = "A";
+			A_info_170.Type = "float";
+			A_info_170.DefaultValue = "";
+			A_info_170.Attributes = {};
+			Sub_info_161.Parameters.push_back(A_info_170);
+			function_parameter_info B_info_176;
+			B_info_176.Name = "B";
+			B_info_176.Type = "double";
+			B_info_176.DefaultValue = "";
+			B_info_176.Attributes = {};
+			Sub_info_161.Parameters.push_back(B_info_176);
 		}
-		member_function_info Get_info_181;
-		Get_info_181.Name = "Get";
-		Get_info_181.Declaration = "short () const";
-		Get_info_181.Attributes = {
+		member_function_info Get_info_183;
+		Get_info_183.Name = "Get";
+		Get_info_183.Declaration = "short () const";
+		Get_info_183.Attributes = {
 				{ "readonly", "" }
 			};
-		Get_info_181.ReturnType = "short";
+		Get_info_183.ReturnType = "short";
 		//parameters
 		{
 		}
@@ -241,7 +243,7 @@ struct pycppgen<CObject>{
 
 template<>
 struct pycppgen<CChild>{
-	static std::map<std::string_view, std::string_view> Attributes = {
+	std::map<std::string_view, std::string_view> Attributes = {
 		{ "pure", "" }
 	};
 
@@ -249,19 +251,19 @@ struct pycppgen<CChild>{
 		struct access_helper : CChild {
 			const size_t Matrix_Offset = offsetof(access_helper, CChild::Matrix);
 		};
-		member_variable_info Matrix_info_251;
-		Matrix_info_251.Name = "Matrix";
-		Matrix_info_251.Type = typeid(float[4][4]).name();
-		Matrix_info_251.Offset = access_helper().Matrix_Offset;
-		Matrix_info_251.ElementSize = sizeof(std::remove_all_extents_t<float[4][4]>);
-		Matrix_info_251.TotalSize = sizeof(float[4][4]);
-		Matrix_info_251.ArrayRank = std::rank_v<float[4][4]>;
-		Matrix_info_251.ArrayExtents.push_back(std::extent_v<float[4][4], 0>);
-		Matrix_info_251.ArrayExtents.push_back(std::extent_v<float[4][4], 1>);
-		Matrix_info_251.Attributes = {
+		member_variable_info Matrix_info_253;
+		Matrix_info_253.Name = "Matrix";
+		Matrix_info_253.Type = typeid(float[4][4]).name();
+		Matrix_info_253.Offset = access_helper().Matrix_Offset;
+		Matrix_info_253.ElementSize = sizeof(std::remove_all_extents_t<float[4][4]>);
+		Matrix_info_253.TotalSize = sizeof(float[4][4]);
+		Matrix_info_253.ArrayRank = std::rank_v<float[4][4]>;
+		Matrix_info_253.ArrayExtents.push_back(std::extent_v<float[4][4], 0>);
+		Matrix_info_253.ArrayExtents.push_back(std::extent_v<float[4][4], 1>);
+		Matrix_info_253.Attributes = {
 			{ "pure", "" }
 		};
-		fn(Matrix_info_251);
+		fn(Matrix_info_253);
 
 	}
 	static void for_each_static_var(std::function<void(std::string_view name)> fn) {

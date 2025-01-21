@@ -33,6 +33,8 @@ struct member_function_info {
 
 template<typename T> struct pycppgen {};
 
+template<typename T> auto pycppgen_typeof(T&& t) { return pycppgen<std::decay_t<decltype(t)>>(); }
+
 #endif //_PYCPPGEN_DECLARATIONS
 
 namespace pycppgen_globals {

@@ -33,6 +33,8 @@ struct member_function_info {
 
 template<typename T> struct pycppgen {};
 
+template<typename T> auto pycppgen_typeof(T&& t) { return pycppgen<std::decay_t<decltype(t)>>(); }
+
 #endif //_PYCPPGEN_DECLARATIONS
 
 //<autogen_pycppgen_CObject_SSubObject>
@@ -42,7 +44,7 @@ template<typename T> struct pycppgen {};
 
 template<>
 struct pycppgen<CObject::SSubObject>{
-	static std::map<std::string_view, std::string_view> Attributes = {
+	std::map<std::string_view, std::string_view> Attributes = {
 
 	};
 

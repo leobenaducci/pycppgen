@@ -11,5 +11,5 @@ struct SVector
     float x,y,z;
 
     //$[[pycppgen pure]
-    static void OnRegister();
+    static void OnRegister() {}
 };

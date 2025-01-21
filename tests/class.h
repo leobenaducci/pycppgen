@@ -53,7 +53,7 @@ public:
     }
 
     //$[[pycppgen pure]
-    static void OnRegister();
+    static void OnRegister() {}
 };
 
 class CChild : CObject

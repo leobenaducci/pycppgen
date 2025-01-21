@@ -11,8 +11,19 @@
 #include "enum.h"
 #include "enum.gen.h"
 
+#include "pycppgen.gen.h"
+
 int main()
 {
+    pycppgen_globals::for_each_type_call([](auto&& t)
+        {
+            pycppgen_typeof(t).for_each_var(
+                [&](const member_variable_info& v)
+                {
+                    printf("%s CObject::%s -> Offset: %llu Size: %llu\n", v.Type.data(), v.Name.data(), v.Offset, v.ElementSize);
+                });
+        });
+
 	pycppgen<EEnum>::for_each_enum(
           [](EEnum v)
           {

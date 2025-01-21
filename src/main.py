@@ -211,6 +211,9 @@ def PopNode() :
 def ParseFunction(cursor, isFreeFunction : bool = False) :
     global NodeList, NodeTree, NodeStack
 
+    if re.fullmatch("[a-zA-Z0-9_-_]+", cursor.spelling) == None:
+        return
+
     node = PushNode(cursor, EKindFunction)
     
     node[ENodeReturnType] = cursor.result_type.spelling
@@ -545,7 +548,7 @@ def CodeGenOutputNode(code, node) :
     if node[ENodeKind] == EKindClass or node[ENodeKind] == EKindClassTemplate or node[ENodeKind] == EKindStruct :
         code = CodeGenOutputMetaHeader(code, node)
 
-        code += "\tstatic std::map<std::string_view, std::string_view> Attributes = "
+        code += "\tstd::map<std::string_view, std::string_view> Attributes = "
         code += CodeGenOutputAttributes(node, 1) 
         code += ";\n\n"
 
@@ -693,6 +696,7 @@ def CodeGen(filePath : str) :
     code += "};\n\n"
 
     code += "template<typename T> struct pycppgen {};\n\n"
+    code += "template<typename T> auto pycppgen_typeof(T&& t) { return pycppgen<std::decay_t<decltype(t)>>(); }\n\n"
     code += "#endif //_PYCPPGEN_DECLARATIONS\n\n"
 
     for key in NodeList :
@@ -717,7 +721,7 @@ def CodeGen(filePath : str) :
 
 def CodeGenGlobalAddForEachTypeCall(code, node) :
     if node[ENodeKind] == EKindClass or node[ENodeKind] == EKindStruct : #or node[ENodeKind] == EKindClassTemplate:
-        code += f"\t\tfn<{node[ENodeFullName]}>();\n"
+        code += f"\t\tfn(*({node[ENodeFullName]}*)0);\n"
     return code
 
 def CodeGenGlobal(path : str) :
@@ -727,10 +731,11 @@ def CodeGenGlobal(path : str) :
     code += "#pragma once\n\n"
     code += ""
     for k in PerFileData :
-        code += f"#include \"{GetOutputFilePath(k)}\"\n"
-    code += "\nnamespace pycppgen_globals {\n"
+        code += f"#include \"{pathlib.Path(GetOutputFilePath(k)).relative_to(path)}\"\n"
 
-    code += "\ttemplate<typename T> static void for_each_type_call(T fn) {\n"
+    code += "\nnamespace pycppgen_globals\n{\n"
+
+    code += "\tstatic void for_each_type_call(auto fn) {\n"
     for _, node in NodeList.items() :
         code = CodeGenGlobalAddForEachTypeCall(code, node)
     code += "\t}\n\n"
