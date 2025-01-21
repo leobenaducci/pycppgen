@@ -1,5 +1,3 @@
-#include "function.h"
-
 #ifndef _PYCPPGEN_DECLARATIONS
 #define _PYCPPGEN_DECLARATIONS
 
@@ -14,7 +12,7 @@ struct member_variable_info {
 	std::map<std::string, std::string> Attributes;
 };
 
-template<typename T> struct meta {};
+template<typename T> struct pycppgen {};
 
 #endif //_PYCPPGEN_DECLARATIONS
 

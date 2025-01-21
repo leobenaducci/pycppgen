@@ -1,5 +1,3 @@
-#include "class.h"
-
 #ifndef _PYCPPGEN_DECLARATIONS
 #define _PYCPPGEN_DECLARATIONS
 
@@ -14,12 +12,15 @@ struct member_variable_info {
 	std::map<std::string, std::string> Attributes;
 };
 
-template<typename T> struct meta {};
+template<typename T> struct pycppgen {};
 
 #endif //_PYCPPGEN_DECLARATIONS
 
+#ifndef pycppgen_CObject
+#define pycppgen_CObject
+
 template<>
-struct meta<CObject>{
+struct pycppgen<CObject>{
 	std::map<std::string, std::string> Attributes = {
 		{ "pure", "" }
 	};
@@ -95,8 +96,12 @@ struct meta<CObject>{
 	}
 };
 
+#endif //pycppgen_CObject
+#ifndef pycppgen_CChild
+#define pycppgen_CChild
+
 template<>
-struct meta<CChild>{
+struct pycppgen<CChild>{
 	std::map<std::string, std::string> Attributes = {};
 
 	static void for_each_var(std::function<void(const member_variable_info&)> fn) {
@@ -118,3 +123,4 @@ struct meta<CChild>{
 	}
 };
 
+#endif //pycppgen_CChild

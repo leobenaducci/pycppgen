@@ -2,6 +2,8 @@
 
 #include "class.h"
 
+#include "namespace.gen.h"
+
 //$[[pycppgen]]
 namespace TestNameSpace
 {

@@ -26,9 +26,11 @@ ENodeMetaTemplateDecl = "meta_template_decl"
 ENodeReturnType = "return_type"
 ENodeAttributes = "attributes"
 
+EKindUnknown = "kind_unknown"
 EKindNamespace = "kind_namespace"
 EKindAlias = "kind_alias"
 EKindEnum = "kind_enum"
+EKindEnumValue = "kind_enum_value"
 EKindClassTemplate = "kind_class_template"
 EKindClass = "kind_class"
 EKindStruct = "kind_struct"
@@ -39,7 +41,27 @@ EKindTemplateTypeParameter = "kind_template_type_parameter"
 EKindTemplateNonTypeParameter = "kind_template_non_type_parameter"
 EKindTemplateTemplateParameter = "kind_template_template_parameter"
 
+EParseCommentsBeforeDecl = "comments_before_decl"
+EParseCommentsAfterDecl = "comments_after_decl"
+
 EInvalid = "invalid"
+
+ParseCommentsMode = {
+    EKindUnknown : EParseCommentsBeforeDecl,
+    EKindNamespace : EParseCommentsBeforeDecl,
+    EKindAlias : EParseCommentsBeforeDecl,
+    EKindEnum : EParseCommentsBeforeDecl,
+    EKindEnumValue : EParseCommentsAfterDecl,
+    EKindClassTemplate : EParseCommentsBeforeDecl,
+    EKindClass : EParseCommentsBeforeDecl,
+    EKindStruct : EParseCommentsBeforeDecl,
+    EKindFunction : EParseCommentsBeforeDecl,
+    EKindParameter : EParseCommentsAfterDecl,
+    EKindVariable : EParseCommentsBeforeDecl,
+    EKindTemplateTypeParameter : EParseCommentsBeforeDecl,
+    EKindTemplateNonTypeParameter : EParseCommentsBeforeDecl,
+    EKindTemplateTemplateParameter : EParseCommentsBeforeDecl,
+}
 
 TypeAliases = dict(
     {
@@ -55,9 +77,10 @@ NodeList = {}
 NodeTree = {}
 NodeStack = [NodeTree]
 
-def ParseComments(cursor, preDeclComments = False) :
+def ParseComments(cursor, kind : str = EParseCommentsBeforeDecl) :
    
     try :
+        preDeclComments = not kind in ParseCommentsMode or ParseCommentsMode[kind] == EParseCommentsBeforeDecl
         parent = cursor.semantic_parent
 
         tokens = list(parent.get_tokens())
@@ -164,7 +187,7 @@ def PushNode(cursor, kind : str = EInvalid) :
     node[ENodeType] = str(cursor.type.spelling)
     node[ENodeAccess] = str(cursor.access_specifier)
     node[ENodeScope] = GetScope(cursor)
-    node[ENodeAttributes] = ParseComments(cursor)
+    node[ENodeAttributes] = ParseComments(cursor, kind)
 
     NodeStack.append(node)
     return NodeStack[-1]
@@ -279,7 +302,7 @@ def ParseEnum(cursor) :
         if child.kind == CursorKind.ENUM_CONSTANT_DECL :
             node[ENodeEnumValues][child.spelling] = dict()
             node[ENodeEnumValues][child.spelling]["value"] = str(child.enum_value)
-            node[ENodeEnumValues][child.spelling][ENodeAttributes] = ParseComments(child)
+            node[ENodeEnumValues][child.spelling][ENodeAttributes] = ParseComments(child, EKindEnumValue)
 
     PopNode()
 
@@ -321,7 +344,7 @@ def ParseCursor(cursor, forceInclude = False) :
         return
     
     if not forceInclude :
-        flags = ParseComments(cursor)
+        flags = ParseComments(cursor, EKindUnknown)
         if "include" in flags : 
             if str(flags["include"]) == "False" :
                 return
@@ -365,8 +388,20 @@ def ParseCursor(cursor, forceInclude = False) :
         ParseTypeAlias(cursor)
         return
 
+def GetOutputFilePath(filePath : str) :
+    fileName = str(pathlib.Path(filePath).relative_to(pathlib.Path(filePath).parent))
+    extStart = filePath.rfind(".")
+    ext = filePath[extStart:]
+    outputPath = filePath[:extStart]
+    outputPath += ".gen.h"
+    return outputPath
+
 def ParseFile(filePath : str, sysArgs = []) :
     global NodesToInclude, NodeList, NodeTree, NodeStack
+
+    outputFile = GetOutputFilePath(filePath)
+    if os.path.exists(outputFile) :
+        os.remove(GetOutputFilePath(filePath))
 
     NodesToInclude = []
     NodeList = {}
@@ -390,18 +425,29 @@ def ParseFile(filePath : str, sysArgs = []) :
     CodeGen(filePath)
 
 def CodeGenOutputMetaHeader(code, node) :
+    global pycppdefine
+    pycppdefine = "pycppgen_" + node[ENodeFullName].replace("::", "_").replace("<","_").replace(">","_")
+
+    code += f"#ifndef {pycppdefine}\n"
+    code += f"#define {pycppdefine}\n\n"
     if ENodeMetaTemplateDecl in node :
         code += "template<"
         code += node[ENodeMetaTemplateDecl]
-        code += ">\nstruct meta<"
+        code += ">\nstruct pycppgen<"
     else :
-        code += "template<> struct meta<"
+        code += "template<> struct pycppgen<"
     code += node[ENodeFullName]
     code += ">{\n"
     return code
 
 def CodeGenOutputMetaFooter(code, node) :
+    global pycppdefine
+
     code += "};\n\n"
+    code += f"#endif //{pycppdefine}\n"
+
+    pycppdefine = None
+
     return code
 
 def CodeGenOutputAttributes(node, depth = 0) :
@@ -555,14 +601,9 @@ def CodeGenOutputNode(code, node) :
 def CodeGen(filePath : str) :
     global NodeList, NodeTree, NodeStack
 
-    fileName = str(pathlib.Path(filePath).relative_to(pathlib.Path(filePath).parent))
-    extStart = filePath.rfind(".")
-    ext = filePath[extStart:]
-    outputPath = filePath[:extStart]
-    outputPath += ".gen.h"
+    outputPath = GetOutputFilePath(filePath)
 
-    code = "#include \"" + fileName + "\"\n\n"
-
+    code = ""
     code += "#ifndef _PYCPPGEN_DECLARATIONS\n"
     code += "#define _PYCPPGEN_DECLARATIONS\n\n"
     code += "struct member_variable_info {\n"
@@ -575,7 +616,7 @@ def CodeGen(filePath : str) :
     code += "\tstd::vector<size_t> ArrayExtents;\n"
     code += "\tstd::map<std::string, std::string> Attributes;\n"
     code += "};\n\n"
-    code += "template<typename T> struct meta {};\n\n"
+    code += "template<typename T> struct pycppgen {};\n\n"
     code += "#endif //_PYCPPGEN_DECLARATIONS\n\n"
 
     for key in NodeList :

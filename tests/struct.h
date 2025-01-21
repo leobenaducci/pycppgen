@@ -1,5 +1,8 @@
 
-struct SVector //$[[pycppgen visible]]
+#include "struct.gen.h"
+
+//$[[pycppgen visible]]
+struct SVector
 {
     float x,y,z;
 };

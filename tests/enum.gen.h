@@ -1,5 +1,3 @@
-#include "enum.h"
-
 #ifndef _PYCPPGEN_DECLARATIONS
 #define _PYCPPGEN_DECLARATIONS
 
@@ -14,11 +12,16 @@ struct member_variable_info {
 	std::map<std::string, std::string> Attributes;
 };
 
-template<typename T> struct meta {};
+template<typename T> struct pycppgen {};
 
 #endif //_PYCPPGEN_DECLARATIONS
 
-template<> struct meta<EEnum>{
+#ifndef pycppgen_EEnum
+#define pycppgen_EEnum
+
+enum class EEnum : unsigned;
+
+template<> struct pycppgen<EEnum>{
 	std::map<std::string, std::string> Attributes = {
 		{ "bitmask", "" }
 	};
@@ -66,3 +69,4 @@ template<> struct meta<EEnum>{
 	}
 };
 
+#endif //pycppgen_EEnum
