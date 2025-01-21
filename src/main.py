@@ -458,9 +458,18 @@ def ParseFile(filePath : str, options : list) :
             for g in m.groups() :
                 NodesToInclude += g.replace(" ", ";").replace(",", ";").split(";")
 
+    with open(os.path.join(os.getcwd(), filePath)) as src :
+        with open("tmp.h", "wt") as dst:
+            outlines = []
+            for line in src.readlines() :
+                if re.match(".*\#\s*include", line) != None:
+                    continue
+                outlines += [line]
+            dst.writelines(outlines)
+
     args = ['-x', 'c++', '-std=c++17'] + options
     idx = clang.cindex.Index.create()
-    tu = idx.parse(os.path.join(os.getcwd(), filePath), args = args, options = clang.cindex.TranslationUnit.PARSE_INCOMPLETE | clang.cindex.TranslationUnit.PARSE_SKIP_FUNCTION_BODIES)
+    tu = idx.parse("tmp.h", args = args, options = clang.cindex.TranslationUnit.PARSE_INCOMPLETE | clang.cindex.TranslationUnit.PARSE_SKIP_FUNCTION_BODIES)
 
     for cursor in tu.cursor.walk_preorder():
         ParseCursor(cursor)
@@ -813,6 +822,7 @@ def main(args : list) :
         NodeTree = {}
         NodeStack = [NodeTree]        
 
+        print("parsing file: " + file)
         ParseFile(file, compilerOptions)
 
         PerFileData[file] = {
@@ -828,6 +838,7 @@ def main(args : list) :
         NodeTree = PerFileData[file]["NodeTree"]
         NodeStack = PerFileData[file]["NodeStack"]
     
+        print("generating code for: " + file)
         CodeGen(file)
 
     #clear data
@@ -839,6 +850,7 @@ def main(args : list) :
     for _, v in PerFileData.items() : 
         NodeList.update(v["NodeList"])
 
+    print("global code gen step")
     CodeGenGlobal(args[0])
 
 if __name__ == "__main__":
