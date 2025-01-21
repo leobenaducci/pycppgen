@@ -1,3 +1,7 @@
+#pragma once
+
+#include "class.h"
+
 #ifndef _PYCPPGEN_DECLARATIONS
 #define _PYCPPGEN_DECLARATIONS
 
@@ -21,7 +25,7 @@ template<typename T> struct pycppgen {};
 
 template<>
 struct pycppgen<CObject>{
-	std::map<std::string, std::string> Attributes = {
+	static std::map<std::string_view, std::string_view> Attributes = {
 		{ "pure", "" }
 	};
 
@@ -41,8 +45,8 @@ struct pycppgen<CObject>{
 		ProtectedUint_info.Attributes = {
 			{ "pure", "" }
 		};
-
 		fn(ProtectedUint_info);
+
 		member_variable_info PublicShort_info;
 		PublicShort_info.Name = "PublicShort";
 		PublicShort_info.Type = typeid(short).name();
@@ -53,8 +57,8 @@ struct pycppgen<CObject>{
 		PublicShort_info.Attributes = {
 			{ "pure", "" }
 		};
-
 		fn(PublicShort_info);
+
 		member_variable_info PublicCharArray_info;
 		PublicCharArray_info.Name = "PublicCharArray";
 		PublicCharArray_info.Type = typeid(char[16]).name();
@@ -66,8 +70,8 @@ struct pycppgen<CObject>{
 		PublicCharArray_info.Attributes = {
 			{ "pure", "" }
 		};
-
 		fn(PublicCharArray_info);
+
 	}
 	static void call_function(std::string_view name, CObject* object) {
 		if (name == "Func") {
@@ -94,6 +98,11 @@ struct pycppgen<CObject>{
 		}
 		__debugbreak();
 	}
+	static void for_each_static_var(std::function<void(std::string_view name)> fn) {
+	}
+	static void for_each_static_function(std::function<void(std::string_view name)> fn) {
+		fn("TestStaticFunc");
+	}
 };
 
 #endif //pycppgen_CObject
@@ -102,7 +111,7 @@ struct pycppgen<CObject>{
 
 template<>
 struct pycppgen<CChild>{
-	std::map<std::string, std::string> Attributes = {};
+	static std::map<std::string_view, std::string_view> Attributes = {};
 
 	static void for_each_var(std::function<void(const member_variable_info&)> fn) {
 		struct access_helper : CChild {
@@ -118,9 +127,15 @@ struct pycppgen<CChild>{
 		Matrix_info.ArrayExtents.push_back(std::extent_v<float[4][4], 0>);
 		Matrix_info.ArrayExtents.push_back(std::extent_v<float[4][4], 1>);
 		Matrix_info.Attributes = {};
-
 		fn(Matrix_info);
+
+	}
+	static void for_each_static_var(std::function<void(std::string_view name)> fn) {
+	}
+	static void for_each_static_function(std::function<void(std::string_view name)> fn) {
 	}
 };
 
 #endif //pycppgen_CChild
+namespace pycppgen_globals {
+}

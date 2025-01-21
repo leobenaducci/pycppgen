@@ -1,3 +1,7 @@
+#pragma once
+
+#include "struct.h"
+
 #ifndef _PYCPPGEN_DECLARATIONS
 #define _PYCPPGEN_DECLARATIONS
 
@@ -21,7 +25,7 @@ template<typename T> struct pycppgen {};
 
 template<>
 struct pycppgen<SVector>{
-	std::map<std::string, std::string> Attributes = {
+	static std::map<std::string_view, std::string_view> Attributes = {
 		{ "visible", "" }
 	};
 
@@ -41,8 +45,8 @@ struct pycppgen<SVector>{
 		x_info.Attributes = {
 			{ "visible", "" }
 		};
-
 		fn(x_info);
+
 		member_variable_info y_info;
 		y_info.Name = "y";
 		y_info.Type = typeid(float).name();
@@ -53,8 +57,8 @@ struct pycppgen<SVector>{
 		y_info.Attributes = {
 			{ "visible", "" }
 		};
-
 		fn(y_info);
+
 		member_variable_info z_info;
 		z_info.Name = "z";
 		z_info.Type = typeid(float).name();
@@ -65,9 +69,16 @@ struct pycppgen<SVector>{
 		z_info.Attributes = {
 			{ "visible", "" }
 		};
-
 		fn(z_info);
+
+	}
+	static void for_each_static_var(std::function<void(std::string_view name)> fn) {
+		fn("size");
+	}
+	static void for_each_static_function(std::function<void(std::string_view name)> fn) {
 	}
 };
 
 #endif //pycppgen_SVector
+namespace pycppgen_globals {
+}

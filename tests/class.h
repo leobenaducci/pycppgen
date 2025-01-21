@@ -19,6 +19,9 @@ public:
 
     char PublicCharArray[16];
 
+    //$[[pycppgen]]
+    static int TestStaticFunc() {}
+    
     //$[[pycppgen callable]]
     void Func()
     {

@@ -15,7 +15,11 @@ ENodeUnderlyingType = "underlying_type"
 ENodeAccess = "access"
 ENodeScope = "scope"
 ENodeVariables = "variables"
+ENodeStaticVariables = "static_variables"
 ENodeFunctions = "functions"
+ENodeStaticFunctions = "static_functions"
+ENodeFreeVariables = "free_variables"
+ENodeFreeFunctions = "free_functions"
 ENodeParents = "parents"
 ENodeEnums = "enums"
 ENodeStructs = "structs"
@@ -37,6 +41,8 @@ EKindStruct = "kind_struct"
 EKindFunction = "kind_function"
 EKindParameter = "kind_parameter"
 EKindVariable = "kind_variable"
+EKindFreeFunction = "kind_free_function"
+EKindFreeVariable = "kind_free_variable"
 EKindTemplateTypeParameter = "kind_template_type_parameter"
 EKindTemplateNonTypeParameter = "kind_template_non_type_parameter"
 EKindTemplateTemplateParameter = "kind_template_template_parameter"
@@ -58,6 +64,8 @@ ParseCommentsMode = {
     EKindFunction : EParseCommentsBeforeDecl,
     EKindParameter : EParseCommentsAfterDecl,
     EKindVariable : EParseCommentsBeforeDecl,
+    EKindFreeFunction : EParseCommentsBeforeDecl,
+    EKindFreeVariable : EParseCommentsBeforeDecl,
     EKindTemplateTypeParameter : EParseCommentsBeforeDecl,
     EKindTemplateNonTypeParameter : EParseCommentsBeforeDecl,
     EKindTemplateTemplateParameter : EParseCommentsBeforeDecl,
@@ -87,7 +95,9 @@ def ParseComments(cursor, kind : str = EParseCommentsBeforeDecl) :
         firstToken = list(cursor.get_tokens())[0]
 
         firstTokenIndex = tokens.index(next(x for x in tokens if x.location.line == firstToken.location.line))
-        lastTokenIndex = tokens.index(next(x for x in tokens[firstTokenIndex:] if x.location.line != firstToken.location.line))
+        lastTokenIndex = firstTokenIndex
+        while lastTokenIndex < len(tokens) and tokens[lastTokenIndex].location.line == firstToken.location.line :
+            lastTokenIndex += 1
 
         if preDeclComments :
             lastTokenIndex = firstTokenIndex
@@ -196,7 +206,7 @@ def PopNode() :
     global NodeStack
     NodeStack = NodeStack[:-1]
 
-def ParseFunction(cursor, isGlobal : bool = False) :
+def ParseFunction(cursor, isFreeFunction : bool = False) :
     global NodeList, NodeTree, NodeStack
 
     node = PushNode(cursor, EKindFunction)
@@ -213,17 +223,30 @@ def ParseFunction(cursor, isGlobal : bool = False) :
 
     PopNode()
 
-    AppendToStackTop(node, ENodeFunctions, isGlobal)
+    if isFreeFunction : 
+        node[ENodeKind] = EKindFreeFunction
+        AppendToStackTop(node, ENodeFreeFunctions, True)
+    elif cursor.storage_class == clang.cindex.StorageClass.STATIC :
+        AppendToStackTop(node, ENodeStaticFunctions)
+    else :
+        AppendToStackTop(node, ENodeFunctions)
 
     return node
 
-def ParseVar(cursor) :
+def ParseVar(cursor, isFreeVariable : bool = False) :
     global NodeList, NodeTree, NodeStack
 
     node = PushNode(cursor, EKindVariable)
     PopNode()
 
-    AppendToStackTop(node, ENodeVariables)
+    if isFreeVariable : 
+        node[ENodeKind] = EKindFreeVariable
+        AppendToStackTop(node, ENodeFreeVariables, True)
+    elif cursor.storage_class == clang.cindex.StorageClass.STATIC :
+        AppendToStackTop(node, ENodeStaticVariables)
+    else :
+        AppendToStackTop(node, ENodeVariables)
+
     NodeList[node[ENodeFullName]] = node
     
     return node
@@ -248,13 +271,21 @@ def ParseStruct(cursor) :
             continue
 
         if child.kind == CursorKind.CXX_METHOD:
-            fn = ParseFunction(child)
-            AppendToStackTop(fn, ENodeFunctions)
+            fn = ParseFunction(child, False)
+            continue
+
+        if child.kind == CursorKind.VAR_DECL :
+            var = ParseVar(child, False)
             continue
 
         if child.kind == CursorKind.FIELD_DECL :
-            var = ParseVar(child)
-            AppendToStackTop(var, ENodeVariables)
+            var = ParseVar(child, False)
+            continue
+
+        if cursor.kind == CursorKind.ENUM_DECL :
+            if cursor.is_definition() :
+                ParseEnum(cursor, False)
+            continue
 
         if child.kind == CursorKind.TEMPLATE_TYPE_PARAMETER or child.kind == CursorKind.TEMPLATE_NON_TYPE_PARAMETER or child.kind == CursorKind.TEMPLATE_TEMPLATE_PARAMETER:
             
@@ -290,7 +321,7 @@ def ParseStruct(cursor) :
 
     return node
 
-def ParseEnum(cursor) :
+def ParseEnum(cursor, isGlobal : bool = False) :
     global NodeList, NodeTree, NodeStack
 
     node = PushNode(cursor, EKindEnum)
@@ -306,7 +337,7 @@ def ParseEnum(cursor) :
 
     PopNode()
 
-    AppendToStackTop(node, ENodeEnums, True)
+    AppendToStackTop(node, ENodeEnums, isGlobal)
 
 def ParseNamespace(cursor) :
     global NodeList, NodeTree, NodeStack
@@ -325,7 +356,7 @@ def ParseTypeAlias(cursor) :
     node[ENodeUnderlyingType] = str(cursor.underlying_typedef_type.spelling)
     PopNode()
 
-    AppendToStackTop(node, ENodeVariables, True)
+    AppendToStackTop(node, ENodeVariables)
 
 def ParseCursor(cursor, forceInclude = False) :
     if cursor.kind.is_translation_unit() :
@@ -365,15 +396,15 @@ def ParseCursor(cursor, forceInclude = False) :
 
     if cursor.kind == CursorKind.ENUM_DECL :
         if cursor.is_definition() :
-            ParseEnum(cursor)
+            ParseEnum(cursor, True)
         return
 
     if cursor.kind == CursorKind.VAR_DECL :
-        ParseVar(cursor)
+        ParseVar(cursor, True)
         return
 
     if cursor.kind == CursorKind.FUNCTION_DECL :
-        ParseFunction(cursor)
+        ParseFunction(cursor, True)
         return
 
     if cursor.kind == CursorKind.UNION_DECL :
@@ -479,7 +510,7 @@ def CodeGenOutputNode(code, node) :
     if node[ENodeKind] == EKindClass or node[ENodeKind] == EKindClassTemplate or node[ENodeKind] == EKindStruct :
         code = CodeGenOutputMetaHeader(code, node)
 
-        code += "\tstd::map<std::string, std::string> Attributes = "
+        code += "\tstatic std::map<std::string_view, std::string_view> Attributes = "
         code += CodeGenOutputAttributes(node, 1) 
         code += ";\n\n"
 
@@ -507,13 +538,8 @@ def CodeGenOutputNode(code, node) :
 
                     code += f"\t\t{infoName}.Attributes = "
                     code += CodeGenOutputAttributes(node, 2)
-                    code += ";\n\n"
-
-                    #if ENodeAttributes in var :
-                    #    for k, v in var[ENodeAttributes].items() :
-                    #        code += f"\t\t{infoName}.Attributes[\"{k}\"] = \"{v}\";\n"
-                    
-                    code += f"\t\tfn(" + infoName + ");\n"
+                    code += ";\n"
+                    code += f"\t\tfn(" + infoName + ");\n\n"
         code += "\t}\n"
 
         if ENodeFunctions in node :
@@ -560,6 +586,18 @@ def CodeGenOutputNode(code, node) :
             for k, v in declarations.items() :
                 code += declarations[k] + "\t\t__debugbreak();\n\t}\n"
 
+        code += "\tstatic void for_each_static_var(std::function<void(std::string_view name)> fn) {\n"
+        if ENodeStaticVariables in node and len(node[ENodeStaticVariables]) > 0 :
+            for _, var in node[ENodeStaticVariables].items() :
+                code += f"\t\tfn(\"{var[ENodeName]}\");\n"
+        code += "\t}\n"
+
+        code += "\tstatic void for_each_static_function(std::function<void(std::string_view name)> fn) {\n"
+        if ENodeStaticFunctions in node and len(node[ENodeStaticFunctions]) > 0 :
+            for _, var in node[ENodeStaticFunctions].items() :
+                code += f"\t\tfn(\"{var[ENodeName]}\");\n"
+        code += "\t}\n"
+
         code = CodeGenOutputMetaFooter(code, node)
 
     elif node[ENodeKind] == EKindEnum :
@@ -595,7 +633,6 @@ def CodeGenOutputNode(code, node) :
 
         code = CodeGenOutputMetaFooter(code, node)
 
-
     return code
 
 def CodeGen(filePath : str) :
@@ -604,6 +641,8 @@ def CodeGen(filePath : str) :
     outputPath = GetOutputFilePath(filePath)
 
     code = ""
+    code += "#pragma once\n\n"
+    code += "#include \"" + str(pathlib.Path(filePath).relative_to(pathlib.Path(filePath).parent)) + "\"\n\n"
     code += "#ifndef _PYCPPGEN_DECLARATIONS\n"
     code += "#define _PYCPPGEN_DECLARATIONS\n\n"
     code += "struct member_variable_info {\n"
@@ -621,6 +660,18 @@ def CodeGen(filePath : str) :
 
     for key in NodeList :
         code = CodeGenOutputNode(code, NodeList[key])
+
+    code += "namespace pycppgen_globals {\n"
+    
+    for _, func in NodeList.items() :
+        if func[ENodeKind] == EKindFreeFunction :
+            code += "//" + func[ENodeFullName] + "\n"
+
+    for _, var in NodeList.items() :
+        if var[ENodeKind] == EKindFreeVariable :
+            code += "//" + var[ENodeType] + " " + var[ENodeFullName] + "\n"
+
+    code += "}\n"
 
     with open(outputPath, mode="wt") as output :
         output.write(code)

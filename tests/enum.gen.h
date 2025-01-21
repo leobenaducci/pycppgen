@@ -1,3 +1,7 @@
+#pragma once
+
+#include "enum.h"
+
 #ifndef _PYCPPGEN_DECLARATIONS
 #define _PYCPPGEN_DECLARATIONS
 
@@ -18,8 +22,6 @@ template<typename T> struct pycppgen {};
 
 #ifndef pycppgen_EEnum
 #define pycppgen_EEnum
-
-enum class EEnum : unsigned;
 
 template<> struct pycppgen<EEnum>{
 	std::map<std::string, std::string> Attributes = {
@@ -70,3 +72,5 @@ template<> struct pycppgen<EEnum>{
 };
 
 #endif //pycppgen_EEnum
+namespace pycppgen_globals {
+}

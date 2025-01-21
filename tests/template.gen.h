@@ -1,3 +1,7 @@
+#pragma once
+
+#include "template.h"
+
 #ifndef _PYCPPGEN_DECLARATIONS
 #define _PYCPPGEN_DECLARATIONS
 
@@ -19,9 +23,9 @@ template<typename T> struct pycppgen {};
 #ifndef pycppgen_Template_TVector_T_
 #define pycppgen_Template_TVector_T_
 
-template<typename T>
+template<typename T, >
 struct pycppgen<Template::TVector<T>>{
-	std::map<std::string, std::string> Attributes = {
+	static std::map<std::string_view, std::string_view> Attributes = {
 
 	};
 
@@ -41,8 +45,8 @@ struct pycppgen<Template::TVector<T>>{
 		x_info.Attributes = {
 
 		};
-
 		fn(x_info);
+
 		member_variable_info y_info;
 		y_info.Name = "y";
 		y_info.Type = typeid(T).name();
@@ -53,8 +57,8 @@ struct pycppgen<Template::TVector<T>>{
 		y_info.Attributes = {
 
 		};
-
 		fn(y_info);
+
 		member_variable_info z_info;
 		z_info.Name = "z";
 		z_info.Type = typeid(T).name();
@@ -65,9 +69,15 @@ struct pycppgen<Template::TVector<T>>{
 		z_info.Attributes = {
 
 		};
-
 		fn(z_info);
+
+	}
+	static void for_each_static_var(std::function<void(std::string_view name)> fn) {
+	}
+	static void for_each_static_function(std::function<void(std::string_view name)> fn) {
 	}
 };
 
 #endif //pycppgen_Template_TVector_T_
+namespace pycppgen_globals {
+}

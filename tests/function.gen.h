@@ -1,3 +1,7 @@
+#pragma once
+
+#include "function.h"
+
 #ifndef _PYCPPGEN_DECLARATIONS
 #define _PYCPPGEN_DECLARATIONS
 
@@ -16,3 +20,6 @@ template<typename T> struct pycppgen {};
 
 #endif //_PYCPPGEN_DECLARATIONS
 
+namespace pycppgen_globals {
+//FuncC()
+}
