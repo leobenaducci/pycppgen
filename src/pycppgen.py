@@ -98,10 +98,7 @@ def ParseComments(cursor, kind : str = EParseCommentsBeforeDecl) :
         tokens = list(parent.get_tokens())
         firstToken = list(cursor.get_tokens())[0]
 
-        firstTokenIndex = tokens.index(next(x for x in tokens if x.ptr_data == firstToken.ptr_data))
-        lastTokenIndex = firstTokenIndex
-        while lastTokenIndex < len(tokens) and tokens[lastTokenIndex].location.line == firstToken.location.line :
-            lastTokenIndex += 1
+        firstTokenIndex = tokens.index(next(x for x in tokens if x.location.line == firstToken.location.line))
 
         if preDeclComments :
             lastTokenIndex = firstTokenIndex
@@ -278,6 +275,10 @@ def ParseStruct(cursor) :
         #inheritance
         if child.kind == CursorKind.CXX_BASE_SPECIFIER :
             AppendToStackTop({ENodeFullName: GetFullName(child)}, ENodeParents)
+            continue
+
+        flags = ParseComments(child, EKindUnknown)
+        if not "include" in flags or flags["include"] == False :
             continue
 
         #class functions
@@ -616,7 +617,7 @@ def CodeGenOutputNode(code, node) :
         code += "\tstatic void for_each_function(std::function<void(const member_function_info&)> fn) {\n"
         if ENodeFunctions in node and len(node[ENodeFunctions]) > 0 :
             for _, func in node[ENodeFunctions].items() :
-                if var[ENodeAccess] == str(AccessSpecifier.PUBLIC) or var[ENodeAccess] == str(AccessSpecifier.PROTECTED) :
+                if func[ENodeAccess] == str(AccessSpecifier.PUBLIC) or func[ENodeAccess] == str(AccessSpecifier.PROTECTED) :
                     funcName = func[ENodeName]
                     infoName = f"{funcName}_info_" + str(code.count('\n'))
                     code += f"\t\tmember_function_info {infoName};\n"

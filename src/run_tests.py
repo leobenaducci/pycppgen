@@ -1,5 +1,5 @@
 import os
-from main import main
+from pycppgen import main
 
 path = os.getcwd()
 if not path.endswith("tests") :
