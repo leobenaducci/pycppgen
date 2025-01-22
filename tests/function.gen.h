@@ -1,3 +1,5 @@
+#pragma once
+
 #include "function.h"
 
 #ifndef _PYCPPGEN_DECLARATIONS
@@ -14,7 +16,26 @@ struct member_variable_info {
 	std::map<std::string, std::string> Attributes;
 };
 
-template<typename T> struct meta {};
+struct function_parameter_info {
+	std::string_view Name;
+	std::string_view Type;
+	std::string_view DefaultValue;
+	std::map<std::string, std::string> Attributes;
+};
+
+struct member_function_info {
+	std::string_view Name;
+	std::string_view Declaration;
+	std::string_view ReturnType;
+	std::vector<function_parameter_info> Parameters;
+	std::map<std::string, std::string> Attributes;
+};
+
+template<typename T> struct pycppgen {};
+
+template<typename T> auto pycppgen_typeof(T&& t) { return pycppgen<std::decay_t<decltype(t)>>(); }
 
 #endif //_PYCPPGEN_DECLARATIONS
 
+namespace pycppgen_globals {
+}

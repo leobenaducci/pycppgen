@@ -1,3 +1,5 @@
+#pragma once
+
 #include "namespace.h"
 
 #ifndef _PYCPPGEN_DECLARATIONS
@@ -14,84 +16,59 @@ struct member_variable_info {
 	std::map<std::string, std::string> Attributes;
 };
 
-template<typename T> struct meta {};
+struct function_parameter_info {
+	std::string_view Name;
+	std::string_view Type;
+	std::string_view DefaultValue;
+	std::map<std::string, std::string> Attributes;
+};
+
+struct member_function_info {
+	std::string_view Name;
+	std::string_view Declaration;
+	std::string_view ReturnType;
+	std::vector<function_parameter_info> Parameters;
+	std::map<std::string, std::string> Attributes;
+};
+
+template<typename T> struct pycppgen {};
+
+template<typename T> auto pycppgen_typeof(T&& t) { return pycppgen<std::decay_t<decltype(t)>>(); }
 
 #endif //_PYCPPGEN_DECLARATIONS
 
+//<autogen_pycppgen_CObject_SSubObject>
+
+#ifndef pycppgen_CObject_SSubObject
+#define pycppgen_CObject_SSubObject
+
 template<>
-struct meta<CObject>{
-	std::map<std::string, std::string> Attributes = {
+struct pycppgen<CObject::SSubObject>{
+	std::map<std::string_view, std::string_view> Attributes = {
 
 	};
 
 	static void for_each_var(std::function<void(const member_variable_info&)> fn) {
-		struct access_helper : CObject {
-			const size_t ProtectedUint_Offset = offsetof(access_helper, CObject::ProtectedUint);
-			const size_t PublicShort_Offset = offsetof(access_helper, CObject::PublicShort);
-			const size_t PublicCharArray_Offset = offsetof(access_helper, CObject::PublicCharArray);
-		};
-		member_variable_info ProtectedUint_info;
-		ProtectedUint_info.Name = "ProtectedUint";
-		ProtectedUint_info.Type = typeid(unsigned int).name();
-		ProtectedUint_info.Offset = access_helper().ProtectedUint_Offset;
-		ProtectedUint_info.ElementSize = sizeof(std::remove_all_extents_t<unsigned int>);
-		ProtectedUint_info.TotalSize = sizeof(unsigned int);
-		ProtectedUint_info.ArrayRank = std::rank_v<unsigned int>;
-		ProtectedUint_info.Attributes = {
-
-		};
-
-		fn(ProtectedUint_info);
-		member_variable_info PublicShort_info;
-		PublicShort_info.Name = "PublicShort";
-		PublicShort_info.Type = typeid(short).name();
-		PublicShort_info.Offset = access_helper().PublicShort_Offset;
-		PublicShort_info.ElementSize = sizeof(std::remove_all_extents_t<short>);
-		PublicShort_info.TotalSize = sizeof(short);
-		PublicShort_info.ArrayRank = std::rank_v<short>;
-		PublicShort_info.Attributes = {
-
-		};
-
-		fn(PublicShort_info);
-		member_variable_info PublicCharArray_info;
-		PublicCharArray_info.Name = "PublicCharArray";
-		PublicCharArray_info.Type = typeid(char[16]).name();
-		PublicCharArray_info.Offset = access_helper().PublicCharArray_Offset;
-		PublicCharArray_info.ElementSize = sizeof(std::remove_all_extents_t<char[16]>);
-		PublicCharArray_info.TotalSize = sizeof(char[16]);
-		PublicCharArray_info.ArrayRank = std::rank_v<char[16]>;
-		PublicCharArray_info.ArrayExtents.push_back(std::extent_v<char[16], 0>);
-		PublicCharArray_info.Attributes = {
-
-		};
-
-		fn(PublicCharArray_info);
 	}
-	static void call_function(std::string_view name, CObject* object) {
-		if (name == "Func") {
-			object->Func();
-			return;
-		}
-		__debugbreak();
+	static void for_each_static_var(std::function<void(std::string_view name)> fn) {
 	}
-	static void call_function(std::string_view name, CObject* object, float& result, float _1, double _2) {
-		if (name == "Add") {
-			result = object->Add( _1,  _2);
-			return;
-		}
-		if (name == "Sub") {
-			result = object->Sub( _1,  _2);
-			return;
-		}
-		__debugbreak();
+	static void for_each_function(std::function<void(const member_function_info&)> fn) {
 	}
-	static void call_function(std::string_view name, const CObject* object, short& result) {
-		if (name == "Get") {
-			result = object->Get();
-			return;
+	static bool call_function(std::string_view name) {
+		if (name == "OnRegister") {
+			CObject::SSubObject::OnRegister();
+			return true;
 		}
-		__debugbreak();
+		return false;
 	}
 };
 
+#endif //pycppgen_CObject_SSubObject
+//</autogen_pycppgen_CObject_SSubObject>
+
+namespace pycppgen_globals {
+//TestNameSpace::FuncA()
+//TestNameSpace::FuncB(int)
+//TestNameSpace::FuncC()
+//int TestNameSpace::GlobalInt
+}

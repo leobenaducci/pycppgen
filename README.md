@@ -4,7 +4,7 @@
 `pycppgen` is a Python script designed to parse and generate C++ code based on user-defined tags. By embedding specific tags within your C++ code, the script dynamically generates reflection-ready templates and attributes to streamline your development workflow.
 
 ## Features
-- **Tag-Based Code Generation**: Add `$[[pycppgen]]` or `$[[pycppgen <flags>]]` after a declaration in your C++ code to generate a `struct meta<type>` template.
+- **Tag-Based Code Generation**: Add `$[[pycppgen]]` or `$[[pycppgen <flags>]]` after a declaration in your C++ code to generate a `struct pycppgen<type>` template.
 - **Reflection Support**: Includes both basic reflection and user-provided attributes to enhance metadata management.
 
 ## Motivation

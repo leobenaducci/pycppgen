@@ -1,6 +1,9 @@
 #pragma once
 
+#include "function.gen.h"
+
 void FuncA();
 void FuncB(int B);
 
-int FuncC(); //$[[pycppgen]]
+//$[[pycppgen]]
+int FuncC();

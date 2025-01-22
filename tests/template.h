@@ -1,8 +1,11 @@
 
+#include "template.gen.h"
+
 namespace Template
 {
+    //$[[pycppgen]]
     template<typename T>
-    struct TVector //$[[pycppgen]]
+    struct TVector 
     {
         T x,y,z;
 

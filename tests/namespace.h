@@ -2,13 +2,19 @@
 
 #include "class.h"
 
+#include "namespace.gen.h"
+
 //$[[pycppgen]]
 namespace TestNameSpace
 {
-    void FuncA();
-    void FuncB(int paramB);
+    //$[[pycppgen]]
+    int GlobalInt = 2;
 
     //$[[pycppgen]]
+    void FuncA();
+    
+    void FuncB(int paramB);
+
     int FuncC();
 
     //$[[pycppgen exclude]]

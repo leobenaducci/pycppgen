@@ -172,3 +172,4 @@ cython_debug/
 /intermediate
 /tests/cpp
 /.vscode
+/tests/tmp.h

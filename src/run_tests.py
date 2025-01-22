@@ -1,5 +1,5 @@
 import os
-from main import ParseFile
+from pycppgen import main
 
 path = os.getcwd()
 if not path.endswith("tests") :
@@ -9,12 +9,9 @@ path = os.getcwd()
 if not path.endswith("tests") :
     exit(-1)
 
-ParseFile(path + "\\class.h")
-ParseFile(path + "\\enum.h")
-ParseFile(path + "\\function.h")
-ParseFile(path + "\\namespace.h")
-ParseFile(path + "\\struct.h")
-ParseFile(path + "\\template.h")
+path = "C:/Leo/VkFramework/intermediate/../source/vkfw"
+
+main([path, "-DVKFW=1", "-I..\\"])
 
 os.makedirs("cpp", exist_ok=True)
 os.chdir("cpp")

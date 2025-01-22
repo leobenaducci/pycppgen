@@ -2,26 +2,41 @@
 
 //$[[pycppgen-include CObject CChild]]
 
-class CObject //$[[pycppgen pure]]
+//$[[pycppgen pure]]
+class CObject
 {
 private:
     int PrivateInt = 2;
     
 protected:
 
-    unsigned int ProtectedUint; //$[[pycppgen min=3;max=15]]
+    //$[[pycppgen min=3;max=15]]
+    unsigned int ProtectedUint;
 
 public:
-    short PublicShort = 123; //$[[pycppgen readonly]]
+
+    //$[[pycppgen]]
+    struct SSubObject
+    {
+        static void OnRegister() {}
+    };
+
+    //$[[pycppgen readonly]]
+    short PublicShort = 123;
 
     char PublicCharArray[16];
 
-    void Func() //$[[pycppgen callable]]
+    //$[[pycppgen]]
+    static int TestStaticFunc() {}
+    
+    //$[[pycppgen callable]]
+    void Func()
     {
         PrivateInt = 3;
     }
 
-    float Add(float A, double B)
+    //$[[pycppgen callable]]
+    float Add(float A /*$[[pycppgen clamp]]*/, double B /*$[[pycppgen auto_cast;enum]]*/)
     {
         return A + float(B);
     }
@@ -36,6 +51,9 @@ public:
     {
         return PublicShort;
     }
+
+    //$[[pycppgen pure]
+    static void OnRegister() {}
 };
 
 class CChild : CObject
