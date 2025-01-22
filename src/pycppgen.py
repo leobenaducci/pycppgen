@@ -640,6 +640,12 @@ def CodeGenOutputNode(code, node) :
 
         declarations = dict()
 
+        code += "\tstatic constexpr bool has_function(std::string_view name) {\n"
+        if ENodeFunctions in node :
+            for _, v in node[ENodeFunctions].items() :
+                code += f"\t\tif constexpr (name == \"{v[ENodeName]}\") return true; \n"
+        code += "\t\treturn false;\n\t}\n"
+
         if ENodeFunctions in node :
             for _, v in node[ENodeFunctions].items() :
                 CodeGenOutputAddFunctionDeclaration(declarations, node, v, False)
@@ -795,6 +801,7 @@ def main(args : list) :
         exit(-1)
 
     FilesToParse = []
+    OldGenFiles = []
     for root, _, files in os.walk(args[0]):
         for file in files:
             if re.match(".*\.h", file) and not re.match(".*\.gen.h", file) :
@@ -802,16 +809,12 @@ def main(args : list) :
                 with open(filePath) as f :
                     if f.read().find("$[[pycppgen") != -1:
                         FilesToParse.append(os.path.join(root, file))
+            if re.match(".*\.gen.h", file) :
+                OldGenFiles += [os.path.join(root, file)]
     
     compilerOptions = []
     if len(args) > 1 :
         compilerOptions = args[1:]
-
-    #remove old files
-    for file in FilesToParse :
-        outputFile = GetOutputFilePath(file)
-        if os.path.exists(outputFile) :
-            os.remove(GetOutputFilePath(file))
 
     PerFileData = {}
 
@@ -853,6 +856,16 @@ def main(args : list) :
 
     print("global code gen step")
     CodeGenGlobal(args[0])
+
+    FilesToParse.append(args[0] + "\\pycppgen.h")
+    GenFiles = list(map(lambda x : str(pathlib.Path(GetOutputFilePath(x)).resolve()), FilesToParse))
+    OldGenFiles = list(map(lambda x : str(pathlib.Path(x).resolve()), OldGenFiles))
+    FilesToRemove = list(set(OldGenFiles).difference(GenFiles))
+    
+    #remove old files
+    for file in FilesToRemove :
+        if os.path.exists(file) :
+            os.remove(file)
 
 if __name__ == "__main__":
     if len(sys.argv) < 2 :
