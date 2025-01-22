@@ -699,8 +699,6 @@ def CodeGenOutputNode(code, node) :
 
 #codegen: output file
 def CodeGen(filePath : str) :
-    global NodeList, NodeTree, NodeStack
-
     outputPath = GetOutputFilePath(filePath)
 
     code = ""
@@ -756,8 +754,6 @@ def CodeGen(filePath : str) :
     with open(outputPath, mode="wt") as output :
         output.write(code)
 
-    global FilesToParse
-
 #codegen: emit for each type call
 def CodeGenGlobalAddForEachTypeCall(code, node) :
     if node[ENodeKind] == EKindClass or node[ENodeKind] == EKindStruct : #or node[ENodeKind] == EKindClassTemplate:
@@ -796,6 +792,20 @@ def CodeGenGlobal(path : str) :
     with open(path + "\\pycppgen.gen.h", mode="wt") as file :
         file.write(code)
 
+def IsOutputUpToDate(file : str) :
+    outputFile = GetOutputFilePath(file)
+
+    if not os.path.exists(outputFile) :
+        return False
+    
+    if not os.path.exists(file) :
+        return False
+    
+    fileTime = os.path.getmtime(file)
+    outputTime = os.path.getmtime(outputFile)
+
+    return fileTime < outputTime        
+
 def main(args : list) :
     global FilesToParse, NodesToInclude, NodeList, NodeTree, NodeStack, PerFileData
 
@@ -812,7 +822,7 @@ def main(args : list) :
                 with open(filePath) as f :
                     if f.read().find("$[[pycppgen") != -1:
                         FilesToParse.append(os.path.join(root, file))
-            if re.match(".*\.gen.h", file) :
+            if file != "pycppgen.gen.h" and re.match(".*\.gen.h", file) :
                 OldGenFiles += [os.path.join(root, file)]
     
     compilerOptions = []
@@ -821,30 +831,48 @@ def main(args : list) :
 
     PerFileData = {}
 
+    GenFiles = list(map(lambda x : str(pathlib.Path(GetOutputFilePath(x)).resolve()), FilesToParse))
+    OldGenFiles = list(map(lambda x : str(pathlib.Path(x).resolve()), OldGenFiles))
+    FilesToRemove = list(set(OldGenFiles).difference(GenFiles))
+    FilesToAdd = list(set(GenFiles).difference(OldGenFiles))
+
+    allFilesUpToDate = len(FilesToRemove) == 0 and len(FilesToAdd) == 0 and os.path.exists(args[0] + "\\pycppgen.gen.h")
     for file in FilesToParse :
-        
+        if not IsOutputUpToDate(file) :
+            print("Outdated file detected: " + file)
+            allFilesUpToDate = False
+            break
+
+    if allFilesUpToDate :
+        return
+    
+    print("parsing path: " + args[0])
+
+    for file in FilesToParse :
         #initialize data
         NodesToInclude = []
         NodeList = {}
         NodeTree = {}
         NodeStack = [NodeTree]        
 
-        print("parsing file: " + file)
         ParseFile(file, compilerOptions)
-
+        
         PerFileData[file] = {
             "NodeList": NodeList,
             "NodesToInclude": NodesToInclude,
             "NodeTree": NodeTree,
             "NodeStack": NodeStack
             }
-
+        
     for file in FilesToParse :
+        if IsOutputUpToDate(file) :
+            continue
+
         NodesToInclude = PerFileData[file]["NodesToInclude"]
         NodeList = PerFileData[file]["NodeList"]
         NodeTree = PerFileData[file]["NodeTree"]
         NodeStack = PerFileData[file]["NodeStack"]
-    
+
         print("generating code for: " + file)
         CodeGen(file)
 
@@ -858,12 +886,8 @@ def main(args : list) :
         NodeList.update(v["NodeList"])
 
     print("global code gen step")
-    CodeGenGlobal(args[0])
-
     FilesToParse.append(args[0] + "\\pycppgen.h")
-    GenFiles = list(map(lambda x : str(pathlib.Path(GetOutputFilePath(x)).resolve()), FilesToParse))
-    OldGenFiles = list(map(lambda x : str(pathlib.Path(x).resolve()), OldGenFiles))
-    FilesToRemove = list(set(OldGenFiles).difference(GenFiles))
+    CodeGenGlobal(args[0])
     
     #remove old files
     for file in FilesToRemove :
