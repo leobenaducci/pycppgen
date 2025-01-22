@@ -7,7 +7,7 @@ struct SVector
     //$[[pycppgen visible]]
     static inline const int size = 3;
     
-    //$[[pycppgen visible]]
+    //$[[pycppgen visible;serialize]]
     float x,y,z;
 
     //$[[pycppgen pure]

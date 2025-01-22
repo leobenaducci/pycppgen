@@ -603,7 +603,7 @@ def CodeGenOutputNode(code, node) :
                     code += f"\t\t{infoName}.ArrayRank = std::rank_v<{varType}>;\n"
                     for i in range(0, varType.count("[")) :
                         code += f"\t\t{infoName}.ArrayExtents.push_back(std::extent_v<{varType}, {i}>);\n"
-                    code += f"\t\t{infoName}.Attributes = {CodeGenOutputAttributes(node, 2)};\n"
+                    code += f"\t\t{infoName}.Attributes = {CodeGenOutputAttributes(var, 2)};\n"
                     code += f"\t\tfn(" + infoName + ");\n\n"
         code += "\t}\n"
 
@@ -611,6 +611,36 @@ def CodeGenOutputNode(code, node) :
         if ENodeStaticVariables in node and len(node[ENodeStaticVariables]) > 0 :
             for _, var in node[ENodeStaticVariables].items() :
                 code += f"\t\tfn(\"{var[ENodeName]}\");\n"
+        code += "\t}\n"
+
+        #serialization
+        code += "\ttemplate<typename T> static T dump(const " + node[ENodeType] + "* object) {\n"
+        code += "\t\tT result;\n"
+        code += f"\t\tresult[\"object_type\"] = \"{node[ENodeType]}\";\n"
+        if ENodeVariables in node and len(node[ENodeVariables]) > 0 :
+            code += "\t\tstruct access_helper : " + node[ENodeFullName] + " {\n"
+            for _, var in node[ENodeVariables].items() :
+                if "serialize" in var[ENodeAttributes] and (var[ENodeAccess] == str(AccessSpecifier.PUBLIC) or var[ENodeAccess] == str(AccessSpecifier.PROTECTED)) :
+                    code += "\t\t\tconst auto Get" + var[ENodeName] + "() const { return " + node[ENodeFullName] + "::" + var[ENodeName] + "; }\n"
+            code += "\t\t};\n"
+            for _, var in node[ENodeVariables].items() :
+                if "serialize" in var[ENodeAttributes] and (var[ENodeAccess] == str(AccessSpecifier.PUBLIC) or var[ENodeAccess] == str(AccessSpecifier.PROTECTED)) :
+                    code += f"\t\tresult[\"{var[ENodeName]}\"] = ((access_helper*)object)->Get{var[ENodeName]}();\n"
+        code += "\t\treturn result;\n"
+        code += "\t}\n"
+
+        code += "\ttemplate<typename T> static std::shared_ptr<" + node[ENodeType] + "> parse(const T& data) {\n"
+        code += f"\t\tauto object = std::make_shared<{node[ENodeType]}>();\n"
+        if ENodeVariables in node and len(node[ENodeVariables]) > 0 :
+            code += "\t\tstruct access_helper : " + node[ENodeFullName] + " {\n"
+            for _, var in node[ENodeVariables].items() :
+                if "serialize" in var[ENodeAttributes] and (var[ENodeAccess] == str(AccessSpecifier.PUBLIC) or var[ENodeAccess] == str(AccessSpecifier.PROTECTED)) :
+                    code += "\t\t\tconst void Set" + var[ENodeName] + "(const decltype(" + node[ENodeFullName] + "::" + var[ENodeName] +" )& value) { " +  node[ENodeFullName] + "::" + var[ENodeName] + " = value; }\n"
+            code += "\t\t};\n"
+            for _, var in node[ENodeVariables].items() :
+                if "serialize" in var[ENodeAttributes] and (var[ENodeAccess] == str(AccessSpecifier.PUBLIC) or var[ENodeAccess] == str(AccessSpecifier.PROTECTED)) :
+                    code += "\t\t((access_helper*)object.get())->Set" + var[ENodeName] + "(data[\"" + var[ENodeName]+ "\"]);\n"
+        code += "\t\treturn object;\n"
         code += "\t}\n"
 
         #functions
@@ -789,10 +819,14 @@ def CodeGenGlobal(path : str) :
     code += ""
     code += "}\n"
 
+    if os.path.exists(path + "\\pycppgen.gen.h") :
+        os.remove(path + "\\pycppgen.gen.h")
+
     with open(path + "\\pycppgen.gen.h", mode="wt") as file :
         file.write(code)
 
 def IsOutputUpToDate(file : str) :
+    return False
     outputFile = GetOutputFilePath(file)
 
     if not os.path.exists(outputFile) :

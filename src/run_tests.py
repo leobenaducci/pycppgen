@@ -11,7 +11,8 @@ if not path.endswith("tests") :
 
 path = "C:/Leo/VkFramework/intermediate/../source/vkfw"
 
-main([path, "-DVKFW=1", "-I..\\"])
+#main([path, "-DVKFW=1", "-I..\\"])
+main(["../tests"])
 
 os.makedirs("cpp", exist_ok=True)
 os.chdir("cpp")
