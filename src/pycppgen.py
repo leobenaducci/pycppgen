@@ -478,19 +478,25 @@ def ParseFile(filePath : str, options : list) :
 #codegen: common type header 
 def CodeGenOutputMetaHeader(code, node) :
     global pycppdefine
+
+    #make a unique name
     pycppdefine = "pycppgen_" + node[ENodeFullName].replace("::", "_").replace("<","_").replace(">","_")
 
+    #tag the begining of autogen code
     code += f"//<autogen_{pycppdefine}>\n\n"
+
+    #ifndef pycppgen_<nodefullname>
     code += f"#ifndef {pycppdefine}\n"
+    #define pycppgen_<nodefullname>
     code += f"#define {pycppdefine}\n\n"
+
+    #create the specialized pycppgen struct
+    #code 'template<> struct pycppgen<type_name> {
+    code += "template<"
     if ENodeMetaTemplateDecl in node :
-        code += "template<"
         code += node[ENodeMetaTemplateDecl]
-        code += ">\nstruct pycppgen<"
-    else :
-        code += "template<> struct pycppgen<"
-    code += node[ENodeFullName]
-    code += ">{\n"
+    code += ">\nstruct pycppgen<" + {node[ENodeFullName]} + "> {\n"
+
     return code
 
 #codegen: common type footer
@@ -499,6 +505,8 @@ def CodeGenOutputMetaFooter(code, node) :
 
     code += "};\n\n"
     code += f"#endif //{pycppdefine}\n"
+
+    #tag the end of autogen code
     code += f"//</autogen_{pycppdefine}>\n\n"
 
     pycppdefine = None
@@ -536,32 +544,47 @@ def CodeGenOutputAddFunctionDeclaration(declarations, node, funcNode, isStatic :
     numParams = len(funcNode[ENodeParameters])
     isConst = decl.endswith("const")
       
+    #if call_function with the current return value and parameters doesn't exists, create it
     if not decl in declarations :
+        #code 'static bool call_function(std::string view name, '
         declarations[decl] = "\tstatic bool call_function(std::string_view name, " 
         if not isStatic :
             if isConst :
+                #code 'const '
                 declarations[decl] += "const " 
+            #code '<type>* object, '
             declarations[decl] += node[ENodeType] + "* object, "
 
         if funcNode[ENodeReturnType] != "void" :
+            #code '<return_type>& result, '
             declarations[decl] += funcNode[ENodeReturnType] + "& result, "
 
         paramNum = 1
         for _, pv in funcNode[ENodeParameters].items() :
+            #code '_<param_num, '
             declarations[decl] += pv[ENodeType] + " _" + str(paramNum) + ", "
             paramNum += 1
+
+        #remove last ', ' and close parenthesis 
         declarations[decl] = declarations[decl][:-2] + ") {\n"
     
+    #append name comparison + call code
+    #code '     if (name == "<function_name>") {
     declarations[decl] += "\t\tif (name == \"" + funcNode[ENodeName] + "\") {\n"
     declarations[decl] += "\t\t\t"
+
     if funcNode[ENodeReturnType] != "void" :
+        #code 'result = '
         declarations[decl] += "result = "
 
-    if isStatic :
+    if isStatic :   
+        #code '<class_name>::<function_name>('
         declarations[decl] += f"{node[ENodeType]}::{funcNode[ENodeName]}("
-    else :
+    else :          
+        #code 'object-><function_name>('
         declarations[decl] += f"object->{funcNode[ENodeName]}("
 
+    #code '[_1, _2...]'
     if numParams > 0 :
         paramNum = 1
         for _, pv in funcNode[ENodeParameters].items() :
@@ -570,10 +593,14 @@ def CodeGenOutputAddFunctionDeclaration(declarations, node, funcNode, isStatic :
         declarations[decl] = declarations[decl][:-2] + ");\n"
     else :
         declarations[decl] += ");\n"
+
+    #code '         return true;'
+    #code '     }'
     declarations[decl] += "\t\t\treturn true;\n\t\t}\n"
 
 #codegen: emit a node
 def CodeGenOutputNode(code, node) :
+    #class or structs
     if node[ENodeKind] == EKindClass or node[ENodeKind] == EKindClassTemplate or node[ENodeKind] == EKindStruct :
         code = CodeGenOutputMetaHeader(code, node)
 
