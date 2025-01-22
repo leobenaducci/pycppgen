@@ -638,13 +638,16 @@ def CodeGenOutputNode(code, node) :
                     code += "\t\t}\n"
         code += "\t}\n"
 
-        declarations = dict()
-
         code += "\tstatic constexpr bool has_function(std::string_view name) {\n"
         if ENodeFunctions in node :
             for _, v in node[ENodeFunctions].items() :
                 code += f"\t\tif constexpr (name == \"{v[ENodeName]}\") return true; \n"
+        if ENodeStaticFunctions in node :
+            for _, v in node[ENodeStaticFunctions].items() :
+                code += f"\t\tif constexpr (name == \"{v[ENodeName]}\") return true; \n"
         code += "\t\treturn false;\n\t}\n"
+
+        declarations = dict()
 
         if ENodeFunctions in node :
             for _, v in node[ENodeFunctions].items() :
