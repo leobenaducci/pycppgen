@@ -604,43 +604,62 @@ def CodeGenOutputNode(code, node) :
     if node[ENodeKind] == EKindClass or node[ENodeKind] == EKindClassTemplate or node[ENodeKind] == EKindStruct :
         code = CodeGenOutputMetaHeader(code, node)
 
+        #declare the attribute map
         code += "\tstd::map<std::string_view, std::string_view> Attributes = "
         code += CodeGenOutputAttributes(node, 1) 
         code += ";\n\n"
 
-        #variables
+        #variable's reflection
         code += "\tstatic void for_each_var(std::function<void(const member_variable_info&)> fn) {\n"
         if ENodeVariables in node and len(node[ENodeVariables]) > 0 :
+            #create an access_helper to read protected variables
             code += "\t\tstruct access_helper : " + node[ENodeFullName] + " {\n"
             for _, var in node[ENodeVariables].items() :
-                if var[ENodeAccess] == str(AccessSpecifier.PUBLIC) or var[ENodeAccess] == str(AccessSpecifier.PROTECTED) :
+                if var[ENodeAccess] == str(AccessSpecifier.PROTECTED) :
                     code += "\t\t\tconst size_t " + var[ENodeName] + "_Offset = offsetof(access_helper, " + node[ENodeFullName] + "::" + var[ENodeName] + ");\n"
             code += "\t\t};\n"
             for _, var in node[ENodeVariables].items() :
-                if var[ENodeAccess] == str(AccessSpecifier.PUBLIC) or var[ENodeAccess] == str(AccessSpecifier.PROTECTED) :
-                    varName = var[ENodeName]
-                    varType = var[ENodeType]
-                    infoName = f"{varName}_info_" + str(code.count('\n'))
-                    code += f"\t\tmember_variable_info {infoName};\n"
-                    code += f"\t\t{infoName}.Name = \"{varName}\";\n"
-                    code += f"\t\t{infoName}.Type = typeid({varType}).name();\n"
+                #skip private variables
+                if var[ENodeAccess] == str(AccessSpecifier.PRIVATE) :
+                    continue
+                
+                #frequently used variables
+                varName = var[ENodeName]
+                varType = var[ENodeType]
+                infoName = f"{varName}_info_" + str(code.count('\n'))
+
+                code += f"\t\tmember_variable_info {infoName};\n"
+                #variable name
+                code += f"\t\t{infoName}.Name = \"{varName}\";\n"
+                #typeid name
+                code += f"\t\t{infoName}.Type = typeid({varType}).name();\n"
+                #get the protected variable offset using the access_helper
+                if var[ENodeAccess] == str(AccessSpecifier.PROTECTED) :
                     code += f"\t\t{infoName}.Offset = access_helper().{varName}_Offset;\n"
-                    code += f"\t\t{infoName}.ElementSize = sizeof(std::remove_all_extents_t<{varType}>);\n"
-                    code += f"\t\t{infoName}.TotalSize = sizeof({varType});\n"
-                    code += f"\t\t{infoName}.ArrayRank = std::rank_v<{varType}>;\n"
-                    for i in range(0, varType.count("[")) :
-                        code += f"\t\t{infoName}.ArrayExtents.push_back(std::extent_v<{varType}, {i}>);\n"
-                    code += f"\t\t{infoName}.Attributes = {CodeGenOutputAttributes(var, 2)};\n"
-                    code += f"\t\tfn(" + infoName + ");\n\n"
+                else :
+                    code += f"\t\t{infoName}.Offset = offsetof({node[ENodeFullName]}, {varName};\n"
+                #single element size
+                code += f"\t\t{infoName}.ElementSize = sizeof(std::remove_all_extents_t<{varType}>);\n"
+                #total size
+                code += f"\t\t{infoName}.TotalSize = sizeof({varType});\n"
+                #array dimensions
+                code += f"\t\t{infoName}.ArrayRank = std::rank_v<{varType}>;\n"
+                for i in range(0, varType.count("[")) :
+                    code += f"\t\t{infoName}.ArrayExtents.push_back(std::extent_v<{varType}, {i}>);\n"
+                #variable attributes
+                code += f"\t\t{infoName}.Attributes = {CodeGenOutputAttributes(var, 2)};\n"
+                #call visitor
+                code += f"\t\tfn(" + infoName + ");\n\n"
         code += "\t}\n"
 
+        #TODO do the same for static variables
         code += "\tstatic void for_each_static_var(std::function<void(std::string_view name)> fn) {\n"
         if ENodeStaticVariables in node and len(node[ENodeStaticVariables]) > 0 :
             for _, var in node[ENodeStaticVariables].items() :
                 code += f"\t\tfn(\"{var[ENodeName]}\");\n"
         code += "\t}\n"
 
-        #serialization
+        #serialization creates a dump (output) and parse (input) functions
         code += "\ttemplate<typename T> static T dump(const " + node[ENodeType] + "* object) {\n"
         code += "\t\tT result;\n"
         code += f"\t\tresult[\"object_type\"] = \"{node[ENodeType]}\";\n"
@@ -656,7 +675,7 @@ def CodeGenOutputNode(code, node) :
         code += "\t\treturn result;\n"
         code += "\t}\n"
 
-        code += "\ttemplate<typename T> static std::shared_ptr<" + node[ENodeType] + "> parse(const T& data) {\n"
+        code += "\ttemplate<typename T> static bool parse(const T& data) {\n"
         code += f"\t\tauto object = std::make_shared<{node[ENodeType]}>();\n"
         if ENodeVariables in node and len(node[ENodeVariables]) > 0 :
             code += "\t\tstruct access_helper : " + node[ENodeFullName] + " {\n"
