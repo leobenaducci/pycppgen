@@ -214,10 +214,11 @@ def ParseFunction(cursor, isFreeFunction : bool = False) :
     #push this function to it's parent
     node = PushNode(cursor, EKindFunction)
     
-    #get the return type and parameters
+    #get the return type
     node[ENodeReturnType] = cursor.result_type.spelling
-    node[ENodeParameters] = dict()
 
+    #and parameters
+    node[ENodeParameters] = dict()
     for child in cursor.get_children() :
         if child.kind == CursorKind.PARM_DECL:
             param = PushNode(child, EKindParameter)
@@ -250,9 +251,9 @@ def ParseVar(cursor, isFreeVariable : bool = False) :
         node[ENodeKind] = EKindFreeVariable
         AppendToStackTop(node, ENodeFreeVariables, True)
     elif cursor.storage_class == clang.cindex.StorageClass.STATIC :
-        AppendToStackTop(node, ENodeStaticVariables, True)
+        AppendToStackTop(node, ENodeStaticVariables)
     else :
-        AppendToStackTop(node, ENodeVariables, True)
+        AppendToStackTop(node, ENodeVariables)
     
     return node
 
@@ -609,15 +610,20 @@ def CodeGenOutputNode(code, node) :
         code += CodeGenOutputAttributes(node, 1) 
         code += ";\n\n"
 
-        #variable's reflection
-        code += "\tstatic void for_each_var(std::function<void(const member_variable_info&)> fn) {\n"
+        #create the access helper
         if ENodeVariables in node and len(node[ENodeVariables]) > 0 :
             #create an access_helper to read protected variables
             code += "\t\tstruct access_helper : " + node[ENodeFullName] + " {\n"
             for _, var in node[ENodeVariables].items() :
-                if var[ENodeAccess] == str(AccessSpecifier.PROTECTED) :
+                if var[ENodeAccess] == str(AccessSpecifier.PROTECTED) or var[ENodeAccess] == str(AccessSpecifier.PUBLIC) :
                     code += "\t\t\tconst size_t " + var[ENodeName] + "_Offset = offsetof(access_helper, " + node[ENodeFullName] + "::" + var[ENodeName] + ");\n"
+                    code += "\t\t\tconst void Set" + var[ENodeName] + "(const decltype(" + node[ENodeFullName] + "::" + var[ENodeName] +" )& value) { " +  node[ENodeFullName] + "::" + var[ENodeName] + " = value; }\n"
+                    code += "\t\t\tconst auto Get" + var[ENodeName] + "() const { return " + node[ENodeFullName] + "::" + var[ENodeName] + "; }\n"
             code += "\t\t};\n"
+
+        #variable's reflection
+        code += "\tstatic void for_each_var(std::function<void(const member_variable_info&)> fn) {\n"
+        if ENodeVariables in node and len(node[ENodeVariables]) > 0 :
             for _, var in node[ENodeVariables].items() :
                 #skip private variables
                 if var[ENodeAccess] == str(AccessSpecifier.PRIVATE) :
@@ -662,31 +668,20 @@ def CodeGenOutputNode(code, node) :
         #serialization creates a dump (output) and parse (input) functions
         code += "\ttemplate<typename T> static T dump(const " + node[ENodeType] + "* object) {\n"
         code += "\t\tT result;\n"
-        code += f"\t\tresult[\"object_type\"] = \"{node[ENodeType]}\";\n"
         if ENodeVariables in node and len(node[ENodeVariables]) > 0 :
-            code += "\t\tstruct access_helper : " + node[ENodeFullName] + " {\n"
-            for _, var in node[ENodeVariables].items() :
-                if "serialize" in var[ENodeAttributes] and (var[ENodeAccess] == str(AccessSpecifier.PUBLIC) or var[ENodeAccess] == str(AccessSpecifier.PROTECTED)) :
-                    code += "\t\t\tconst auto Get" + var[ENodeName] + "() const { return " + node[ENodeFullName] + "::" + var[ENodeName] + "; }\n"
-            code += "\t\t};\n"
+            #serialize the values
             for _, var in node[ENodeVariables].items() :
                 if "serialize" in var[ENodeAttributes] and (var[ENodeAccess] == str(AccessSpecifier.PUBLIC) or var[ENodeAccess] == str(AccessSpecifier.PROTECTED)) :
                     code += f"\t\tresult[\"{var[ENodeName]}\"] = ((access_helper*)object)->Get{var[ENodeName]}();\n"
         code += "\t\treturn result;\n"
         code += "\t}\n"
 
-        code += "\ttemplate<typename T> static bool parse(const T& data) {\n"
-        code += f"\t\tauto object = std::make_shared<{node[ENodeType]}>();\n"
+        code += "\ttemplate<typename T, typename R> static bool parse(const T& data, R* object) {\n"
         if ENodeVariables in node and len(node[ENodeVariables]) > 0 :
-            code += "\t\tstruct access_helper : " + node[ENodeFullName] + " {\n"
             for _, var in node[ENodeVariables].items() :
                 if "serialize" in var[ENodeAttributes] and (var[ENodeAccess] == str(AccessSpecifier.PUBLIC) or var[ENodeAccess] == str(AccessSpecifier.PROTECTED)) :
-                    code += "\t\t\tconst void Set" + var[ENodeName] + "(const decltype(" + node[ENodeFullName] + "::" + var[ENodeName] +" )& value) { " +  node[ENodeFullName] + "::" + var[ENodeName] + " = value; }\n"
-            code += "\t\t};\n"
-            for _, var in node[ENodeVariables].items() :
-                if "serialize" in var[ENodeAttributes] and (var[ENodeAccess] == str(AccessSpecifier.PUBLIC) or var[ENodeAccess] == str(AccessSpecifier.PROTECTED)) :
-                    code += "\t\t((access_helper*)object.get())->Set" + var[ENodeName] + "(data[\"" + var[ENodeName]+ "\"]);\n"
-        code += "\t\treturn object;\n"
+                    code += "\t\t((access_helper*)object)->Set" + var[ENodeName] + "(data[\"" + var[ENodeName]+ "\"]);\n"
+        code += "\t\treturn true;\n"
         code += "\t}\n"
 
         #functions
@@ -714,6 +709,7 @@ def CodeGenOutputNode(code, node) :
                     code += "\t\t}\n"
         code += "\t}\n"
 
+        #has_function by name declaration
         code += "\tstatic constexpr bool has_function(std::string_view name) {\n"
         if ENodeFunctions in node :
             for _, v in node[ENodeFunctions].items() :
@@ -725,10 +721,12 @@ def CodeGenOutputNode(code, node) :
 
         declarations = dict()
 
+        #append functions
         if ENodeFunctions in node :
             for _, v in node[ENodeFunctions].items() :
                 CodeGenOutputAddFunctionDeclaration(declarations, node, v, False)
 
+        #append static functions
         if ENodeStaticFunctions in node and len(node[ENodeStaticFunctions]) > 0 :
             for _, v in node[ENodeStaticFunctions].items() :
                 CodeGenOutputAddFunctionDeclaration(declarations, node, v, True)
@@ -741,31 +739,36 @@ def CodeGenOutputNode(code, node) :
     elif node[ENodeKind] == EKindEnum :
         code = CodeGenOutputMetaHeader(code, node)
 
+        #append enum attributes
         code += "\tstd::map<std::string, std::string> Attributes = "
         code += CodeGenOutputAttributes(node, 1) 
         code += ";\n\n"
 
         if ENodeEnumValues in node :
+            #for each enum
             code += "\ttemplate<typename FN> static void for_each_enum(FN&& fn) {\n"
             for k, v in node[ENodeEnumValues].items() :
                 code += "\t\tfn( " + node[ENodeFullName] + "::" + k + " );\n"
             code += "\t}\n"
 
+            #enum to string
             code += "\tstatic constexpr std::string_view enum_to_string(" + node[ENodeFullName] + " value) {\n"
             for k, v in node[ENodeEnumValues].items() :
                 code += "\t\tif (value == " + node[ENodeFullName] + "::" + k + " ) return \"" + k + "\";\n"
             code += "\t\treturn \"\";\n"
             code += "\t}\n"
 
+            #string to enum
             code += "\tstatic constexpr " + node[ENodeFullName] + " string_to_enum(std::string_view value) {\n"
             for k, v in node[ENodeEnumValues].items() :
                 code += "\t\tif (value == \"" + k + "\") return " + node[ENodeFullName] + "::" + k + ";\n"
             code += "\t\treturn static_cast<" + node[ENodeFullName] + ">(-1);\n"
             code += "\t}\n"
 
-            code += "\tstatic std::map<std::string, std::string> enum_attributes(" + node[ENodeFullName] + " value) {\n"
+            #enum value attributes
+            code += "\tstatic std::map<std::string, std::string> enum_value_attributes(" + node[ENodeFullName] + " value) {\n"
             for k, v in node[ENodeEnumValues].items() :
-                code += "\t\tif (value == " + node[ENodeFullName] + "::" + k + " ) {\n\t\t\treturn " + CodeGenOutputAttributes(v, 3) + ";\n\t\t}\n"
+                code += "\t\tif (value == " + node[ENodeFullName] + "::" + k + ") {\n\t\t\treturn " + CodeGenOutputAttributes(v, 3) + ";\n\t\t}\n"
             code += "\t\treturn {};\n"
             code += "\t}\n"
 
