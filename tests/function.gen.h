@@ -38,4 +38,5 @@ template<typename T> auto pycppgen_typeof(T&& t) { return pycppgen<std::decay_t<
 #endif //_PYCPPGEN_DECLARATIONS
 
 namespace pycppgen_globals {
+//FuncC()
 }

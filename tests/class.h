@@ -10,7 +10,7 @@ private:
     
 protected:
 
-    //$[[pycppgen min=3;max=15]]
+    //$[[pycppgen min=3;max=15;serialize]]
     unsigned int ProtectedUint;
 
 public:
@@ -21,9 +21,10 @@ public:
         static void OnRegister() {}
     };
 
-    //$[[pycppgen readonly]]
+    //$[[pycppgen serialize]]
     short PublicShort = 123;
 
+    //$[[pycppgen readonly]]
     char PublicCharArray[16];
 
     //$[[pycppgen]]

@@ -214,10 +214,11 @@ def ParseFunction(cursor, isFreeFunction : bool = False) :
     #push this function to it's parent
     node = PushNode(cursor, EKindFunction)
     
-    #get the return type and parameters
+    #get the return type
     node[ENodeReturnType] = cursor.result_type.spelling
-    node[ENodeParameters] = dict()
 
+    #and parameters
+    node[ENodeParameters] = dict()
     for child in cursor.get_children() :
         if child.kind == CursorKind.PARM_DECL:
             param = PushNode(child, EKindParameter)
@@ -250,9 +251,9 @@ def ParseVar(cursor, isFreeVariable : bool = False) :
         node[ENodeKind] = EKindFreeVariable
         AppendToStackTop(node, ENodeFreeVariables, True)
     elif cursor.storage_class == clang.cindex.StorageClass.STATIC :
-        AppendToStackTop(node, ENodeStaticVariables, True)
+        AppendToStackTop(node, ENodeStaticVariables)
     else :
-        AppendToStackTop(node, ENodeVariables, True)
+        AppendToStackTop(node, ENodeVariables)
     
     return node
 
@@ -463,7 +464,7 @@ def ParseFile(filePath : str, options : list) :
         with open("tmp.h", "wt") as dst:
             outlines = []
             for line in src.readlines() :
-                if re.match(".*\#\s*include", line) != None:
+                if re.match(r".*\#\s*include", line) != None:
                     continue
                 outlines += [line]
             dst.writelines(outlines)
@@ -478,19 +479,25 @@ def ParseFile(filePath : str, options : list) :
 #codegen: common type header 
 def CodeGenOutputMetaHeader(code, node) :
     global pycppdefine
+
+    #make a unique name
     pycppdefine = "pycppgen_" + node[ENodeFullName].replace("::", "_").replace("<","_").replace(">","_")
 
+    #tag the begining of autogen code
     code += f"//<autogen_{pycppdefine}>\n\n"
+
+    #ifndef pycppgen_<nodefullname>
     code += f"#ifndef {pycppdefine}\n"
+    #define pycppgen_<nodefullname>
     code += f"#define {pycppdefine}\n\n"
+
+    #create the specialized pycppgen struct
+    #code 'template<> struct pycppgen<type_name> {
+    code += "template<"
     if ENodeMetaTemplateDecl in node :
-        code += "template<"
         code += node[ENodeMetaTemplateDecl]
-        code += ">\nstruct pycppgen<"
-    else :
-        code += "template<> struct pycppgen<"
-    code += node[ENodeFullName]
-    code += ">{\n"
+    code += ">\nstruct pycppgen<" + node[ENodeFullName] + "> {\n"
+
     return code
 
 #codegen: common type footer
@@ -499,6 +506,8 @@ def CodeGenOutputMetaFooter(code, node) :
 
     code += "};\n\n"
     code += f"#endif //{pycppdefine}\n"
+
+    #tag the end of autogen code
     code += f"//</autogen_{pycppdefine}>\n\n"
 
     pycppdefine = None
@@ -536,32 +545,47 @@ def CodeGenOutputAddFunctionDeclaration(declarations, node, funcNode, isStatic :
     numParams = len(funcNode[ENodeParameters])
     isConst = decl.endswith("const")
       
+    #if call_function with the current return value and parameters doesn't exists, create it
     if not decl in declarations :
+        #code 'static bool call_function(std::string view name, '
         declarations[decl] = "\tstatic bool call_function(std::string_view name, " 
         if not isStatic :
             if isConst :
+                #code 'const '
                 declarations[decl] += "const " 
+            #code '<type>* object, '
             declarations[decl] += node[ENodeType] + "* object, "
 
         if funcNode[ENodeReturnType] != "void" :
+            #code '<return_type>& result, '
             declarations[decl] += funcNode[ENodeReturnType] + "& result, "
 
         paramNum = 1
         for _, pv in funcNode[ENodeParameters].items() :
+            #code '_<param_num, '
             declarations[decl] += pv[ENodeType] + " _" + str(paramNum) + ", "
             paramNum += 1
+
+        #remove last ', ' and close parenthesis 
         declarations[decl] = declarations[decl][:-2] + ") {\n"
     
+    #append name comparison + call code
+    #code '     if (name == "<function_name>") {
     declarations[decl] += "\t\tif (name == \"" + funcNode[ENodeName] + "\") {\n"
     declarations[decl] += "\t\t\t"
+
     if funcNode[ENodeReturnType] != "void" :
+        #code 'result = '
         declarations[decl] += "result = "
 
-    if isStatic :
+    if isStatic :   
+        #code '<class_name>::<function_name>('
         declarations[decl] += f"{node[ENodeType]}::{funcNode[ENodeName]}("
-    else :
+    else :          
+        #code 'object-><function_name>('
         declarations[decl] += f"object->{funcNode[ENodeName]}("
 
+    #code '[_1, _2...]'
     if numParams > 0 :
         paramNum = 1
         for _, pv in funcNode[ENodeParameters].items() :
@@ -570,47 +594,94 @@ def CodeGenOutputAddFunctionDeclaration(declarations, node, funcNode, isStatic :
         declarations[decl] = declarations[decl][:-2] + ");\n"
     else :
         declarations[decl] += ");\n"
+
+    #code '         return true;'
+    #code '     }'
     declarations[decl] += "\t\t\treturn true;\n\t\t}\n"
 
 #codegen: emit a node
 def CodeGenOutputNode(code, node) :
+    #class or structs
     if node[ENodeKind] == EKindClass or node[ENodeKind] == EKindClassTemplate or node[ENodeKind] == EKindStruct :
         code = CodeGenOutputMetaHeader(code, node)
 
+        #declare the attribute map
         code += "\tstd::map<std::string_view, std::string_view> Attributes = "
         code += CodeGenOutputAttributes(node, 1) 
         code += ";\n\n"
 
-        #variables
-        code += "\tstatic void for_each_var(std::function<void(const member_variable_info&)> fn) {\n"
+        #create the access helper
         if ENodeVariables in node and len(node[ENodeVariables]) > 0 :
+            #create an access_helper to read protected variables
             code += "\t\tstruct access_helper : " + node[ENodeFullName] + " {\n"
             for _, var in node[ENodeVariables].items() :
-                if var[ENodeAccess] == str(AccessSpecifier.PUBLIC) or var[ENodeAccess] == str(AccessSpecifier.PROTECTED) :
+                if var[ENodeAccess] == str(AccessSpecifier.PROTECTED) or var[ENodeAccess] == str(AccessSpecifier.PUBLIC) :
                     code += "\t\t\tconst size_t " + var[ENodeName] + "_Offset = offsetof(access_helper, " + node[ENodeFullName] + "::" + var[ENodeName] + ");\n"
+                    code += "\t\t\tconst void Set" + var[ENodeName] + "(const decltype(" + node[ENodeFullName] + "::" + var[ENodeName] +" )& value) { " +  node[ENodeFullName] + "::" + var[ENodeName] + " = value; }\n"
+                    code += "\t\t\tconst auto Get" + var[ENodeName] + "() const { return " + node[ENodeFullName] + "::" + var[ENodeName] + "; }\n"
             code += "\t\t};\n"
+
+        #variable's reflection
+        code += "\tstatic void for_each_var(std::function<void(const member_variable_info&)> fn) {\n"
+        if ENodeVariables in node and len(node[ENodeVariables]) > 0 :
             for _, var in node[ENodeVariables].items() :
-                if var[ENodeAccess] == str(AccessSpecifier.PUBLIC) or var[ENodeAccess] == str(AccessSpecifier.PROTECTED) :
-                    varName = var[ENodeName]
-                    varType = var[ENodeType]
-                    infoName = f"{varName}_info_" + str(code.count('\n'))
-                    code += f"\t\tmember_variable_info {infoName};\n"
-                    code += f"\t\t{infoName}.Name = \"{varName}\";\n"
-                    code += f"\t\t{infoName}.Type = typeid({varType}).name();\n"
+                #skip private variables
+                if var[ENodeAccess] == str(AccessSpecifier.PRIVATE) :
+                    continue
+                
+                #frequently used variables
+                varName = var[ENodeName]
+                varType = var[ENodeType]
+                infoName = f"{varName}_info_" + str(code.count('\n'))
+
+                code += f"\t\tmember_variable_info {infoName};\n"
+                #variable name
+                code += f"\t\t{infoName}.Name = \"{varName}\";\n"
+                #typeid name
+                code += f"\t\t{infoName}.Type = typeid({varType}).name();\n"
+                #get the protected variable offset using the access_helper
+                if var[ENodeAccess] == str(AccessSpecifier.PROTECTED) :
                     code += f"\t\t{infoName}.Offset = access_helper().{varName}_Offset;\n"
-                    code += f"\t\t{infoName}.ElementSize = sizeof(std::remove_all_extents_t<{varType}>);\n"
-                    code += f"\t\t{infoName}.TotalSize = sizeof({varType});\n"
-                    code += f"\t\t{infoName}.ArrayRank = std::rank_v<{varType}>;\n"
-                    for i in range(0, varType.count("[")) :
-                        code += f"\t\t{infoName}.ArrayExtents.push_back(std::extent_v<{varType}, {i}>);\n"
-                    code += f"\t\t{infoName}.Attributes = {CodeGenOutputAttributes(node, 2)};\n"
-                    code += f"\t\tfn(" + infoName + ");\n\n"
+                else :
+                    code += f"\t\t{infoName}.Offset = offsetof({node[ENodeFullName]}, {varName};\n"
+                #single element size
+                code += f"\t\t{infoName}.ElementSize = sizeof(std::remove_all_extents_t<{varType}>);\n"
+                #total size
+                code += f"\t\t{infoName}.TotalSize = sizeof({varType});\n"
+                #array dimensions
+                code += f"\t\t{infoName}.ArrayRank = std::rank_v<{varType}>;\n"
+                for i in range(0, varType.count("[")) :
+                    code += f"\t\t{infoName}.ArrayExtents.push_back(std::extent_v<{varType}, {i}>);\n"
+                #variable attributes
+                code += f"\t\t{infoName}.Attributes = {CodeGenOutputAttributes(var, 2)};\n"
+                #call visitor
+                code += f"\t\tfn(" + infoName + ");\n\n"
         code += "\t}\n"
 
+        #TODO do the same for static variables
         code += "\tstatic void for_each_static_var(std::function<void(std::string_view name)> fn) {\n"
         if ENodeStaticVariables in node and len(node[ENodeStaticVariables]) > 0 :
             for _, var in node[ENodeStaticVariables].items() :
                 code += f"\t\tfn(\"{var[ENodeName]}\");\n"
+        code += "\t}\n"
+
+        #serialization creates a dump (output) and parse (input) functions
+        code += "\ttemplate<typename T> static T dump(const " + node[ENodeType] + "* object) {\n"
+        code += "\t\tT result;\n"
+        if ENodeVariables in node and len(node[ENodeVariables]) > 0 :
+            #serialize the values
+            for _, var in node[ENodeVariables].items() :
+                if "serialize" in var[ENodeAttributes] and (var[ENodeAccess] == str(AccessSpecifier.PUBLIC) or var[ENodeAccess] == str(AccessSpecifier.PROTECTED)) :
+                    code += f"\t\tresult[\"{var[ENodeName]}\"] = ((access_helper*)object)->Get{var[ENodeName]}();\n"
+        code += "\t\treturn result;\n"
+        code += "\t}\n"
+
+        code += "\ttemplate<typename T, typename R> static bool parse(const T& data, R* object) {\n"
+        if ENodeVariables in node and len(node[ENodeVariables]) > 0 :
+            for _, var in node[ENodeVariables].items() :
+                if "serialize" in var[ENodeAttributes] and (var[ENodeAccess] == str(AccessSpecifier.PUBLIC) or var[ENodeAccess] == str(AccessSpecifier.PROTECTED)) :
+                    code += "\t\t((access_helper*)object)->Set" + var[ENodeName] + "(data[\"" + var[ENodeName]+ "\"]);\n"
+        code += "\t\treturn true;\n"
         code += "\t}\n"
 
         #functions
@@ -638,6 +709,7 @@ def CodeGenOutputNode(code, node) :
                     code += "\t\t}\n"
         code += "\t}\n"
 
+        #has_function by name declaration
         code += "\tstatic constexpr bool has_function(std::string_view name) {\n"
         if ENodeFunctions in node :
             for _, v in node[ENodeFunctions].items() :
@@ -649,10 +721,12 @@ def CodeGenOutputNode(code, node) :
 
         declarations = dict()
 
+        #append functions
         if ENodeFunctions in node :
             for _, v in node[ENodeFunctions].items() :
                 CodeGenOutputAddFunctionDeclaration(declarations, node, v, False)
 
+        #append static functions
         if ENodeStaticFunctions in node and len(node[ENodeStaticFunctions]) > 0 :
             for _, v in node[ENodeStaticFunctions].items() :
                 CodeGenOutputAddFunctionDeclaration(declarations, node, v, True)
@@ -665,31 +739,36 @@ def CodeGenOutputNode(code, node) :
     elif node[ENodeKind] == EKindEnum :
         code = CodeGenOutputMetaHeader(code, node)
 
+        #append enum attributes
         code += "\tstd::map<std::string, std::string> Attributes = "
         code += CodeGenOutputAttributes(node, 1) 
         code += ";\n\n"
 
         if ENodeEnumValues in node :
+            #for each enum
             code += "\ttemplate<typename FN> static void for_each_enum(FN&& fn) {\n"
             for k, v in node[ENodeEnumValues].items() :
                 code += "\t\tfn( " + node[ENodeFullName] + "::" + k + " );\n"
             code += "\t}\n"
 
+            #enum to string
             code += "\tstatic constexpr std::string_view enum_to_string(" + node[ENodeFullName] + " value) {\n"
             for k, v in node[ENodeEnumValues].items() :
                 code += "\t\tif (value == " + node[ENodeFullName] + "::" + k + " ) return \"" + k + "\";\n"
             code += "\t\treturn \"\";\n"
             code += "\t}\n"
 
+            #string to enum
             code += "\tstatic constexpr " + node[ENodeFullName] + " string_to_enum(std::string_view value) {\n"
             for k, v in node[ENodeEnumValues].items() :
                 code += "\t\tif (value == \"" + k + "\") return " + node[ENodeFullName] + "::" + k + ";\n"
             code += "\t\treturn static_cast<" + node[ENodeFullName] + ">(-1);\n"
             code += "\t}\n"
 
-            code += "\tstatic std::map<std::string, std::string> enum_attributes(" + node[ENodeFullName] + " value) {\n"
+            #enum value attributes
+            code += "\tstatic std::map<std::string, std::string> enum_value_attributes(" + node[ENodeFullName] + " value) {\n"
             for k, v in node[ENodeEnumValues].items() :
-                code += "\t\tif (value == " + node[ENodeFullName] + "::" + k + " ) {\n\t\t\treturn " + CodeGenOutputAttributes(v, 3) + ";\n\t\t}\n"
+                code += "\t\tif (value == " + node[ENodeFullName] + "::" + k + ") {\n\t\t\treturn " + CodeGenOutputAttributes(v, 3) + ";\n\t\t}\n"
             code += "\t\treturn {};\n"
             code += "\t}\n"
 
@@ -789,6 +868,9 @@ def CodeGenGlobal(path : str) :
     code += ""
     code += "}\n"
 
+    if os.path.exists(path + "\\pycppgen.gen.h") :
+        os.remove(path + "\\pycppgen.gen.h")
+
     with open(path + "\\pycppgen.gen.h", mode="wt") as file :
         file.write(code)
 
@@ -817,12 +899,12 @@ def main(args : list) :
     OldGenFiles = []
     for root, _, files in os.walk(args[0]):
         for file in files:
-            if re.match(".*\.h", file) and not re.match(".*\.gen.h", file) :
+            if re.match(r".*\.h", file) and not re.match(r".*\.gen.h", file) :
                 filePath = os.path.join(root, file)
                 with open(filePath) as f :
                     if f.read().find("$[[pycppgen") != -1:
                         FilesToParse.append(os.path.join(root, file))
-            if file != "pycppgen.gen.h" and re.match(".*\.gen.h", file) :
+            if file != "pycppgen.gen.h" and re.match(r".*\.gen.h", file) :
                 OldGenFiles += [os.path.join(root, file)]
     
     compilerOptions = []

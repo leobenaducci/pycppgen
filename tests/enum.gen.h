@@ -72,16 +72,10 @@ template<> struct pycppgen<EEnum>{
 			return {};
 		}
 		if (value == EEnum::Something ) {
-			return {
-				{ "disabled", "" },
-				{ "visible", "true" }
-			};
+			return {};
 		}
 		if (value == EEnum::Value ) {
-			return {
-				{ "hidden", "" },
-				{ "selectable", "" }
-			};
+			return {};
 		}
 		if (value == EEnum::Test ) {
 			return {};
