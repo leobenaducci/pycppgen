@@ -464,7 +464,7 @@ def ParseFile(filePath : str, options : list) :
         with open("tmp.h", "wt") as dst:
             outlines = []
             for line in src.readlines() :
-                if re.match(".*\\#\\s*include", line) != None:
+                if re.match(r".*\#\s*include", line) != None:
                     continue
                 outlines += [line]
             dst.writelines(outlines)
@@ -900,12 +900,12 @@ def main(args : list) :
     OldGenFiles = []
     for root, _, files in os.walk(args[0]):
         for file in files:
-            if re.match(".*\\.h", file) and not re.match(".*\\.gen.h", file) :
+            if re.match(r".*\.h", file) and not re.match(r".*\.gen.h", file) :
                 filePath = os.path.join(root, file)
                 with open(filePath) as f :
                     if f.read().find("$[[pycppgen") != -1:
                         FilesToParse.append(os.path.join(root, file))
-            if file != "pycppgen.gen.h" and re.match(".*\\.gen.h", file) :
+            if file != "pycppgen.gen.h" and re.match(r".*\.gen.h", file) :
                 OldGenFiles += [os.path.join(root, file)]
     
     compilerOptions = []
