@@ -1,10 +1,9 @@
 import os
-import io
 import pathlib
 import sys
 import clang.cindex
 import re
-import argparse
+import inspect
 from clang.cindex import CursorKind
 from clang.cindex import AccessSpecifier
 
@@ -497,6 +496,7 @@ def CodeGenOutputMetaHeader(code, node) :
     if ENodeMetaTemplateDecl in node :
         code += node[ENodeMetaTemplateDecl]
     code += ">\nstruct pycppgen<" + node[ENodeFullName] + "> {\n"
+    code += "\tstatic constexpr bool is_valid() { return true; }\n"
 
     return code
 
@@ -613,13 +613,14 @@ def CodeGenOutputNode(code, node) :
         #create the access helper
         if ENodeVariables in node and len(node[ENodeVariables]) > 0 :
             #create an access_helper to read protected variables
-            code += "\t\tstruct access_helper : " + node[ENodeFullName] + " {\n"
+            code += "\tstruct access_helper : " + node[ENodeFullName] + " {\n"
             for _, var in node[ENodeVariables].items() :
                 if var[ENodeAccess] == str(AccessSpecifier.PROTECTED) or var[ENodeAccess] == str(AccessSpecifier.PUBLIC) :
-                    code += "\t\t\tconst size_t " + var[ENodeName] + "_Offset = offsetof(access_helper, " + node[ENodeFullName] + "::" + var[ENodeName] + ");\n"
-                    code += "\t\t\tconst void Set" + var[ENodeName] + "(const decltype(" + node[ENodeFullName] + "::" + var[ENodeName] +" )& value) { " +  node[ENodeFullName] + "::" + var[ENodeName] + " = value; }\n"
-                    code += "\t\t\tconst auto Get" + var[ENodeName] + "() const { return " + node[ENodeFullName] + "::" + var[ENodeName] + "; }\n"
-            code += "\t\t};\n"
+                    code += "\t\tconst size_t " + var[ENodeName] + "_Offset = offsetof(access_helper, " + node[ENodeFullName] + "::" + var[ENodeName] + ");\n"
+                    code += "\t\tconst void Set" + var[ENodeName] + "(const decltype(" + node[ENodeFullName] + "::" + var[ENodeName] +" )& value) { " +  node[ENodeFullName] + "::" + var[ENodeName] + " = value; }\n"
+                    code += "\t\tconst auto& Get" + var[ENodeName] + "() const { return " + node[ENodeFullName] + "::" + var[ENodeName] + "; }\n"
+                    code += "\t\tauto& Get" + var[ENodeName] + "Ref() { return " + node[ENodeFullName] + "::" + var[ENodeName] + "; }\n"
+            code += "\t};\n"
 
         #variable's reflection
         code += "\tstatic void for_each_var(std::function<void(const member_variable_info&)> fn) {\n"
@@ -656,6 +657,27 @@ def CodeGenOutputNode(code, node) :
                 code += f"\t\t{infoName}.Attributes = {CodeGenOutputAttributes(var, 2)};\n"
                 #call visitor
                 code += f"\t\tfn(" + infoName + ");\n\n"
+        code += "\t}\n"
+
+        code += "\tstatic void for_each_var(" + node[ENodeType] + "* obj, auto visitor) {\n"
+        if ENodeVariables in node and len(node[ENodeVariables]) > 0 :
+            for _, var in node[ENodeVariables].items() :
+                #skip private variables
+                if var[ENodeAccess] == str(AccessSpecifier.PRIVATE) :
+                    continue
+               
+                code += f"\t\tvisitor(\"{var[ENodeName]}\", ((access_helper*)obj)->Get{var[ENodeName]}Ref());\n"
+        code += "\t}\n"
+
+        code += "\tstatic std::map<std::string, std::string> get_member_attributes(std::string_view name) {\n"
+        if ENodeVariables in node and len(node[ENodeVariables]) > 0 :
+            for _, var in node[ENodeVariables].items() :
+                #skip private variables
+                if var[ENodeAccess] == str(AccessSpecifier.PRIVATE) :
+                    continue
+                
+                code += f"\t\tif (name == \"{var[ENodeName]}\") return {CodeGenOutputAttributes(var, 2)};\n"
+        code += "\t\treturn {};\n"
         code += "\t}\n"
 
         #TODO do the same for static variables
@@ -811,7 +833,7 @@ def CodeGen(filePath : str) :
     code += "\tstd::map<std::string, std::string> Attributes;\n"
     code += "};\n\n"
 
-    code += "template<typename T> struct pycppgen {};\n\n"
+    code += "template<typename T> struct pycppgen { static constexpr bool is_valid() { return false; } };\n\n"
     code += "template<typename T> auto pycppgen_typeof(T&& t) { return pycppgen<std::decay_t<decltype(t)>>(); }\n\n"
     code += "#endif //_PYCPPGEN_DECLARATIONS\n\n"
 
@@ -874,19 +896,19 @@ def CodeGenGlobal(path : str) :
     with open(path + "\\pycppgen.gen.h", mode="wt") as file :
         file.write(code)
 
+def IsFileUpToDate(src : str, dst : str) :
+    if not os.path.exists(dst) or not os.path.exists(src) :
+        return False
+
+    srcTime = os.path.getmtime(src)
+    dstTime = os.path.getmtime(dst)
+
+    return srcTime < dstTime  
+
 def IsOutputUpToDate(file : str) :
     outputFile = GetOutputFilePath(file)
 
-    if not os.path.exists(outputFile) :
-        return False
-    
-    if not os.path.exists(file) :
-        return False
-    
-    fileTime = os.path.getmtime(file)
-    outputTime = os.path.getmtime(outputFile)
-
-    return fileTime < outputTime        
+    IsFileUpToDate(file, outputFile)
 
 def main(args : list) :
     global FilesToParse, NodesToInclude, NodeList, NodeTree, NodeStack, PerFileData
@@ -911,10 +933,17 @@ def main(args : list) :
     if len(args) > 1 :
         compilerOptions = args[1:]
 
-    PerFileData = {}
-
     GenFiles = list(map(lambda x : str(pathlib.Path(GetOutputFilePath(x)).resolve()), FilesToParse))
     OldGenFiles = list(map(lambda x : str(pathlib.Path(x).resolve()), OldGenFiles))
+
+    if not IsFileUpToDate(inspect.getsourcefile(sys.modules[__name__]), args[0] + "\\pycppgen.ver") :
+        for file in OldGenFiles :
+            if os.path.exists(file) :
+                os.remove(file)
+        OldGenFiles = []
+        with open(args[0] + "\\pycppgen.ver", "wt") as f :
+            f.write("")
+
     FilesToRemove = list(set(OldGenFiles).difference(GenFiles))
     FilesToAdd = list(set(GenFiles).difference(OldGenFiles))
 
@@ -930,6 +959,7 @@ def main(args : list) :
     
     print("parsing path: " + args[0])
 
+    PerFileData = {}
     for file in FilesToParse :
         #initialize data
         NodesToInclude = []
