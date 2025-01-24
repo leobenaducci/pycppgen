@@ -875,7 +875,6 @@ def CodeGenGlobal(path : str) :
         file.write(code)
 
 def IsOutputUpToDate(file : str) :
-    return False
     outputFile = GetOutputFilePath(file)
 
     if not os.path.exists(outputFile) :
