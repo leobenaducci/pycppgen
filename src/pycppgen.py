@@ -868,6 +868,14 @@ def CodeGenGlobalHeader(path : str) :
     code += "#pragma once\n\n"
     code += "#ifndef _PYCPPGEN_HEADER_\n"
     code += "#define _PYCPPGEN_HEADER_\n\n"
+    code += "#include <string>\n"
+    code += "#include <string_view>\n"
+    code += "#include <array>\n"
+    code += "#include <vector>\n"
+    code += "#include <map>\n"
+    code += "#include <functional>\n"
+    code += "#include <type_traits>\n"
+    code += "\n"
     code += "struct member_variable_info {\n"
     code += "\tstd::string_view Name;\n"
     code += "\tstd::string_view Type;\n"
@@ -898,7 +906,7 @@ def CodeGenGlobalHeader(path : str) :
     code += "template<typename T> auto pycppgen_of(T&& t) { return pycppgen<std::decay_t<decltype(t)>>(); }\n\n"
     
     code += "#define PYCPPGEN_STRUCT \\\n"
-    code += "\tvirtual void for_each_var(std::function<void(const member_variable_info&)> fn) const; \\\n"
+    code += "\tvirtual void for_each_var(std::function<void(const member_variable_info&)> fn) const;\n"
 
     code += "#endif //_PYCPPGEN_HEADER_\n\n"
 

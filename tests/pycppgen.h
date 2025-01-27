@@ -3,6 +3,14 @@
 #ifndef _PYCPPGEN_HEADER_
 #define _PYCPPGEN_HEADER_
 
+#include <string>
+#include <string_view>
+#include <array>
+#include <vector>
+#include <map>
+#include <functional>
+#include <type_traits>
+
 struct member_variable_info {
 	std::string_view Name;
 	std::string_view Type;
@@ -31,9 +39,9 @@ struct member_function_info {
 
 template<typename T> struct pycppgen { static constexpr bool is_valid() { return false; } };
 
-template<typename T> auto pycppgen_typeof(T&& t) { return pycppgen<std::decay_t<decltype(t)>>(); }
+template<typename T> auto pycppgen_of(T&& t) { return pycppgen<std::decay_t<decltype(t)>>(); }
 
 #define PYCPPGEN_STRUCT \
-	virtual void for_each_var(std::function<void(const member_variable_info&)> fn) const; \
+	virtual void for_each_var(std::function<void(const member_variable_info&)> fn) const;
 #endif //_PYCPPGEN_HEADER_
 

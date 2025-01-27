@@ -17,6 +17,7 @@ namespace pycppgen_globals
 	}
 
 	static void for_each_type_static_call_by_name(std::string_view funcName) {
+		pycppgen<CObject>::call_function(funcName);
 	}
 
 }

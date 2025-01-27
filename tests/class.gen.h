@@ -152,11 +152,23 @@ struct pycppgen<CObject> {
 			B_info_147.Attributes = {};
 			Add_info_132.Parameters.push_back(B_info_147);
 		}
+		member_function_info Get_info_154;
+		Get_info_154.Name = "Get";
+		Get_info_154.Declaration = "short () const";
+		Get_info_154.Attributes = {
+				{ "pure", "" }
+			};
+		Get_info_154.ReturnType = "short";
+		//parameters
+		{
+		}
 	}
 	static constexpr bool has_function(std::string_view name) {
 		if (name == std::string_view("Func")) return true; 
 		if (name == std::string_view("Add")) return true; 
+		if (name == std::string_view("Get")) return true; 
 		if (name == std::string_view("TestStaticFunc")) return true; 
+		if (name == std::string_view("OnRegister")) return true; 
 		return false;
 	}
 	static bool call_function(std::string_view name, CObject* object) {
@@ -173,9 +185,23 @@ struct pycppgen<CObject> {
 		}
 		return false;
 	}
+	static bool call_function(std::string_view name, const CObject* object, short& result) {
+		if (name == "Get") {
+			result = object->Get();
+			return true;
+		}
+		return false;
+	}
 	static bool call_function(std::string_view name, int& result) {
 		if (name == "TestStaticFunc") {
 			result = CObject::TestStaticFunc();
+			return true;
+		}
+		return false;
+	}
+	static bool call_function(std::string_view name) {
+		if (name == "OnRegister") {
+			CObject::OnRegister();
 			return true;
 		}
 		return false;
@@ -193,13 +219,37 @@ struct pycppgen<CObject> {
 template<>
 struct pycppgen<CChild> {
 	static constexpr bool is_valid() { return true; }
-	std::map<std::string_view, std::string_view> Attributes = {};
+	std::map<std::string_view, std::string_view> Attributes = {
+		{ "pure", "" }
+	};
 
+	struct access_helper : CChild {
+		const size_t Matrix_Offset = offsetof(access_helper, CChild::Matrix);
+		const void SetMatrix(const decltype(CChild::Matrix )& value) { CChild::Matrix = value; }
+		const auto& GetMatrix() const { return CChild::Matrix; }
+		auto& GetMatrixRef() { return CChild::Matrix; }
+	};
 	static void for_each_var(std::function<void(const member_variable_info&)> fn) {
+		member_variable_info Matrix_info_232;
+		Matrix_info_232.Name = "Matrix";
+		Matrix_info_232.Type = typeid(int).name();
+		Matrix_info_232.Offset = offsetof(CChild, Matrix);
+		Matrix_info_232.ElementSize = sizeof(std::remove_all_extents_t<int>);
+		Matrix_info_232.TotalSize = sizeof(int);
+		Matrix_info_232.ArrayRank = std::rank_v<int>;
+		Matrix_info_232.Attributes = {
+
+		};
+		fn(Matrix_info_232);
+
 	}
 	static void for_each_var(CChild* obj, auto visitor) {
+		visitor("Matrix", ((access_helper*)obj)->GetMatrixRef());
 	}
 	static std::map<std::string, std::string> get_member_attributes(std::string_view name) {
+		if (name == "Matrix") return {
+
+		};
 		return {};
 	}
 	static void for_each_static_var(std::function<void(std::string_view name)> fn) {

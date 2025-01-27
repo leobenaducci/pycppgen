@@ -2,14 +2,6 @@
 
 //$[[pycppgen-include CObject CChild]]
 
-struct visitor
-{
-    template<typename T>
-    void visit(T&& v)
-    {
-    }
-};
-
 //$[[pycppgen pure]]
 class CObject
 {
@@ -25,9 +17,7 @@ public:
 
     PYCPPGEN_STRUCT;
 
-    virtual void for_each(visitor& fn)
-    {
-    }
+    CObject() {}
 
     //$[[pycppgen]]
     struct SSubObject
@@ -60,19 +50,25 @@ public:
         return A + float(B);
     }
 
-    //$[[pycppgen pure]
+    //$[[pycppgen pure]]
     short Get() const
     {
         return PublicShort;
     }
 
-    //$[[pycppgen pure]
+    //$[[pycppgen pure]]
     static void OnRegister() {}
 };
 
-class CChild : CObject
+//$[[pycppgen pure]]
+class CChild : public CObject
 {
 public:
-    float Matrix[4][4];
+    CChild() {}
+
+    PYCPPGEN_STRUCT;
+
+    //$[[pycppgen]]
+    std::array<float, 16> Matrix;
 };
 

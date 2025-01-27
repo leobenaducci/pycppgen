@@ -14,7 +14,7 @@ int main()
 {
     pycppgen_globals::for_each_type_call([](auto&& t)
         {
-            pycppgen_typeof(t).for_each_var(
+            pycppgen_of(t).for_each_var(
                 [&](const member_variable_info& v)
                 {
                     printf("%s CObject::%s -> Offset: %llu Size: %llu\n", v.Type.data(), v.Name.data(), v.Offset, v.ElementSize);
@@ -36,22 +36,20 @@ int main()
           }
       );
     
-	pycppgen<CObject>::for_each_var(
-          [&](const member_variable_info& v)
+	CObject* o = new CChild();
+    float rf;
+    pycppgen<CObject>::call_function("Add", o, rf, 1.f, 2.f);
+
+    o->for_each_var([&](const member_variable_info& v)
           {
               printf("%s CObject::%s -> Offset: %llu Size: %llu\n", v.Type.data(), v.Name.data(), v.Offset, v.ElementSize);
           }
       );
-    
-	CObject o;
-    float rf;
-    pycppgen<CObject>::call_function("Add", &o, rf, 1.f, 2.f);
-
-    o.for_each_var2();
+  
 
     const CObject co {};
     short rs;
     //pycppgen<CObject>::call_function("Get", &co, rs);
-
+    
     return 0;
 }
