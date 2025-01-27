@@ -6,11 +6,8 @@
 #include <map>
 #include <string>
 
-#include "class.h"
 #include "class.gen.h"
-#include "enum.h"
 #include "enum.gen.h"
-
 #include "pycppgen.gen.h"
 
 int main()
@@ -29,7 +26,7 @@ int main()
           {
               printf("EEnum::%s = %d\n", pycppgen<EEnum>::enum_to_string(v).data(), (uint32_t)v);
 
-              for (auto it : pycppgen<decltype(v)>::enum_attributes(v))
+              for (auto it : pycppgen<decltype(v)>::enum_value_attributes(v))
               {
                   if(it.second.length() > 0)
                       printf("\t%s = %s\n", it.first.c_str(), it.second.c_str());
@@ -52,7 +49,7 @@ int main()
 
     const CObject co {};
     short rs;
-    pycppgen<CObject>::call_function("Get", &co, rs);
+    //pycppgen<CObject>::call_function("Get", &co, rs);
 
     return 0;
 }

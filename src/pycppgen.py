@@ -30,6 +30,7 @@ ENodeMetaTemplateDecl = "meta_template_decl"
 ENodeReturnType = "return_type"
 ENodeAttributes = "attributes"
 ENodeDefaultValue = "default_value"
+ENodeCursor = "clang_cursor"
 
 EKindUnknown = "kind_unknown"
 EKindNamespace = "kind_namespace"
@@ -194,6 +195,7 @@ def PushNode(cursor, kind : str = EInvalid) :
     node[ENodeAccess] = str(cursor.access_specifier)
     node[ENodeScope] = GetScope(cursor)
     node[ENodeAttributes] = ParseComments(cursor, kind)
+    node[ENodeCursor] = cursor
 
     NodeStack.append(node)
     return NodeStack[-1]
@@ -269,37 +271,13 @@ def ParseStruct(cursor) :
 
     node = PushNode(cursor, kind)
     node[ENodeMetaTemplateDecl] = ""
+    node[ENodeFunctions] = {}
 
     for child in cursor.get_children() :
         
         #inheritance
         if child.kind == CursorKind.CXX_BASE_SPECIFIER :
             AppendToStackTop({ENodeFullName: GetFullName(child)}, ENodeParents)
-            continue
-
-        flags = ParseComments(child, EKindUnknown)
-        if not "include" in flags or flags["include"] == False :
-            continue
-
-        #class functions
-        if child.kind == CursorKind.CXX_METHOD:
-            fn = ParseFunction(child, False)
-            continue
-
-        #static variables?
-        if child.kind == CursorKind.VAR_DECL :
-            var = ParseVar(child, False)
-            continue
-
-        #member variables (field)
-        if child.kind == CursorKind.FIELD_DECL :
-            var = ParseVar(child, False)
-            continue
-
-        #member enum definitions
-        if cursor.kind == CursorKind.ENUM_DECL :
-            if cursor.is_definition() :
-                ParseEnum(cursor, False)
             continue
 
         #template parameters
@@ -325,6 +303,31 @@ def ParseStruct(cursor) :
 
             AppendToStackTop(param, ENodeParameters)
 
+            continue
+
+        flags = ParseComments(child, EKindUnknown)
+        if not "include" in flags or flags["include"] == False :
+            continue
+
+        #class functions
+        if child.kind == CursorKind.CXX_METHOD:
+            fn = ParseFunction(child, False)
+            continue
+
+        #static variables?
+        if child.kind == CursorKind.VAR_DECL :
+            var = ParseVar(child, False)
+            continue
+
+        #member variables (field)
+        if child.kind == CursorKind.FIELD_DECL :
+            var = ParseVar(child, False)
+            continue
+
+        #member enum definitions
+        if cursor.kind == CursorKind.ENUM_DECL :
+            if cursor.is_definition() :
+                ParseEnum(cursor, False)
             continue
 
         #generic parse (shouldn't do anything)
@@ -466,6 +469,7 @@ def ParseFile(filePath : str, options : list) :
                 if re.match(r".*\#\s*include", line) != None:
                     continue
                 outlines += [line]
+            dst.writelines(["#define PYCPPGEN_STRUCT void _PYCPPGEN_STRUCT() {}\n"])
             dst.writelines(outlines)
 
     args = ['-x', 'c++', '-std=c++17'] + options
@@ -505,6 +509,14 @@ def CodeGenOutputMetaFooter(code, node) :
     global pycppdefine
 
     code += "};\n\n"
+
+    cursor = node[ENodeCursor]
+    if cursor.kind == CursorKind.STRUCT_DECL or cursor.kind == CursorKind.CLASS_DECL or cursor.kind == CursorKind.CLASS_TEMPLATE or cursor.kind == CursorKind.CLASS_TEMPLATE_PARTIAL_SPECIALIZATION :
+        for c in cursor.get_children() :
+            if c.spelling == "_PYCPPGEN_STRUCT" :
+                code += "void " + node[ENodeFullName] + "::for_each_var(std::function<void(const member_variable_info&)> fn) const { return pycppgen<std::decay_t<decltype(*this)>>::for_each_var(fn); }\n"
+                code += "void " + node[ENodeFullName] + "::for_each_var(std::function<void(const member_variable_info&)> fn) { return pycppgen<std::decay_t<decltype(*this)>>::for_each_var(fn); }\n"
+
     code += f"#endif //{pycppdefine}\n"
 
     #tag the end of autogen code
@@ -644,7 +656,7 @@ def CodeGenOutputNode(code, node) :
                 if var[ENodeAccess] == str(AccessSpecifier.PROTECTED) :
                     code += f"\t\t{infoName}.Offset = access_helper().{varName}_Offset;\n"
                 else :
-                    code += f"\t\t{infoName}.Offset = offsetof({node[ENodeFullName]}, {varName};\n"
+                    code += f"\t\t{infoName}.Offset = offsetof({node[ENodeFullName]}, {varName});\n"
                 #single element size
                 code += f"\t\t{infoName}.ElementSize = sizeof(std::remove_all_extents_t<{varType}>);\n"
                 #total size
@@ -690,11 +702,17 @@ def CodeGenOutputNode(code, node) :
         #serialization creates a dump (output) and parse (input) functions
         code += "\ttemplate<typename T> static T dump(const " + node[ENodeType] + "* object) {\n"
         code += "\t\tT result;\n"
-        if ENodeVariables in node and len(node[ENodeVariables]) > 0 :
+
+        if "for_each_var" in node[ENodeFunctions] :
+            code += "\t\tfor_each_var([this](const std::string& name, const auto& value) {\n"
+            code += "\t\t\tresult[name] = value;\n"
+            code += "\t\t});\n"
+        elif ENodeVariables in node and len(node[ENodeVariables]) > 0 :
             #serialize the values
             for _, var in node[ENodeVariables].items() :
                 if "serialize" in var[ENodeAttributes] and (var[ENodeAccess] == str(AccessSpecifier.PUBLIC) or var[ENodeAccess] == str(AccessSpecifier.PROTECTED)) :
                     code += f"\t\tresult[\"{var[ENodeName]}\"] = ((access_helper*)object)->Get{var[ENodeName]}();\n"
+
         code += "\t\treturn result;\n"
         code += "\t}\n"
 
@@ -804,9 +822,40 @@ def CodeGen(filePath : str) :
 
     code = ""
     code += "#pragma once\n\n"
+    code += "#include \"pycppgen.h\"\n"
     code += "#include \"" + str(pathlib.Path(filePath).relative_to(pathlib.Path(filePath).parent)) + "\"\n\n"
-    code += "#ifndef _PYCPPGEN_DECLARATIONS\n"
-    code += "#define _PYCPPGEN_DECLARATIONS\n\n"
+
+    for key in NodeList :
+        code = CodeGenOutputNode(code, NodeList[key])
+
+    code += "namespace pycppgen_globals {\n"
+    
+    for _, func in NodeList.items() :
+        if func[ENodeKind] == EKindFreeFunction :
+            code += "//" + func[ENodeFullName] + "\n"
+
+    for _, var in NodeList.items() :
+        if var[ENodeKind] == EKindFreeVariable :
+            code += "//" + var[ENodeType] + " " + var[ENodeFullName] + "\n"
+
+    code += "}\n"
+
+    with open(outputPath, mode="wt") as output :
+        output.write(code)
+
+#codegen: emit for each type call
+def CodeGenGlobalAddForEachTypeCall(code, node) :
+    if node[ENodeKind] == EKindClass or node[ENodeKind] == EKindStruct : #or node[ENodeKind] == EKindClassTemplate:
+        code += f"\t\tfn(*({node[ENodeFullName]}*)0);\n"
+    return code
+
+#codegen: output global file
+def CodeGenGlobalHeader(path : str) :
+    
+    code = ""
+    code += "#pragma once\n\n"
+    code += "#ifndef _PYCPPGEN_HEADER_\n"
+    code += "#define _PYCPPGEN_HEADER_\n\n"
     code += "struct member_variable_info {\n"
     code += "\tstd::string_view Name;\n"
     code += "\tstd::string_view Type;\n"
@@ -835,36 +884,21 @@ def CodeGen(filePath : str) :
 
     code += "template<typename T> struct pycppgen { static constexpr bool is_valid() { return false; } };\n\n"
     code += "template<typename T> auto pycppgen_typeof(T&& t) { return pycppgen<std::decay_t<decltype(t)>>(); }\n\n"
-    code += "#endif //_PYCPPGEN_DECLARATIONS\n\n"
-
-    for key in NodeList :
-        code = CodeGenOutputNode(code, NodeList[key])
-
-    code += "namespace pycppgen_globals {\n"
     
-    for _, func in NodeList.items() :
-        if func[ENodeKind] == EKindFreeFunction :
-            code += "//" + func[ENodeFullName] + "\n"
+    code += "#define PYCPPGEN_STRUCT \\\n"
+    code += "\tvirtual void for_each_var(std::function<void(const member_variable_info&)> fn) const; \\\n"
+    code += "\tvirtual void for_each_var(std::function<void(const member_variable_info&)> fn); \n"
 
-    for _, var in NodeList.items() :
-        if var[ENodeKind] == EKindFreeVariable :
-            code += "//" + var[ENodeType] + " " + var[ENodeFullName] + "\n"
+    code += "#endif //_PYCPPGEN_HEADER_\n\n"
 
-    code += "}\n"
-
-    with open(outputPath, mode="wt") as output :
+    with open(path + "/pycppgen.h", mode="wt") as output :
         output.write(code)
 
-#codegen: emit for each type call
-def CodeGenGlobalAddForEachTypeCall(code, node) :
-    if node[ENodeKind] == EKindClass or node[ENodeKind] == EKindStruct : #or node[ENodeKind] == EKindClassTemplate:
-        code += f"\t\tfn(*({node[ENodeFullName]}*)0);\n"
-    return code
-
-#codegen: output global file
 def CodeGenGlobal(path : str) :
     global PerFileData
     
+    CodeGenGlobalHeader(path)
+
     code = ""
     code += "#pragma once\n\n"
     code += ""

@@ -15,6 +15,9 @@ protected:
 
 public:
 
+    PYCPPGEN_STRUCT;
+
+
     //$[[pycppgen]]
     struct SSubObject
     {
@@ -24,7 +27,6 @@ public:
     //$[[pycppgen serialize]]
     short PublicShort = 123;
 
-    //$[[pycppgen readonly]]
     char PublicCharArray[16];
 
     //$[[pycppgen]]
