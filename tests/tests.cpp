@@ -47,6 +47,8 @@ int main()
     float rf;
     pycppgen<CObject>::call_function("Add", &o, rf, 1.f, 2.f);
 
+    o.for_each_var2();
+
     const CObject co {};
     short rs;
     //pycppgen<CObject>::call_function("Get", &co, rs);

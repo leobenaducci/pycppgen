@@ -35,6 +35,5 @@ template<typename T> auto pycppgen_typeof(T&& t) { return pycppgen<std::decay_t<
 
 #define PYCPPGEN_STRUCT \
 	virtual void for_each_var(std::function<void(const member_variable_info&)> fn) const; \
-	virtual void for_each_var(std::function<void(const member_variable_info&)> fn); 
 #endif //_PYCPPGEN_HEADER_
 

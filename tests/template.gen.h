@@ -17,20 +17,20 @@ struct pycppgen<Template::TVector<T>> {
 
 	static void for_each_var(std::function<void(const member_variable_info&)> fn) {
 	}
-	//static void for_each_var(* obj, auto visitor) {
-	//}
+	static void for_each_var(* obj, auto visitor) {
+	}
 	static std::map<std::string, std::string> get_member_attributes(std::string_view name) {
 		return {};
 	}
 	static void for_each_static_var(std::function<void(std::string_view name)> fn) {
 	}
-	//template<typename T> static T dump(const * object) {
-	//	T result;
-	//	return result;
-	//}
-	//template<typename T, typename R> static bool parse(const T& data, R* object) {
-	//	return true;
-	//}
+	template<typename T> static T dump(const * object) {
+		T result;
+		return result;
+	}
+	template<typename T, typename R> static bool parse(const T& data, R* object) {
+		return true;
+	}
 	static void for_each_function(std::function<void(const member_function_info&)> fn) {
 	}
 	static constexpr bool has_function(std::string_view name) {

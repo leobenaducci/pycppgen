@@ -182,8 +182,6 @@ struct pycppgen<CObject> {
 	}
 };
 
-void CObject::for_each_var(std::function<void(const member_variable_info&)> fn) const { return pycppgen<std::decay_t<decltype(*this)>>::for_each_var(fn); }
-void CObject::for_each_var(std::function<void(const member_variable_info&)> fn) { return pycppgen<std::decay_t<decltype(*this)>>::for_each_var(fn); }
 #endif //pycppgen_CObject
 //</autogen_pycppgen_CObject>
 

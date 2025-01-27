@@ -2,6 +2,14 @@
 
 //$[[pycppgen-include CObject CChild]]
 
+struct visitor
+{
+    template<typename T>
+    void visit(T&& v)
+    {
+    }
+};
+
 //$[[pycppgen pure]]
 class CObject
 {
@@ -17,6 +25,9 @@ public:
 
     PYCPPGEN_STRUCT;
 
+    virtual void for_each(visitor& fn)
+    {
+    }
 
     //$[[pycppgen]]
     struct SSubObject
