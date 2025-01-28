@@ -24,6 +24,7 @@ ENodeParents = "parents"
 ENodeEnums = "enums"
 ENodeStructs = "structs"
 ENodeNamespaces = "namespaces"
+ENodeNamespace = "namespace"
 ENodeParameters = "parameters"
 ENodeEnumValues = "enum_values"
 ENodeMetaTemplateDecl = "meta_template_decl"
@@ -200,6 +201,13 @@ def PushNode(cursor, kind : str = EInvalid) :
     node[ENodeScope] = GetScope(cursor)
     node[ENodeAttributes] = ParseComments(cursor, kind)
     node[ENodeCursor] = cursor
+    node[ENodeNamespace] = ""
+
+    for v in NodeStack :
+        if ENodeKind in v and v[ENodeKind] == EKindNamespace :
+            node[ENodeNamespace] += v[ENodeName] + "::"
+    if len(node[ENodeNamespace]) > 0 :
+        node[ENodeNamespace] = node[ENodeNamespace][:-2]
 
     NodeStack.append(node)
     return NodeStack[-1]
@@ -671,6 +679,8 @@ def CodeGenOutputNode(hppCode, cppCode, node) :
 
         #variable's reflection
         hppCode += "\tstatic void for_each_var(std::function<void(const member_variable_info&)> fn) {\n"
+        if ENodeNamespace in node and node[ENodeNamespace] != "" :
+            hppCode += f"\t\tusing namespace {node[ENodeNamespace]};\n"
         
         #parent classes
         if ENodeParents in node :
@@ -694,6 +704,8 @@ def CodeGenOutputNode(hppCode, cppCode, node) :
         hppCode += "\t}\n\n"
 
         hppCode += "\tstatic void for_each_var(" + node[ENodeType] + "* obj, auto visitor) {\n"
+        if ENodeNamespace in node and node[ENodeNamespace] != "" :
+            hppCode += f"\t\tusing namespace {node[ENodeNamespace]};\n"
         #parent classes
         if ENodeParents in node :
             for p in node[ENodeParents] :
@@ -714,6 +726,8 @@ def CodeGenOutputNode(hppCode, cppCode, node) :
         hppCode += "\t}\n\n"
 
         hppCode += "\tstatic void for_each_var(const " + node[ENodeType] + "* obj, auto visitor) {\n"
+        if ENodeNamespace in node and node[ENodeNamespace] != "" :
+            hppCode += f"\t\tusing namespace {node[ENodeNamespace]};\n"
         #parent classes
         if ENodeParents in node :
             for p in node[ENodeParents] :
@@ -734,6 +748,9 @@ def CodeGenOutputNode(hppCode, cppCode, node) :
         hppCode += "\t}\n\n"
 
         hppCode += "\tstatic std::map<std::string, std::string> get_member_attributes(std::string_view name) {\n"
+        if ENodeNamespace in node and node[ENodeNamespace] != "" :
+            hppCode += f"\t\tusing namespace {node[ENodeNamespace]};\n"
+
         if ENodeVariables in node and len(node[ENodeVariables]) > 0 :
             for _, var in node[ENodeVariables].items() :
                 #skip private variables
@@ -792,6 +809,9 @@ def CodeGenOutputNode(hppCode, cppCode, node) :
 
         #functions
         hppCode += "\tstatic void for_each_function(std::function<void(const member_function_info&)> fn) {\n"
+        if ENodeNamespace in node and node[ENodeNamespace] != "" :
+            hppCode += f"\t\tusing namespace {node[ENodeNamespace]};\n"
+
         if ENodeParents in node :
             for p in node[ENodeParents] :
                 hppCode += f"\t\tpycppgen<{p}>::for_each_function(fn);\n"
@@ -821,6 +841,9 @@ def CodeGenOutputNode(hppCode, cppCode, node) :
 
         #has_function by name declaration
         hppCode += "\tstatic constexpr bool has_function(std::string_view name) {\n"
+        if ENodeNamespace in node and node[ENodeNamespace] != "" :
+            hppCode += f"\t\tusing namespace {node[ENodeNamespace]};\n"
+
         if ENodeFunctions in node :
             for _, v in node[ENodeFunctions].items() :
                 hppCode += f"\t\tif (name == std::string_view(\"{v[ENodeName]}\")) return true; \n"
