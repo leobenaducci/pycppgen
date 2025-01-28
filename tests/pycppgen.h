@@ -11,6 +11,7 @@
 #include <map>
 #include <functional>
 #include <type_traits>
+#include <any>
 
 struct member_variable_info {
 	std::string_view Name;
@@ -39,11 +40,15 @@ struct member_function_info {
 	std::map<std::string, std::string> Attributes;
 };
 
-template<typename T> struct pycppgen { static constexpr bool is_valid() { return false; } };
+template<typename T = void> struct pycppgen { static constexpr bool is_valid() { return false; } };
 template<> struct pycppgen<void> 
 {
     pycppgen(const std::type_info& info) : HashCode(info.hash_code()) {}
     void for_each_var(std::function<void(const member_variable_info&)> fn) const;
+    void for_each_var(const void* obj, auto fn) const;
+    void for_each_var(void* obj, auto fn) const;    
+    template<typename T> static void for_each_var(const T* obj, auto fn);
+    template<typename T> static void for_each_var(T* obj, auto fn);    
 
 protected:
     decltype(std::declval<std::type_info>().hash_code()) HashCode;

@@ -81,6 +81,12 @@ struct pycppgen<SStructTest> {
 		visitor("z", ((access_helper*)obj)->GetzRef());
 	}
 
+	static void for_each_var(const SStructTest* obj, auto visitor) {
+		visitor("x", ((access_helper*)obj)->GetxRef());
+		visitor("y", ((access_helper*)obj)->GetyRef());
+		visitor("z", ((access_helper*)obj)->GetzRef());
+	}
+
 	static std::map<std::string, std::string> get_member_attributes(std::string_view name) {
 		if (name == "x")
 		{

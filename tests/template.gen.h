@@ -21,6 +21,9 @@ struct pycppgen<Template::TVector<T>> {
 	static void for_each_var(Template::TVector<T>* obj, auto visitor) {
 	}
 
+	static void for_each_var(const Template::TVector<T>* obj, auto visitor) {
+	}
+
 	static std::map<std::string, std::string> get_member_attributes(std::string_view name) {
 		return {};
 	}

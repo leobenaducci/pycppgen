@@ -12,45 +12,74 @@
 
 void CChild::DoSomething() {}
 
+namespace std
+{
+    template<typename T, size_t N>
+    std::string to_string(const std::array<T, N>& arr)
+    {
+        std::string str;
+        str.reserve(N * 3 + 3);
+
+        str += '[';
+        
+        for (const auto& it : arr)
+            str += std::to_string(it) + ", ";
+
+        if (arr.size() > 0)
+            str.resize(str.length() - 2);
+
+        str += ']';
+
+        return str;
+    }
+}
+
 int main()
 {
-    printf("%s\n", typeid(EEnum).name());
-    pycppgen<EEnum>::for_each_enum(
-        [](EEnum v)
-        {
-            printf("\tEEnum::%s = %d\n", pycppgen<EEnum>::enum_to_string(v).data(), (uint32_t)v);
-    
-            for (auto it : pycppgen<decltype(v)>::enum_value_attributes(v))
-            {
-                if(it.second.length() > 0)
-                    printf("\t\t%s = %s\n", it.first.c_str(), it.second.c_str());
-                else
-                    printf("\t\t%s\n", it.first.c_str());
-            }
-        }
-    );
-    printf("---\n");
-
-    pycppgen_globals::for_each_type_call([](const auto& t)
-        {
-            printf("%s ->\n", typeid(t).name());
-
-            pycppgen_of(t).for_each_var(
-                [&](const member_variable_info& v)
-                {
-                    printf("\t%s %s -> Offset: %llu Size: %llu\n", v.Type.data(), v.FullName.data(), v.Offset, v.ElementSize);
-                });
-            printf("---\n");
-        });
-    
-   
+    //printf("%s\n", typeid(EEnum).name());
+    //pycppgen<EEnum>::for_each_enum(
+    //    [](EEnum v)
+    //    {
+    //        printf("\tEEnum::%s = %d\n", pycppgen<EEnum>::enum_to_string(v).data(), (uint32_t)v);
+    //
+    //        for (auto it : pycppgen<decltype(v)>::enum_value_attributes(v))
+    //        {
+    //            if(it.second.length() > 0)
+    //                printf("\t\t%s = %s\n", it.first.c_str(), it.second.c_str());
+    //            else
+    //                printf("\t\t%s\n", it.first.c_str());
+    //        }
+    //    }
+    //);
+    //printf("---\n");
+    //
+    //pycppgen_globals::for_each_type_call([](const auto& t)
+    //    {
+    //        printf("%s ->\n", typeid(decltype(t)).name());
+    //
+    //        pycppgen_of(t).for_each_var(
+    //            [&](const member_variable_info& v)
+    //            {
+    //                printf("\t%s %s -> Offset: %llu Size: %llu\n", v.Type.data(), v.FullName.data(), v.Offset, v.ElementSize);
+    //            });
+    //        printf("---\n");
+    //    });
+    //
+    //
 	CObject* o = new CChild();
-    printf("%s (%s) ->\n", typeid(o).name(), typeid(*o).name());
-    pycppgen_of(o).for_each_var([&](const member_variable_info& v)
+    //printf("%s (%s) ->\n", typeid(o).name(), typeid(*o).name());
+    //pycppgen_of(o).for_each_var([&](const member_variable_info& v)
+    //    {
+    //        printf("\t%s %s -> Offset: %llu Size: %llu\n", v.Type.data(), v.FullName.data(), v.Offset, v.ElementSize);
+    //    }
+    //);
+
+    pycppgen<>::for_each_var(o, [&](std::string_view name, auto&& t)
         {
-            printf("\t%s %s -> Offset: %llu Size: %llu\n", v.Type.data(), v.FullName.data(), v.Offset, v.ElementSize);
+            printf("%s -> %s\n", name.data(), std::to_string(t).c_str());
         }
     );
+
 
     printf("---\n");
 

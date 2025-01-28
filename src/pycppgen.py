@@ -699,6 +699,22 @@ def CodeGenOutputNode(hppCode, cppCode, node) :
                 hppCode += f"\t\tvisitor(\"{var[ENodeName]}\", ((access_helper*)obj)->Get{var[ENodeName]}Ref());\n"
         hppCode += "\t}\n\n"
 
+        hppCode += "\tstatic void for_each_var(const " + node[ENodeType] + "* obj, auto visitor) {\n"
+        #parent classes
+        if ENodeParents in node :
+            for p in node[ENodeParents] :
+                hppCode += f"\t\tpycppgen<{p}>::for_each_var(obj, visitor);\n"
+            hppCode += "\n"
+
+        if ENodeVariables in node and len(node[ENodeVariables]) > 0 :
+            for _, var in node[ENodeVariables].items() :
+                #skip private variables
+                if var[ENodeAccess] == str(AccessSpecifier.PRIVATE) :
+                    continue
+               
+                hppCode += f"\t\tvisitor(\"{var[ENodeName]}\", ((access_helper*)obj)->Get{var[ENodeName]}Ref());\n"
+        hppCode += "\t}\n\n"
+
         hppCode += "\tstatic std::map<std::string, std::string> get_member_attributes(std::string_view name) {\n"
         if ENodeVariables in node and len(node[ENodeVariables]) > 0 :
             for _, var in node[ENodeVariables].items() :
@@ -918,6 +934,7 @@ def CodeGenGlobalHeader(path : str) :
 #include <map>
 #include <functional>
 #include <type_traits>
+#include <any>
 
 struct member_variable_info {
 	std::string_view Name;
@@ -946,11 +963,15 @@ struct member_function_info {
 	std::map<std::string, std::string> Attributes;
 };
 
-template<typename T> struct pycppgen { static constexpr bool is_valid() { return false; } };
+template<typename T = void> struct pycppgen { static constexpr bool is_valid() { return false; } };
 template<> struct pycppgen<void> 
 {
     pycppgen(const std::type_info& info) : HashCode(info.hash_code()) {}
     void for_each_var(std::function<void(const member_variable_info&)> fn) const;
+    void for_each_var(const void* obj, auto fn) const;
+    void for_each_var(void* obj, auto fn) const;    
+    template<typename T> static void for_each_var(const T* obj, auto fn);
+    template<typename T> static void for_each_var(T* obj, auto fn);    
 
 protected:
     decltype(std::declval<std::type_info>().hash_code()) HashCode;
@@ -1001,10 +1022,45 @@ def CodeGenGlobal(path : str) :
             for _, func in node[ENodeStaticFunctions].items() :
                 if (not ENodeParameters in func or len(func[ENodeParameters]) == 0) and (not ENodeReturnType in func or func[ENodeReturnType] == "void"):
                     code += f"\t\tpycppgen<{node[ENodeFullName]}>::call_function(funcName);\n"
-    code += "\t}\n\n"
+    code += "\t}\n"
 
     code += ""
-    code += "}\n"
+    code += "}\n\n"
+    
+    code += "void pycppgen<void>::for_each_var(const void* obj, auto fn) const\n"
+    code += "{\n"
+    for _, node in NodeList.items() :
+        if node[ENodeKind] == EKindClass or node[ENodeKind] == EKindStruct :
+            code += f"\tif (HashCode == typeid({node[ENodeFullName]}).hash_code())\n"
+            code += f"\t\tpycppgen<{node[ENodeFullName]}>::for_each_var((const {node[ENodeFullName]}*)obj, fn);\n"
+    code += "}\n\n"
+
+    code += "void pycppgen<void>::for_each_var(void* obj, auto fn) const\n"
+    code += "{\n"
+    for _, node in NodeList.items() :
+        if node[ENodeKind] == EKindClass or node[ENodeKind] == EKindStruct :
+            code += f"\tif (HashCode == typeid({node[ENodeFullName]}).hash_code())\n"
+            code += f"\t\tpycppgen<{node[ENodeFullName]}>::for_each_var(({node[ENodeFullName]}*)obj, fn);\n"
+    code += "}\n\n"
+
+    code += "template<typename T> static void pycppgen<void>::for_each_var(const T* obj, auto fn)\n"
+    code += "{\n"
+    code += f"\tconst auto hashCode = typeid(obj).hash_code();\n"
+    for _, node in NodeList.items() :
+        if node[ENodeKind] == EKindClass or node[ENodeKind] == EKindStruct :
+            code += f"\tif (hashCode == typeid({node[ENodeFullName]}).hash_code())\n"
+            code += f"\t\tpycppgen<{node[ENodeFullName]}>::for_each_var((const {node[ENodeFullName]}*)obj, fn);\n"
+    code += "}\n\n"
+
+    code += "template<typename T> static void pycppgen<void>::for_each_var(T* obj, auto fn)\n"
+    code += "{\n"
+    code += f"\tconst auto hashCode = typeid(obj).hash_code();\n"
+    for _, node in NodeList.items() :
+        if node[ENodeKind] == EKindClass or node[ENodeKind] == EKindStruct :
+            code += f"\tif (hashCode == typeid({node[ENodeFullName]}).hash_code())\n"
+            code += f"\t\tpycppgen<{node[ENodeFullName]}>::for_each_var(({node[ENodeFullName]}*)obj, fn);\n"
+    code += "}\n\n"
+
 
     if os.path.exists(path + "\\pycppgen.gen.h") :
         os.remove(path + "\\pycppgen.gen.h")
