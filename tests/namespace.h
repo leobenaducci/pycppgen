@@ -8,9 +8,6 @@
 namespace TestNameSpace
 {
     //$[[pycppgen]]
-    int GlobalInt = 2;
-
-    //$[[pycppgen]]
     void FuncA();
     
     void FuncB(int paramB);

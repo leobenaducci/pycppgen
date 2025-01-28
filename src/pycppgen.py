@@ -903,51 +903,70 @@ def CodeGenGlobalAddForEachTypeCall(code, node) :
 #codegen: output global file
 def CodeGenGlobalHeader(path : str) :
     
-    code = ""
-    code += "#pragma once\n\n"
-    code += "#ifndef _PYCPPGEN_HEADER_\n"
-    code += "#define _PYCPPGEN_HEADER_\n\n"
-    code += "#include <string>\n"
-    code += "#include <string_view>\n"
-    code += "#include <array>\n"
-    code += "#include <vector>\n"
-    code += "#include <map>\n"
-    code += "#include <functional>\n"
-    code += "#include <type_traits>\n"
-    code += "\n"
-    code += "struct member_variable_info {\n"
-    code += "\tstd::string_view Name;\n"
-    code += "\tstd::string_view Type;\n"
-    code += "\tsize_t Offset = 0;\n"
-    code += "\tsize_t ElementSize = 0;\n"
-    code += "\tsize_t TotalSize = 0;\n"
-    code += "\tsize_t ArrayRank = 0;\n"
-    code += "\tstd::vector<size_t> ArrayExtents;\n"
-    code += "\tstd::map<std::string, std::string> Attributes;\n"
-    code += "};\n\n"
-    
-    code += "struct function_parameter_info {\n"
-    code += "\tstd::string_view Name;\n"
-    code += "\tstd::string_view Type;\n"
-    code += "\tstd::string_view DefaultValue;\n"
-    code += "\tstd::map<std::string, std::string> Attributes;\n"
-    code += "};\n\n"
+    code = """
+#pragma once
 
-    code += "struct member_function_info {\n"
-    code += "\tstd::string_view Name;\n"
-    code += "\tstd::string_view Declaration;\n"
-    code += "\tstd::string_view ReturnType;\n"
-    code += "\tstd::vector<function_parameter_info> Parameters;\n"
-    code += "\tstd::map<std::string, std::string> Attributes;\n"
-    code += "};\n\n"
+#ifndef _PYCPPGEN_HEADER_
+#define _PYCPPGEN_HEADER_
 
-    code += "template<typename T> struct pycppgen { static constexpr bool is_valid() { return false; } };\n\n"
-    code += "template<typename T> auto pycppgen_of(T&& t) { return pycppgen<std::decay_t<decltype(t)>>(); }\n\n"
-    
-    code += "#define PYCPPGEN_STRUCT \\\n"
-    code += "\tvirtual void for_each_var(std::function<void(const member_variable_info&)> fn) const;\n"
+#include <string>
+#include <string_view>
+#include <array>
+#include <vector>
+#include <map>
+#include <functional>
+#include <type_traits>
 
-    code += "#endif //_PYCPPGEN_HEADER_\n\n"
+struct member_variable_info {
+	std::string_view Name;
+	std::string_view Type;
+	size_t Offset = 0;
+	size_t ElementSize = 0;
+	size_t TotalSize = 0;
+	size_t ArrayRank = 0;
+	std::vector<size_t> ArrayExtents;
+	std::map<std::string, std::string> Attributes;
+};
+
+struct function_parameter_info {
+	std::string_view Name;
+	std::string_view Type;
+	std::string_view DefaultValue;
+	std::map<std::string, std::string> Attributes;
+};
+
+struct member_function_info {
+	std::string_view Name;
+	std::string_view Declaration;
+	std::string_view ReturnType;
+	std::vector<function_parameter_info> Parameters;
+	std::map<std::string, std::string> Attributes;
+};
+
+template<typename T> struct pycppgen { static constexpr bool is_valid() { return false; } };
+template<> struct pycppgen<void> 
+{
+    pycppgen(const std::type_info& info) : HashCode(info.hash_code()) {}
+    void for_each_var(std::function<void(const member_variable_info&)> fn) const;
+
+protected:
+    decltype(std::declval<std::type_info>().hash_code()) HashCode;
+};
+
+template<typename T> requires (!std::is_pointer_v<T>)
+auto pycppgen_of(const T& t) 
+{
+	return pycppgen<std::decay_t<T>>(); 
+}
+
+template<typename T> requires (std::is_pointer_v<T>)
+auto pycppgen_of(const T t) 
+{
+	return pycppgen<void>(typeid(*t));
+}
+
+#endif //_PYCPPGEN_HEADER_
+    """
 
     with open(path + "/pycppgen.h", mode="wt") as output :
         output.write(code)
@@ -957,9 +976,11 @@ def CodeGenGlobal(path : str) :
     
     CodeGenGlobalHeader(path)
 
+    #pycppgen.gen.h
     code = ""
     code += "#pragma once\n\n"
-    code += ""
+    code += "\n"
+    code += "#include \"pycppgen.h\"\n"
     for k in PerFileData :
         code += f"#include \"{GetOutputFileName(k)}\"\n"
 
@@ -986,6 +1007,25 @@ def CodeGenGlobal(path : str) :
         os.remove(path + "\\pycppgen.gen.h")
 
     with open(path + "\\pycppgen.gen.h", mode="wt") as file :
+        file.write(code)
+
+    #pycppgen.gen.cpp
+    code = ""
+    code += "#include \"pycppgen.h\"\n"
+    code += "#include \"pycppgen.gen.h\"\n"
+    code += "\n"
+    code += "void pycppgen<void>::for_each_var(std::function<void(const member_variable_info&)> fn) const\n"
+    code += "{\n"
+    for _, node in NodeList.items() :
+        if node[ENodeKind] == EKindClass or node[ENodeKind] == EKindStruct :
+            code += f"\tif (HashCode == typeid({node[ENodeFullName]}).hash_code())\n"
+            code += f"\t\tpycppgen<{node[ENodeFullName]}>::for_each_var(fn);\n"
+    code += "}\n"
+
+    if os.path.exists(path + "\\pycppgen.gen.cpp") :
+        os.remove(path + "\\pycppgen.gen.cpp")
+
+    with open(path + "\\pycppgen.gen.cpp", mode="wt") as file :
         file.write(code)
 
 def IsFileUpToDate(src : str, dst : str) :

@@ -1,3 +1,4 @@
+
 #pragma once
 
 #ifndef _PYCPPGEN_HEADER_
@@ -38,10 +39,26 @@ struct member_function_info {
 };
 
 template<typename T> struct pycppgen { static constexpr bool is_valid() { return false; } };
+template<> struct pycppgen<void> 
+{
+    pycppgen(const std::type_info& info) : HashCode(info.hash_code()) {}
+    void for_each_var(std::function<void(const member_variable_info&)> fn) const;
 
-template<typename T> auto pycppgen_of(T&& t) { return pycppgen<std::decay_t<decltype(t)>>(); }
+protected:
+    decltype(std::declval<std::type_info>().hash_code()) HashCode;
+};
 
-#define PYCPPGEN_STRUCT \
-	virtual void for_each_var(std::function<void(const member_variable_info&)> fn) const;
+template<typename T> requires (!std::is_pointer_v<T>)
+auto pycppgen_of(const T& t) 
+{
+	return pycppgen<std::decay_t<T>>(); 
+}
+
+template<typename T> requires (std::is_pointer_v<T>)
+auto pycppgen_of(const T t) 
+{
+	return pycppgen<void>(typeid(*t));
+}
+
 #endif //_PYCPPGEN_HEADER_
-
+    

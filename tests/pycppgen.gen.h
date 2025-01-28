@@ -1,5 +1,7 @@
 #pragma once
 
+
+#include "pycppgen.h"
 #include "class.gen.h"
 #include "enum.gen.h"
 #include "function.gen.h"

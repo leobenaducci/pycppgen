@@ -5,5 +5,4 @@
 
 namespace pycppgen_globals {
 //TestNameSpace::FuncA()
-//int TestNameSpace::GlobalInt
 }

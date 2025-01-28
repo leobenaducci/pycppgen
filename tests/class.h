@@ -11,13 +11,12 @@ private:
 protected:
 
     //$[[pycppgen min=3;max=15;serialize]]
-    unsigned int ProtectedUint;
+    unsigned int ProtectedUint = 2;
 
 public:
 
-    PYCPPGEN_STRUCT
-
     CObject() {}
+    virtual ~CObject() {}
 
     //$[[pycppgen]]
     struct SSubObject
@@ -64,9 +63,10 @@ public:
 class CChild : public CObject
 {
 public:
-    CChild() {}
+    CChild() : Matrix({}) {}
+    virtual ~CChild() {}
 
-    PYCPPGEN_STRUCT
+    virtual void DoSomething();
 
     //$[[pycppgen]]
     std::array<float, 16> Matrix;
