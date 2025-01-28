@@ -289,7 +289,15 @@ def ParseStruct(cursor) :
         
         #inheritance
         if child.kind == CursorKind.CXX_BASE_SPECIFIER :
-            AppendToStackTop({ENodeFullName: GetFullName(child)}, ENodeParents)
+            if child.referenced :
+                childFullName = GetFullName(child.referenced)
+                flags = ParseComments(child.referenced, EKindUnknown)
+                if "include" in flags : 
+                    if str(flags["include"]) == "False" :
+                        continue
+                elif not childFullName in NodesToInclude :
+                    continue
+                AppendToStackTop({ENodeFullName: childFullName, ENodeCursor: child.referenced}, ENodeParents)
             continue
 
         #template parameters
