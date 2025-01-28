@@ -191,7 +191,10 @@ def PushNode(cursor, kind : str = EInvalid) :
     node[ENodeName] = str(cursor.spelling)
     node[ENodeFullName] = GetFullName(cursor)
     node[ENodeKind] = kind
-    node[ENodeType] = str(cursor.type.spelling)
+    if kind == EKindClassTemplate :
+        node[ENodeType] = node[ENodeFullName]
+    else :
+        node[ENodeType] = str(cursor.type.spelling)
     node[ENodeAccess] = str(cursor.access_specifier)
     node[ENodeScope] = GetScope(cursor)
     node[ENodeAttributes] = ParseComments(cursor, kind)
@@ -480,6 +483,8 @@ def ParseFile(filePath : str, options : list) :
     idx = clang.cindex.Index.create()
     tu = idx.parse("tmp.h", args = args, options = clang.cindex.TranslationUnit.PARSE_INCOMPLETE | clang.cindex.TranslationUnit.PARSE_SKIP_FUNCTION_BODIES)
 
+    os.remove("tmp.h")
+    
     for cursor in tu.cursor.walk_preorder():
         ParseCursor(cursor)
 
@@ -542,7 +547,7 @@ def CodeGenOutputAttributes(node, depth = 0) :
             result = result[:-2]
         result += "\n" 
         depth -= 1
-        result += "\t" * depth + "}"
+        result += "\t" * (depth + 1) + "}"
     else :
         result = "{}"
 
@@ -630,10 +635,17 @@ def CodeGenOutputNode(hppCode, cppCode, node) :
                     hppCode += "\t\tconst void Set" + var[ENodeName] + "(const decltype(" + node[ENodeFullName] + "::" + var[ENodeName] +" )& value) { " +  node[ENodeFullName] + "::" + var[ENodeName] + " = value; }\n"
                     hppCode += "\t\tconst auto& Get" + var[ENodeName] + "() const { return " + node[ENodeFullName] + "::" + var[ENodeName] + "; }\n"
                     hppCode += "\t\tauto& Get" + var[ENodeName] + "Ref() { return " + node[ENodeFullName] + "::" + var[ENodeName] + "; }\n"
-            hppCode += "\t};\n"
+            hppCode += "\t};\n\n"
 
         #variable's reflection
         hppCode += "\tstatic void for_each_var(std::function<void(const member_variable_info&)> fn) {\n"
+        
+        #parent classes
+        if ENodeParents in node :
+            for p in node[ENodeParents] :
+                hppCode += f"\t\tpycppgen<{p}>::for_each_var(fn);\n"
+            hppCode += "\n"
+
         if ENodeVariables in node and len(node[ENodeVariables]) > 0 :
             for _, var in node[ENodeVariables].items() :
                 #skip private variables
@@ -667,9 +679,15 @@ def CodeGenOutputNode(hppCode, cppCode, node) :
                 hppCode += f"\t\t{infoName}.Attributes = {CodeGenOutputAttributes(var, 2)};\n"
                 #call visitor
                 hppCode += f"\t\tfn(" + infoName + ");\n\n"
-        hppCode += "\t}\n"
+        hppCode += "\t}\n\n"
 
         hppCode += "\tstatic void for_each_var(" + node[ENodeType] + "* obj, auto visitor) {\n"
+        #parent classes
+        if ENodeParents in node :
+            for p in node[ENodeParents] :
+                hppCode += f"\t\tpycppgen<{p}>::for_each_var(obj, visitor);\n"
+            hppCode += "\n"
+
         if ENodeVariables in node and len(node[ENodeVariables]) > 0 :
             for _, var in node[ENodeVariables].items() :
                 #skip private variables
@@ -677,7 +695,7 @@ def CodeGenOutputNode(hppCode, cppCode, node) :
                     continue
                
                 hppCode += f"\t\tvisitor(\"{var[ENodeName]}\", ((access_helper*)obj)->Get{var[ENodeName]}Ref());\n"
-        hppCode += "\t}\n"
+        hppCode += "\t}\n\n"
 
         hppCode += "\tstatic std::map<std::string, std::string> get_member_attributes(std::string_view name) {\n"
         if ENodeVariables in node and len(node[ENodeVariables]) > 0 :
@@ -686,16 +704,30 @@ def CodeGenOutputNode(hppCode, cppCode, node) :
                 if var[ENodeAccess] == str(AccessSpecifier.PRIVATE) :
                     continue
                 
-                hppCode += f"\t\tif (name == \"{var[ENodeName]}\") return {CodeGenOutputAttributes(var, 2)};\n"
+                hppCode += f"\t\tif (name == \"{var[ENodeName]}\")\n"
+                hppCode += "\t\t{\n"
+                hppCode += f"\t\t\treturn {CodeGenOutputAttributes(var, 3)};\n"
+                hppCode += "\t\t}\n"
+            
+                #parent classes
+                if ENodeParents in node :
+                    hppCode += "\n"
+                    for p in node[ENodeParents] :
+                        hppCode += "\t\t{\n"
+                        hppCode += f"\t\t\tconst auto m = pycppgen<{p}>::get_member_attributes(name);\n"
+                        hppCode += f"\t\t\tif (!m.empty()) return m;\n"
+                        hppCode += "\t\t}\n"
+                    hppCode += "\n"
+
         hppCode += "\t\treturn {};\n"
-        hppCode += "\t}\n"
+        hppCode += "\t}\n\n"
 
         #TODO do the same for static variables
         hppCode += "\tstatic void for_each_static_var(std::function<void(std::string_view name)> fn) {\n"
         if ENodeStaticVariables in node and len(node[ENodeStaticVariables]) > 0 :
             for _, var in node[ENodeStaticVariables].items() :
                 hppCode += f"\t\tfn(\"{var[ENodeName]}\");\n"
-        hppCode += "\t}\n"
+        hppCode += "\t}\n\n"
 
         #serialization creates a dump (output) and parse (input) functions
         hppCode += "\ttemplate<typename T> static T dump(const " + node[ENodeType] + "* object) {\n"
@@ -712,7 +744,7 @@ def CodeGenOutputNode(hppCode, cppCode, node) :
                     hppCode += f"\t\tresult[\"{var[ENodeName]}\"] = ((access_helper*)object)->Get{var[ENodeName]}();\n"
 
         hppCode += "\t\treturn result;\n"
-        hppCode += "\t}\n"
+        hppCode += "\t}\n\n"
 
         hppCode += "\ttemplate<typename T, typename R> static bool parse(const T& data, R* object) {\n"
         if ENodeVariables in node and len(node[ENodeVariables]) > 0 :
@@ -720,10 +752,14 @@ def CodeGenOutputNode(hppCode, cppCode, node) :
                 if "serialize" in var[ENodeAttributes] and (var[ENodeAccess] == str(AccessSpecifier.PUBLIC) or var[ENodeAccess] == str(AccessSpecifier.PROTECTED)) :
                     hppCode += "\t\t((access_helper*)object)->Set" + var[ENodeName] + "(data[\"" + var[ENodeName]+ "\"]);\n"
         hppCode += "\t\treturn true;\n"
-        hppCode += "\t}\n"
+        hppCode += "\t}\n\n"
 
         #functions
         hppCode += "\tstatic void for_each_function(std::function<void(const member_function_info&)> fn) {\n"
+        if ENodeParents in node :
+            for p in node[ENodeParents] :
+                hppCode += f"\t\tpycppgen<{p}>::for_each_function(fn);\n"
+
         if ENodeFunctions in node and len(node[ENodeFunctions]) > 0 :
             for _, func in node[ENodeFunctions].items() :
                 if func[ENodeAccess] == str(AccessSpecifier.PUBLIC) or func[ENodeAccess] == str(AccessSpecifier.PROTECTED) :
@@ -745,7 +781,7 @@ def CodeGenOutputNode(hppCode, cppCode, node) :
                         hppCode += f"\t\t\t{paramInfoName}.Attributes = {CodeGenOutputAttributes(pv, 3)};\n"
                         hppCode += f"\t\t\t{infoName}.Parameters.push_back({paramInfoName});\n"
                     hppCode += "\t\t}\n"
-        hppCode += "\t}\n"
+        hppCode += "\t}\n\n"
 
         #has_function by name declaration
         hppCode += "\tstatic constexpr bool has_function(std::string_view name) {\n"
@@ -755,7 +791,10 @@ def CodeGenOutputNode(hppCode, cppCode, node) :
         if ENodeStaticFunctions in node :
             for _, v in node[ENodeStaticFunctions].items() :
                 hppCode += f"\t\tif (name == std::string_view(\"{v[ENodeName]}\")) return true; \n"
-        hppCode += "\t\treturn false;\n\t}\n"
+        if ENodeParents in node :
+            for p in node[ENodeParents] :
+                hppCode += f"\t\tif (pycppgen<{p}>::has_function(name)) return true;\n"
+        hppCode += "\t\treturn false;\n\t}\n\n"
 
         declarations = dict()
 
@@ -770,7 +809,7 @@ def CodeGenOutputNode(hppCode, cppCode, node) :
                 CodeGenOutputAddFunctionDeclaration(declarations, node, v, True)
 
         for _, v in declarations.items() :
-            hppCode += v + "\t\treturn false;\n\t}\n"
+            hppCode += v + "\t\treturn false;\n\t}\n\n"
 
         hppCode = CodeGenOutputMetaFooter(hppCode, node)
 

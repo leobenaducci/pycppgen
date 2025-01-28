@@ -15,7 +15,7 @@ protected:
 
 public:
 
-    PYCPPGEN_STRUCT;
+    PYCPPGEN_STRUCT
 
     CObject() {}
 
@@ -66,7 +66,7 @@ class CChild : public CObject
 public:
     CChild() {}
 
-    PYCPPGEN_STRUCT;
+    PYCPPGEN_STRUCT
 
     //$[[pycppgen]]
     std::array<float, 16> Matrix;

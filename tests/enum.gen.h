@@ -13,7 +13,7 @@ struct pycppgen<EEnum> {
 	static constexpr bool is_valid() { return true; }
 	std::map<std::string, std::string> Attributes = {
 		{ "bitmask", "" }
-	};
+		};
 
 	template<typename FN> static void for_each_enum(FN&& fn) {
 		fn( EEnum::None );
