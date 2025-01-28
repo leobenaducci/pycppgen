@@ -76,15 +76,87 @@ struct pycppgen<SStructTest> {
 	}
 
 	static void for_each_var(SStructTest* obj, auto visitor) {
-		visitor("x", ((access_helper*)obj)->GetxRef());
-		visitor("y", ((access_helper*)obj)->GetyRef());
-		visitor("z", ((access_helper*)obj)->GetzRef());
+		member_variable_info x_info_78;
+		x_info_78.Name = "x";
+		x_info_78.FullName = "SStructTest::x";
+		x_info_78.Type = typeid(float).name();
+		x_info_78.Offset = offsetof(SStructTest, x);
+		x_info_78.ElementSize = sizeof(std::remove_all_extents_t<float>);
+		x_info_78.TotalSize = sizeof(float);
+		x_info_78.ArrayRank = std::rank_v<float>;
+		x_info_78.Attributes = {
+			{ "visible", "" },
+			{ "serialize", "" }
+			};
+		visitor(x_info_78, ((access_helper*)obj)->GetxRef());
+		member_variable_info y_info_91;
+		y_info_91.Name = "y";
+		y_info_91.FullName = "SStructTest::y";
+		y_info_91.Type = typeid(float).name();
+		y_info_91.Offset = offsetof(SStructTest, y);
+		y_info_91.ElementSize = sizeof(std::remove_all_extents_t<float>);
+		y_info_91.TotalSize = sizeof(float);
+		y_info_91.ArrayRank = std::rank_v<float>;
+		y_info_91.Attributes = {
+			{ "visible", "" },
+			{ "serialize", "" }
+			};
+		visitor(y_info_91, ((access_helper*)obj)->GetyRef());
+		member_variable_info z_info_104;
+		z_info_104.Name = "z";
+		z_info_104.FullName = "SStructTest::z";
+		z_info_104.Type = typeid(float).name();
+		z_info_104.Offset = offsetof(SStructTest, z);
+		z_info_104.ElementSize = sizeof(std::remove_all_extents_t<float>);
+		z_info_104.TotalSize = sizeof(float);
+		z_info_104.ArrayRank = std::rank_v<float>;
+		z_info_104.Attributes = {
+			{ "visible", "" },
+			{ "serialize", "" }
+			};
+		visitor(z_info_104, ((access_helper*)obj)->GetzRef());
 	}
 
 	static void for_each_var(const SStructTest* obj, auto visitor) {
-		visitor("x", ((access_helper*)obj)->GetxRef());
-		visitor("y", ((access_helper*)obj)->GetyRef());
-		visitor("z", ((access_helper*)obj)->GetzRef());
+		member_variable_info x_info_120;
+		x_info_120.Name = "x";
+		x_info_120.FullName = "SStructTest::x";
+		x_info_120.Type = typeid(float).name();
+		x_info_120.Offset = offsetof(SStructTest, x);
+		x_info_120.ElementSize = sizeof(std::remove_all_extents_t<float>);
+		x_info_120.TotalSize = sizeof(float);
+		x_info_120.ArrayRank = std::rank_v<float>;
+		x_info_120.Attributes = {
+			{ "visible", "" },
+			{ "serialize", "" }
+			};
+		visitor(x_info_120, ((access_helper*)obj)->GetxRef());
+		member_variable_info y_info_133;
+		y_info_133.Name = "y";
+		y_info_133.FullName = "SStructTest::y";
+		y_info_133.Type = typeid(float).name();
+		y_info_133.Offset = offsetof(SStructTest, y);
+		y_info_133.ElementSize = sizeof(std::remove_all_extents_t<float>);
+		y_info_133.TotalSize = sizeof(float);
+		y_info_133.ArrayRank = std::rank_v<float>;
+		y_info_133.Attributes = {
+			{ "visible", "" },
+			{ "serialize", "" }
+			};
+		visitor(y_info_133, ((access_helper*)obj)->GetyRef());
+		member_variable_info z_info_146;
+		z_info_146.Name = "z";
+		z_info_146.FullName = "SStructTest::z";
+		z_info_146.Type = typeid(float).name();
+		z_info_146.Offset = offsetof(SStructTest, z);
+		z_info_146.ElementSize = sizeof(std::remove_all_extents_t<float>);
+		z_info_146.TotalSize = sizeof(float);
+		z_info_146.ArrayRank = std::rank_v<float>;
+		z_info_146.Attributes = {
+			{ "visible", "" },
+			{ "serialize", "" }
+			};
+		visitor(z_info_146, ((access_helper*)obj)->GetzRef());
 	}
 
 	static std::map<std::string, std::string> get_member_attributes(std::string_view name) {

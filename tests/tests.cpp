@@ -74,9 +74,9 @@ int main()
     //    }
     //);
 
-    pycppgen<>::for_each_var(o, [&](std::string_view name, auto&& t)
+    pycppgen<>::for_each_var(o, [&](const member_variable_info& v, auto&& t)
         {
-            printf("%s -> %s\n", name.data(), std::to_string(t).c_str());
+            printf("%s = %s\n", v.FullName.data(), std::to_string(t).c_str());
         }
     );
 

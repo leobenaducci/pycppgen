@@ -613,6 +613,37 @@ def CodeGenOutputAddFunctionDeclaration(declarations, node, funcNode, isStatic :
     #code '     }'
     declarations[decl] += "\t\t\treturn true;\n\t\t}\n"
 
+def GenerateMemberInfo(node, var, infoName) :
+    result = ""
+
+    varName = var[ENodeName]
+    varType = var[ENodeType]
+
+    result += f"\t\tmember_variable_info {infoName};\n"
+    #variable name
+    result += f"\t\t{infoName}.Name = \"{varName}\";\n"
+    #full name
+    result += f"\t\t{infoName}.FullName = \"{var[ENodeFullName]}\";\n"
+    #typeid name
+    result += f"\t\t{infoName}.Type = typeid({varType}).name();\n"
+    #get the protected variable offset using the access_helper
+    if var[ENodeAccess] == str(AccessSpecifier.PROTECTED) :
+        result += f"\t\t{infoName}.Offset = access_helper().{varName}_Offset;\n"
+    else :
+        result += f"\t\t{infoName}.Offset = offsetof({node[ENodeFullName]}, {varName});\n"
+    #single element size
+    result += f"\t\t{infoName}.ElementSize = sizeof(std::remove_all_extents_t<{varType}>);\n"
+    #total size
+    result += f"\t\t{infoName}.TotalSize = sizeof({varType});\n"
+    #array dimensions
+    result += f"\t\t{infoName}.ArrayRank = std::rank_v<{varType}>;\n"
+    for i in range(0, varType.count("[")) :
+        result += f"\t\t{infoName}.ArrayExtents.push_back(std::extent_v<{varType}, {i}>);\n"
+    #variable attributes
+    result += f"\t\t{infoName}.Attributes = {CodeGenOutputAttributes(var, 2)};\n"
+
+    return result
+
 #codegen: emit a node5
 def CodeGenOutputNode(hppCode, cppCode, node) :
    
@@ -652,35 +683,13 @@ def CodeGenOutputNode(hppCode, cppCode, node) :
                 if var[ENodeAccess] == str(AccessSpecifier.PRIVATE) :
                     continue
                 
-                #frequently used variables
-                varName = var[ENodeName]
-                varType = var[ENodeType]
-                infoName = f"{varName}_info_" + str(hppCode.count('\n'))
-
-                hppCode += f"\t\tmember_variable_info {infoName};\n"
-                #variable name
-                hppCode += f"\t\t{infoName}.Name = \"{varName}\";\n"
-                #full name
-                hppCode += f"\t\t{infoName}.FullName = \"{var[ENodeFullName]}\";\n"
-                #typeid name
-                hppCode += f"\t\t{infoName}.Type = typeid({varType}).name();\n"
-                #get the protected variable offset using the access_helper
-                if var[ENodeAccess] == str(AccessSpecifier.PROTECTED) :
-                    hppCode += f"\t\t{infoName}.Offset = access_helper().{varName}_Offset;\n"
-                else :
-                    hppCode += f"\t\t{infoName}.Offset = offsetof({node[ENodeFullName]}, {varName});\n"
-                #single element size
-                hppCode += f"\t\t{infoName}.ElementSize = sizeof(std::remove_all_extents_t<{varType}>);\n"
-                #total size
-                hppCode += f"\t\t{infoName}.TotalSize = sizeof({varType});\n"
-                #array dimensions
-                hppCode += f"\t\t{infoName}.ArrayRank = std::rank_v<{varType}>;\n"
-                for i in range(0, varType.count("[")) :
-                    hppCode += f"\t\t{infoName}.ArrayExtents.push_back(std::extent_v<{varType}, {i}>);\n"
-                #variable attributes
-                hppCode += f"\t\t{infoName}.Attributes = {CodeGenOutputAttributes(var, 2)};\n"
+                #generate member_variable_info
+                infoName = f"{var[ENodeName]}_info_" + str(hppCode.count('\n'))
+                hppCode += GenerateMemberInfo(node, var, infoName)
+                
                 #call visitor
                 hppCode += f"\t\tfn(" + infoName + ");\n\n"
+
         hppCode += "\t}\n\n"
 
         hppCode += "\tstatic void for_each_var(" + node[ENodeType] + "* obj, auto visitor) {\n"
@@ -696,7 +705,11 @@ def CodeGenOutputNode(hppCode, cppCode, node) :
                 if var[ENodeAccess] == str(AccessSpecifier.PRIVATE) :
                     continue
                
-                hppCode += f"\t\tvisitor(\"{var[ENodeName]}\", ((access_helper*)obj)->Get{var[ENodeName]}Ref());\n"
+                #generate member_variable_info
+                infoName = f"{var[ENodeName]}_info_" + str(hppCode.count('\n'))
+                hppCode += GenerateMemberInfo(node, var, infoName)
+
+                hppCode += f"\t\tvisitor({infoName}, ((access_helper*)obj)->Get{var[ENodeName]}Ref());\n"
         hppCode += "\t}\n\n"
 
         hppCode += "\tstatic void for_each_var(const " + node[ENodeType] + "* obj, auto visitor) {\n"
@@ -712,7 +725,11 @@ def CodeGenOutputNode(hppCode, cppCode, node) :
                 if var[ENodeAccess] == str(AccessSpecifier.PRIVATE) :
                     continue
                
-                hppCode += f"\t\tvisitor(\"{var[ENodeName]}\", ((access_helper*)obj)->Get{var[ENodeName]}Ref());\n"
+                #generate member_variable_info
+                infoName = f"{var[ENodeName]}_info_" + str(hppCode.count('\n'))
+                hppCode += GenerateMemberInfo(node, var, infoName)
+
+                hppCode += f"\t\tvisitor({infoName}, ((access_helper*)obj)->Get{var[ENodeName]}Ref());\n"
         hppCode += "\t}\n\n"
 
         hppCode += "\tstatic std::map<std::string, std::string> get_member_attributes(std::string_view name) {\n"
