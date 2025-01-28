@@ -87,6 +87,7 @@ TypeAliases = dict(
 NodeList = {}
 NodeTree = {}
 NodeStack = [NodeTree]
+ProjectPath = ""
 
 #try to parse the comments before or after the cursor (hacky but, cursor.raw_comments isn't working as expected)
 def ParseComments(cursor, kind : str = EParseCommentsBeforeDecl) :
@@ -1023,7 +1024,7 @@ def CodeGenGlobal(path : str) :
     code += "\n"
     code += "#include \"pycppgen.h\"\n"
     for k in PerFileData :
-        code += f"#include \"{GetOutputFileName(k)}\"\n"
+        code += f"#include \"{pathlib.Path(GetOutputFilePath(k)).relative_to(ProjectPath)}\"\n"
 
     code += "\nnamespace pycppgen_globals\n{\n"
 
@@ -1119,15 +1120,16 @@ def IsOutputUpToDate(file : str) :
     IsFileUpToDate(file, outputFile)
 
 def main(args : list) :
-    global FilesToParse, NodesToInclude, NodeList, NodeTree, NodeStack, PerFileData
+    global FilesToParse, NodesToInclude, NodeList, NodeTree, NodeStack, PerFileData, ProjectPath
 
     if len(args) < 1 :
         print("usage py main.py <directory> <options>")
         exit(-1)
 
+    ProjectPath = str(pathlib.Path(args[0]).resolve())
     FilesToParse = []
     OldGenFiles = []
-    for root, _, files in os.walk(args[0]):
+    for root, _, files in os.walk(ProjectPath):
         for file in files:
             if re.match(r".*\.h", file) and not re.match(r".*\.gen.h", file) :
                 filePath = os.path.join(root, file)
@@ -1144,18 +1146,18 @@ def main(args : list) :
     GenFiles = list(map(lambda x : str(pathlib.Path(GetOutputFilePath(x)).resolve()), FilesToParse))
     OldGenFiles = list(map(lambda x : str(pathlib.Path(x).resolve()), OldGenFiles))
 
-    if not IsFileUpToDate(inspect.getsourcefile(sys.modules[__name__]), args[0] + "\\pycppgen.ver") :
+    if not IsFileUpToDate(inspect.getsourcefile(sys.modules[__name__]), ProjectPath + "\\pycppgen.ver") :
         for file in OldGenFiles :
             if os.path.exists(file) :
                 os.remove(file)
         OldGenFiles = []
-        with open(args[0] + "\\pycppgen.ver", "wt") as f :
+        with open(ProjectPath + "\\pycppgen.ver", "wt") as f :
             f.write("")
 
     FilesToRemove = list(set(OldGenFiles).difference(GenFiles))
     FilesToAdd = list(set(GenFiles).difference(OldGenFiles))
 
-    allFilesUpToDate = len(FilesToRemove) == 0 and len(FilesToAdd) == 0 and os.path.exists(args[0] + "\\pycppgen.gen.h")
+    allFilesUpToDate = len(FilesToRemove) == 0 and len(FilesToAdd) == 0 and os.path.exists(ProjectPath + "\\pycppgen.gen.h")
     for file in FilesToParse :
         if not IsOutputUpToDate(file) :
             print("Outdated file detected: " + file)
@@ -1165,7 +1167,7 @@ def main(args : list) :
     if allFilesUpToDate :
         return
     
-    print("parsing path: " + args[0])
+    print("parsing path: " + ProjectPath)
 
     PerFileData = {}
     for file in FilesToParse :
