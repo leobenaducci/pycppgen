@@ -31,9 +31,6 @@ public:
     //$[[pycppgen]]
     std::array<char, 16> PublicCharArray;
 
-    //$[[pycppgen]]
-    static int TestStaticFunc() {}
-    
     //$[[pycppgen callable]]
     void Func() { PrivateInt = 3; }
 

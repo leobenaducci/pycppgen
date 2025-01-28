@@ -50,10 +50,7 @@ void pycppgen<void>::for_each_var(void* obj, auto fn) const
 
 template<typename T> static void pycppgen<void>::for_each_var(const T* obj, auto fn)
 {
-	if (obj == nullptr)
-		return;
-
-	const auto hashCode = typeid(*obj).hash_code();
+	const auto hashCode = typeid(obj).hash_code();
 	if (hashCode == typeid(CObject::SSubObject).hash_code())
 		pycppgen<CObject::SSubObject>::for_each_var((const CObject::SSubObject*)obj, fn);
 	if (hashCode == typeid(CObject).hash_code())
@@ -66,10 +63,7 @@ template<typename T> static void pycppgen<void>::for_each_var(const T* obj, auto
 
 template<typename T> static void pycppgen<void>::for_each_var(T* obj, auto fn)
 {
-	if (obj == nullptr)
-		return;
-
-	const auto hashCode = typeid(*obj).hash_code();
+	const auto hashCode = typeid(obj).hash_code();
 	if (hashCode == typeid(CObject::SSubObject).hash_code())
 		pycppgen<CObject::SSubObject>::for_each_var((CObject::SSubObject*)obj, fn);
 	if (hashCode == typeid(CObject).hash_code())

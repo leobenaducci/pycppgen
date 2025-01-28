@@ -303,7 +303,6 @@ struct pycppgen<CObject> {
 		if (name == std::string_view("Func")) return true; 
 		if (name == std::string_view("Add")) return true; 
 		if (name == std::string_view("Get")) return true; 
-		if (name == std::string_view("TestStaticFunc")) return true; 
 		if (name == std::string_view("OnRegister")) return true; 
 		return false;
 	}
@@ -327,14 +326,6 @@ struct pycppgen<CObject> {
 	static bool call_function(std::string_view name, const CObject* object, short& result) {
 		if (name == "Get") {
 			result = object->Get();
-			return true;
-		}
-		return false;
-	}
-
-	static bool call_function(std::string_view name, int& result) {
-		if (name == "TestStaticFunc") {
-			result = CObject::TestStaticFunc();
 			return true;
 		}
 		return false;
@@ -375,53 +366,53 @@ struct pycppgen<CChild> {
 	static void for_each_var(std::function<void(const member_variable_info&)> fn) {
 		pycppgen<CObject>::for_each_var(fn);
 
-		member_variable_info Matrix_info_377;
-		Matrix_info_377.Name = "Matrix";
-		Matrix_info_377.FullName = "CChild::Matrix";
-		Matrix_info_377.Type = typeid(int).name();
-		Matrix_info_377.Offset = offsetof(CChild, Matrix);
-		Matrix_info_377.ElementSize = sizeof(std::remove_all_extents_t<int>);
-		Matrix_info_377.TotalSize = sizeof(int);
-		Matrix_info_377.ArrayRank = std::rank_v<int>;
-		Matrix_info_377.Attributes = {
+		member_variable_info Matrix_info_368;
+		Matrix_info_368.Name = "Matrix";
+		Matrix_info_368.FullName = "CChild::Matrix";
+		Matrix_info_368.Type = typeid(int).name();
+		Matrix_info_368.Offset = offsetof(CChild, Matrix);
+		Matrix_info_368.ElementSize = sizeof(std::remove_all_extents_t<int>);
+		Matrix_info_368.TotalSize = sizeof(int);
+		Matrix_info_368.ArrayRank = std::rank_v<int>;
+		Matrix_info_368.Attributes = {
 
 			};
-		fn(Matrix_info_377);
+		fn(Matrix_info_368);
 
 	}
 
 	static void for_each_var(CChild* obj, auto visitor) {
 		pycppgen<CObject>::for_each_var(obj, visitor);
 
-		member_variable_info Matrix_info_395;
-		Matrix_info_395.Name = "Matrix";
-		Matrix_info_395.FullName = "CChild::Matrix";
-		Matrix_info_395.Type = typeid(int).name();
-		Matrix_info_395.Offset = offsetof(CChild, Matrix);
-		Matrix_info_395.ElementSize = sizeof(std::remove_all_extents_t<int>);
-		Matrix_info_395.TotalSize = sizeof(int);
-		Matrix_info_395.ArrayRank = std::rank_v<int>;
-		Matrix_info_395.Attributes = {
+		member_variable_info Matrix_info_386;
+		Matrix_info_386.Name = "Matrix";
+		Matrix_info_386.FullName = "CChild::Matrix";
+		Matrix_info_386.Type = typeid(int).name();
+		Matrix_info_386.Offset = offsetof(CChild, Matrix);
+		Matrix_info_386.ElementSize = sizeof(std::remove_all_extents_t<int>);
+		Matrix_info_386.TotalSize = sizeof(int);
+		Matrix_info_386.ArrayRank = std::rank_v<int>;
+		Matrix_info_386.Attributes = {
 
 			};
-		visitor(Matrix_info_395, ((access_helper*)obj)->GetMatrixRef());
+		visitor(Matrix_info_386, ((access_helper*)obj)->GetMatrixRef());
 	}
 
 	static void for_each_var(const CChild* obj, auto visitor) {
 		pycppgen<CObject>::for_each_var(obj, visitor);
 
-		member_variable_info Matrix_info_412;
-		Matrix_info_412.Name = "Matrix";
-		Matrix_info_412.FullName = "CChild::Matrix";
-		Matrix_info_412.Type = typeid(int).name();
-		Matrix_info_412.Offset = offsetof(CChild, Matrix);
-		Matrix_info_412.ElementSize = sizeof(std::remove_all_extents_t<int>);
-		Matrix_info_412.TotalSize = sizeof(int);
-		Matrix_info_412.ArrayRank = std::rank_v<int>;
-		Matrix_info_412.Attributes = {
+		member_variable_info Matrix_info_403;
+		Matrix_info_403.Name = "Matrix";
+		Matrix_info_403.FullName = "CChild::Matrix";
+		Matrix_info_403.Type = typeid(int).name();
+		Matrix_info_403.Offset = offsetof(CChild, Matrix);
+		Matrix_info_403.ElementSize = sizeof(std::remove_all_extents_t<int>);
+		Matrix_info_403.TotalSize = sizeof(int);
+		Matrix_info_403.ArrayRank = std::rank_v<int>;
+		Matrix_info_403.Attributes = {
 
 			};
-		visitor(Matrix_info_412, ((access_helper*)obj)->GetMatrixRef());
+		visitor(Matrix_info_403, ((access_helper*)obj)->GetMatrixRef());
 	}
 
 	static std::map<std::string, std::string> get_member_attributes(std::string_view name) {
@@ -454,13 +445,13 @@ struct pycppgen<CChild> {
 
 	static void for_each_function(std::function<void(const member_function_info&)> fn) {
 		pycppgen<CObject>::for_each_function(fn);
-		member_function_info DoSomething_info_456;
-		DoSomething_info_456.Name = "DoSomething";
-		DoSomething_info_456.Declaration = "void ()";
-		DoSomething_info_456.Attributes = {
+		member_function_info DoSomething_info_447;
+		DoSomething_info_447.Name = "DoSomething";
+		DoSomething_info_447.Declaration = "void ()";
+		DoSomething_info_447.Attributes = {
 
 				};
-		DoSomething_info_456.ReturnType = "void";
+		DoSomething_info_447.ReturnType = "void";
 		//parameters
 		{
 		}

@@ -66,29 +66,26 @@ int main()
     //    });
     //
     //
-	CObject* o = new CChild();
-    //printf("%s (%s) ->\n", typeid(o).name(), typeid(*o).name());
-    //pycppgen_of(o).for_each_var([&](const member_variable_info& v)
-    //    {
-    //        printf("\t%s %s -> Offset: %llu Size: %llu\n", v.Type.data(), v.FullName.data(), v.Offset, v.ElementSize);
-    //    }
-    //);
 
+	CObject* o = new CChild();
     pycppgen<>::for_each_var(o, [&](const member_variable_info& v, auto&& t)
         {
             printf("%s = %s\n", v.FullName.data(), std::to_string(t).c_str());
         }
     );
 
-
     printf("---\n");
 
     float rf;
     pycppgen<CObject>::call_function("Add", o, rf, 1.f, 2.f);
 
-    const CObject co {};
+    printf("Add(1.f, 2.f) = %.2f\n", rf);
+
+    const CObject co;
     short rs;
     pycppgen<CObject>::call_function("Get", &co, rs);
-    
+
+    printf("Get() = %d\n", rs);
+
     return 0;
 }
