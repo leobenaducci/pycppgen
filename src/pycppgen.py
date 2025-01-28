@@ -660,6 +660,8 @@ def CodeGenOutputNode(hppCode, cppCode, node) :
                 hppCode += f"\t\tmember_variable_info {infoName};\n"
                 #variable name
                 hppCode += f"\t\t{infoName}.Name = \"{varName}\";\n"
+                #full name
+                hppCode += f"\t\t{infoName}.FullName = \"{var[ENodeFullName]}\";\n"
                 #typeid name
                 hppCode += f"\t\t{infoName}.Type = typeid({varType}).name();\n"
                 #get the protected variable offset using the access_helper
@@ -919,6 +921,7 @@ def CodeGenGlobalHeader(path : str) :
 
 struct member_variable_info {
 	std::string_view Name;
+	std::string_view FullName;
 	std::string_view Type;
 	size_t Offset = 0;
 	size_t ElementSize = 0;

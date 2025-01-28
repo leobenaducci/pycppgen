@@ -14,6 +14,7 @@
 
 struct member_variable_info {
 	std::string_view Name;
+	std::string_view FullName;
 	std::string_view Type;
 	size_t Offset = 0;
 	size_t ElementSize = 0;

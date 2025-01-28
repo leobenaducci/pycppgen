@@ -4,5 +4,7 @@
 #include "namespace.h"
 
 namespace pycppgen_globals {
-//TestNameSpace::FuncA()
+//TestNamespace::Func1()
+//TestNamespace::Func2(int)
+//TestNamespace::Func3()
 }

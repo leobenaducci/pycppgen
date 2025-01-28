@@ -3,38 +3,39 @@
 #include "pycppgen.h"
 #include "struct.h"
 
-//<autogen_pycppgen_SVector>
+//<autogen_pycppgen_SStructTest>
 
-#ifndef pycppgen_SVector
-#define pycppgen_SVector
+#ifndef pycppgen_SStructTest
+#define pycppgen_SStructTest
 
 template<>
-struct pycppgen<SVector> {
+struct pycppgen<SStructTest> {
 	static constexpr bool is_valid() { return true; }
 	std::map<std::string_view, std::string_view> Attributes = {
 		{ "visible", "" }
 		};
 
-	struct access_helper : SVector {
-		const size_t x_Offset = offsetof(access_helper, SVector::x);
-		const void Setx(const decltype(SVector::x )& value) { SVector::x = value; }
-		const auto& Getx() const { return SVector::x; }
-		auto& GetxRef() { return SVector::x; }
-		const size_t y_Offset = offsetof(access_helper, SVector::y);
-		const void Sety(const decltype(SVector::y )& value) { SVector::y = value; }
-		const auto& Gety() const { return SVector::y; }
-		auto& GetyRef() { return SVector::y; }
-		const size_t z_Offset = offsetof(access_helper, SVector::z);
-		const void Setz(const decltype(SVector::z )& value) { SVector::z = value; }
-		const auto& Getz() const { return SVector::z; }
-		auto& GetzRef() { return SVector::z; }
+	struct access_helper : SStructTest {
+		const size_t x_Offset = offsetof(access_helper, SStructTest::x);
+		const void Setx(const decltype(SStructTest::x )& value) { SStructTest::x = value; }
+		const auto& Getx() const { return SStructTest::x; }
+		auto& GetxRef() { return SStructTest::x; }
+		const size_t y_Offset = offsetof(access_helper, SStructTest::y);
+		const void Sety(const decltype(SStructTest::y )& value) { SStructTest::y = value; }
+		const auto& Gety() const { return SStructTest::y; }
+		auto& GetyRef() { return SStructTest::y; }
+		const size_t z_Offset = offsetof(access_helper, SStructTest::z);
+		const void Setz(const decltype(SStructTest::z )& value) { SStructTest::z = value; }
+		const auto& Getz() const { return SStructTest::z; }
+		auto& GetzRef() { return SStructTest::z; }
 	};
 
 	static void for_each_var(std::function<void(const member_variable_info&)> fn) {
 		member_variable_info x_info_33;
 		x_info_33.Name = "x";
+		x_info_33.FullName = "SStructTest::x";
 		x_info_33.Type = typeid(float).name();
-		x_info_33.Offset = offsetof(SVector, x);
+		x_info_33.Offset = offsetof(SStructTest, x);
 		x_info_33.ElementSize = sizeof(std::remove_all_extents_t<float>);
 		x_info_33.TotalSize = sizeof(float);
 		x_info_33.ArrayRank = std::rank_v<float>;
@@ -44,35 +45,37 @@ struct pycppgen<SVector> {
 			};
 		fn(x_info_33);
 
-		member_variable_info y_info_46;
-		y_info_46.Name = "y";
-		y_info_46.Type = typeid(float).name();
-		y_info_46.Offset = offsetof(SVector, y);
-		y_info_46.ElementSize = sizeof(std::remove_all_extents_t<float>);
-		y_info_46.TotalSize = sizeof(float);
-		y_info_46.ArrayRank = std::rank_v<float>;
-		y_info_46.Attributes = {
+		member_variable_info y_info_47;
+		y_info_47.Name = "y";
+		y_info_47.FullName = "SStructTest::y";
+		y_info_47.Type = typeid(float).name();
+		y_info_47.Offset = offsetof(SStructTest, y);
+		y_info_47.ElementSize = sizeof(std::remove_all_extents_t<float>);
+		y_info_47.TotalSize = sizeof(float);
+		y_info_47.ArrayRank = std::rank_v<float>;
+		y_info_47.Attributes = {
 			{ "visible", "" },
 			{ "serialize", "" }
 			};
-		fn(y_info_46);
+		fn(y_info_47);
 
-		member_variable_info z_info_59;
-		z_info_59.Name = "z";
-		z_info_59.Type = typeid(float).name();
-		z_info_59.Offset = offsetof(SVector, z);
-		z_info_59.ElementSize = sizeof(std::remove_all_extents_t<float>);
-		z_info_59.TotalSize = sizeof(float);
-		z_info_59.ArrayRank = std::rank_v<float>;
-		z_info_59.Attributes = {
+		member_variable_info z_info_61;
+		z_info_61.Name = "z";
+		z_info_61.FullName = "SStructTest::z";
+		z_info_61.Type = typeid(float).name();
+		z_info_61.Offset = offsetof(SStructTest, z);
+		z_info_61.ElementSize = sizeof(std::remove_all_extents_t<float>);
+		z_info_61.TotalSize = sizeof(float);
+		z_info_61.ArrayRank = std::rank_v<float>;
+		z_info_61.Attributes = {
 			{ "visible", "" },
 			{ "serialize", "" }
 			};
-		fn(z_info_59);
+		fn(z_info_61);
 
 	}
 
-	static void for_each_var(SVector* obj, auto visitor) {
+	static void for_each_var(SStructTest* obj, auto visitor) {
 		visitor("x", ((access_helper*)obj)->GetxRef());
 		visitor("y", ((access_helper*)obj)->GetyRef());
 		visitor("z", ((access_helper*)obj)->GetzRef());
@@ -107,7 +110,7 @@ struct pycppgen<SVector> {
 		fn("size");
 	}
 
-	template<typename T> static T dump(const SVector* object) {
+	template<typename T> static T dump(const SStructTest* object) {
 		T result;
 		result["x"] = ((access_helper*)object)->Getx();
 		result["y"] = ((access_helper*)object)->Gety();
@@ -131,9 +134,9 @@ struct pycppgen<SVector> {
 
 };
 
-#endif //pycppgen_SVector
-//</autogen_pycppgen_SVector>
+#endif //pycppgen_SStructTest
+//</autogen_pycppgen_SStructTest>
 
 namespace pycppgen_globals {
-//const int SVector::size
+//const int SStructTest::size
 }

@@ -9,6 +9,6 @@ void pycppgen<void>::for_each_var(std::function<void(const member_variable_info&
 		pycppgen<CObject>::for_each_var(fn);
 	if (HashCode == typeid(CChild).hash_code())
 		pycppgen<CChild>::for_each_var(fn);
-	if (HashCode == typeid(SVector).hash_code())
-		pycppgen<SVector>::for_each_var(fn);
+	if (HashCode == typeid(SStructTest).hash_code())
+		pycppgen<SStructTest>::for_each_var(fn);
 }

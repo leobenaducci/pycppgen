@@ -1,6 +1,6 @@
 #pragma once
 
-//$[[pycppgen-include CObject CChild]]
+//$[[pycppgen-include CObject]]
 
 //$[[pycppgen pure]]
 class CObject
@@ -21,22 +21,21 @@ public:
     //$[[pycppgen]]
     struct SSubObject
     {
+        //$[[pycppgen]]
         static void OnRegister() {}
     };
 
     //$[[pycppgen serialize]]
     short PublicShort = 123;
 
-    char PublicCharArray[16];
+    //$[[pycppgen]]
+    std::array<char, 16> PublicCharArray;
 
     //$[[pycppgen]]
     static int TestStaticFunc() {}
     
     //$[[pycppgen callable]]
-    void Func()
-    {
-        PrivateInt = 3;
-    }
+    void Func() { PrivateInt = 3; }
 
     //$[[pycppgen callable]]
     float Add(float A /*$[[pycppgen clamp]]*/, double B /*$[[pycppgen auto_cast;enum]]*/)
@@ -66,6 +65,7 @@ public:
     CChild() : Matrix({}) {}
     virtual ~CChild() {}
 
+    //$[[pycppgen]]
     virtual void DoSomething();
 
     //$[[pycppgen]]

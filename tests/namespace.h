@@ -1,24 +1,28 @@
 #pragma once
 
 #include "class.h"
-
+#include "struct.h"
 #include "namespace.gen.h"
 
 //$[[pycppgen]]
-namespace TestNameSpace
+namespace TestNamespace
 {
     //$[[pycppgen]]
-    void FuncA();
+    void Func1();
     
-    void FuncB(int paramB);
+    //$[[pycppgen]]
+    void Func2(int paramB);
 
-    int FuncC();
+    //$[[pycppgen]]
+    int Func3();
 
     //$[[pycppgen exclude]]
-    class CChild : CObject
+    class CNamespaceChild : public CObject
     {
     public:
-        float Matrix[4][4];
+
+        //$[[pycppgen]
+        SStructTest A;
     };
 
 }

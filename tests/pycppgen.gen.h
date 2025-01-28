@@ -12,13 +12,14 @@
 namespace pycppgen_globals
 {
 	static void for_each_type_call(auto fn) {
-		fn(*(CObject::SSubObject*)0);
-		fn(*(CObject*)0);
-		fn(*(CChild*)0);
-		fn(*(SVector*)0);
+		fn(CObject::SSubObject());
+		fn(CObject());
+		fn(CChild());
+		fn(SStructTest());
 	}
 
 	static void for_each_type_static_call_by_name(std::string_view funcName) {
+		pycppgen<CObject::SSubObject>::call_function(funcName);
 		pycppgen<CObject>::call_function(funcName);
 	}
 
