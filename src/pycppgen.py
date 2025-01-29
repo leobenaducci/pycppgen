@@ -689,12 +689,19 @@ def CodeGenOutputNode(hppCode, cppCode, node) :
                     hppCode += "\t\tauto& Get" + var[ENodeName] + "Ref() { return " + node[ENodeFullName] + "::" + var[ENodeName] + "; }\n"
             hppCode += "\t};\n\n"
 
+        #parent classes
+        hppCode += "\tstatic void for_each_parent(auto fn) {\n"
+        if ENodeParents in node :
+            for p in node[ENodeParents] :
+                hppCode += f"\t\tfn(*({p}*)0);\n"
+        hppCode += "\t};\n\n"
+        
         #variable's reflection
         hppCode += "\tstatic void for_each_var(std::function<void(const member_variable_info&)> fn) {\n"
         if ENodeNamespace in node and node[ENodeNamespace] != "" :
             hppCode += f"\t\tusing namespace {node[ENodeNamespace]};\n"
         
-        #parent classes
+        #parent variables
         if ENodeParents in node :
             for p in node[ENodeParents] :
                 hppCode += f"\t\tpycppgen<{p}>::for_each_var(fn);\n"

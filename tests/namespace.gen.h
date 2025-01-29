@@ -15,6 +15,9 @@ struct pycppgen<TestNamespace::CNamespaceChild> {
 
 		};
 
+	static void for_each_parent(auto fn) {
+	};
+
 	static void for_each_var(std::function<void(const member_variable_info&)> fn) {
 		using namespace TestNamespace;
 	}
