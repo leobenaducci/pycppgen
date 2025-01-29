@@ -14,9 +14,9 @@
 #include <any>
 
 struct member_variable_info {
-	std::string_view Name;
-	std::string_view FullName;
-	std::string_view Type;
+	std::string Name;
+	std::string FullName;
+	std::string Type;
 	size_t Offset = 0;
 	size_t ElementSize = 0;
 	size_t TotalSize = 0;
@@ -26,16 +26,16 @@ struct member_variable_info {
 };
 
 struct function_parameter_info {
-	std::string_view Name;
-	std::string_view Type;
-	std::string_view DefaultValue;
+	std::string Name;
+	std::string Type;
+	std::string DefaultValue;
 	std::map<std::string, std::string> Attributes;
 };
 
 struct member_function_info {
-	std::string_view Name;
-	std::string_view Declaration;
-	std::string_view ReturnType;
+	std::string Name;
+	std::string Declaration;
+	std::string ReturnType;
 	std::vector<function_parameter_info> Parameters;
 	std::map<std::string, std::string> Attributes;
 };
@@ -65,6 +65,48 @@ template<typename T> requires (std::is_pointer_v<T>)
 auto pycppgen_of(const T t) 
 {
 	return pycppgen<void>(typeid(*t));
+}
+
+namespace pycppgen_detail
+{
+	template <typename T>
+	size_t get_rank(const T& arr) {
+		return std::rank_v<T>;
+	}
+
+	template <typename T, std::size_t N>
+	size_t get_rank(const std::array<T, N>& arr) {
+	    return 1;
+	}
+
+	template <typename T>
+	std::vector<size_t> get_extents(const T& arr) {
+		return { 0 };
+	}
+
+	template <typename T, std::size_t N>
+	std::vector<size_t> get_extents(const std::array<T, N>& arr) {
+	    return { N };
+	}
+
+	template <typename T, std::size_t N>
+	std::vector<size_t> get_extents(T (&)[N]) {
+	    return { N };
+	}
+	
+	template <typename T, std::size_t N, std::size_t M, typename... Dims>
+	std::vector<std::size_t> get_extents(T (&)[N][M], Dims... dims) {
+	    std::vector<size_t> extents = {N, M};
+	    (extents.push_back(dims), ...);
+	    return extents;
+	}
+
+	template <typename T, std::size_t N, std::size_t M, std::size_t B, typename... Dims>
+	std::vector<std::size_t> get_extents(T (&)[N][M][B], Dims... dims) {
+	    std::vector<size_t> extents = {N, M, B};
+	    (extents.push_back(dims), ...);
+	    return extents;
+	}
 }
 
 #endif //_PYCPPGEN_HEADER_

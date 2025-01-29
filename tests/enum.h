@@ -8,3 +8,13 @@ enum class EEnum : unsigned
     Value,  //$[[pycppgen hidden;selectable]]
     Test = 10,
 };
+
+//$[[pycppgen]]
+enum class EAnotherEnum : unsigned
+{
+    Zero,
+    One,
+    Two,
+    Three,
+    COUNT, //$[[pycppgen hidden]
+};

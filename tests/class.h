@@ -1,5 +1,7 @@
 #pragma once
 
+#include <array>
+
 //$[[pycppgen-include CObject]]
 
 //$[[pycppgen pure]]

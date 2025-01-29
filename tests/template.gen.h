@@ -3,10 +3,10 @@
 #include "pycppgen.h"
 #include "template.h"
 
-//<autogen_pycppgen_Template_TVector_T_>
+//<autogen__pycppgen_Template_TVector_T_>
 
-#ifndef pycppgen_Template_TVector_T_
-#define pycppgen_Template_TVector_T_
+#ifndef _pycppgen_Template_TVector_T_
+#define _pycppgen_Template_TVector_T_
 
 template<typename T>
 struct pycppgen<Template::TVector<T>> {
@@ -55,8 +55,8 @@ struct pycppgen<Template::TVector<T>> {
 
 };
 
-#endif //pycppgen_Template_TVector_T_
-//</autogen_pycppgen_Template_TVector_T_>
+#endif //_pycppgen_Template_TVector_T_
+//</autogen__pycppgen_Template_TVector_T_>
 
 namespace pycppgen_globals {
 }

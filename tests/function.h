@@ -1,7 +1,5 @@
 #pragma once
 
-#include "function.gen.h"
-
 //$[[pycppgen]]
 void FuncA();
 

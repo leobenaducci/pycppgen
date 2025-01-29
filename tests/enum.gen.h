@@ -3,10 +3,10 @@
 #include "pycppgen.h"
 #include "enum.h"
 
-//<autogen_pycppgen_EEnum>
+//<autogen__pycppgen_EEnum>
 
-#ifndef pycppgen_EEnum
-#define pycppgen_EEnum
+#ifndef _pycppgen_EEnum
+#define _pycppgen_EEnum
 
 template<>
 struct pycppgen<EEnum> {
@@ -15,7 +15,7 @@ struct pycppgen<EEnum> {
 		{ "bitmask", "" }
 		};
 
-	template<typename FN> static void for_each_enum(FN&& fn) {
+	template<typename FN> static void for_each_enum_value(FN&& fn) {
 		fn( EEnum::None );
 		fn( EEnum::Something );
 		fn( EEnum::Value );
@@ -52,8 +52,66 @@ struct pycppgen<EEnum> {
 	}
 };
 
-#endif //pycppgen_EEnum
-//</autogen_pycppgen_EEnum>
+#endif //_pycppgen_EEnum
+//</autogen__pycppgen_EEnum>
+
+//<autogen__pycppgen_EAnotherEnum>
+
+#ifndef _pycppgen_EAnotherEnum
+#define _pycppgen_EAnotherEnum
+
+template<>
+struct pycppgen<EAnotherEnum> {
+	static constexpr bool is_valid() { return true; }
+	std::map<std::string, std::string> Attributes = {
+
+		};
+
+	template<typename FN> static void for_each_enum_value(FN&& fn) {
+		fn( EAnotherEnum::Zero );
+		fn( EAnotherEnum::One );
+		fn( EAnotherEnum::Two );
+		fn( EAnotherEnum::Three );
+		fn( EAnotherEnum::COUNT );
+	}
+	static constexpr std::string_view enum_to_string(EAnotherEnum value) {
+		if (value == EAnotherEnum::Zero ) return "Zero";
+		if (value == EAnotherEnum::One ) return "One";
+		if (value == EAnotherEnum::Two ) return "Two";
+		if (value == EAnotherEnum::Three ) return "Three";
+		if (value == EAnotherEnum::COUNT ) return "COUNT";
+		return "";
+	}
+	static constexpr EAnotherEnum string_to_enum(std::string_view value) {
+		if (value == "Zero") return EAnotherEnum::Zero;
+		if (value == "One") return EAnotherEnum::One;
+		if (value == "Two") return EAnotherEnum::Two;
+		if (value == "Three") return EAnotherEnum::Three;
+		if (value == "COUNT") return EAnotherEnum::COUNT;
+		return static_cast<EAnotherEnum>(-1);
+	}
+	static std::map<std::string, std::string> enum_value_attributes(EAnotherEnum value) {
+		if (value == EAnotherEnum::Zero) {
+			return {};
+		}
+		if (value == EAnotherEnum::One) {
+			return {};
+		}
+		if (value == EAnotherEnum::Two) {
+			return {};
+		}
+		if (value == EAnotherEnum::Three) {
+			return {};
+		}
+		if (value == EAnotherEnum::COUNT) {
+			return {};
+		}
+		return {};
+	}
+};
+
+#endif //_pycppgen_EAnotherEnum
+//</autogen__pycppgen_EAnotherEnum>
 
 namespace pycppgen_globals {
 }

@@ -2,9 +2,7 @@
 
 #include "class.h"
 #include "struct.h"
-#include "namespace.gen.h"
 
-//$[[pycppgen]]
 namespace TestNamespace
 {
     //$[[pycppgen]]
@@ -16,7 +14,7 @@ namespace TestNamespace
     //$[[pycppgen]]
     int Func3();
 
-    //$[[pycppgen exclude]]
+    //$[[pycppgen]]
     class CNamespaceChild : public CObject
     {
     public:

@@ -36,60 +36,72 @@ namespace std
 
 int main()
 {
-    //printf("%s\n", typeid(EEnum).name());
-    //pycppgen<EEnum>::for_each_enum(
-    //    [](EEnum v)
-    //    {
-    //        printf("\tEEnum::%s = %d\n", pycppgen<EEnum>::enum_to_string(v).data(), (uint32_t)v);
-    //
-    //        for (auto it : pycppgen<decltype(v)>::enum_value_attributes(v))
-    //        {
-    //            if(it.second.length() > 0)
-    //                printf("\t\t%s = %s\n", it.first.c_str(), it.second.c_str());
-    //            else
-    //                printf("\t\t%s\n", it.first.c_str());
-    //        }
-    //    }
-    //);
-    //printf("---\n");
-    //
-    //pycppgen_globals::for_each_type_call([](const auto& t)
-    //    {
-    //        printf("%s ->\n", typeid(decltype(t)).name());
-    //
-    //        pycppgen_of(t).for_each_var(
-    //            [&](const member_variable_info& v)
-    //            {
-    //                printf("\t%s %s -> Offset: %llu Size: %llu\n", v.Type.data(), v.FullName.data(), v.Offset, v.ElementSize);
-    //            });
-    //        printf("---\n");
-    //    });
-    //
-    //
-
-	CObject* o = new CChild();
-    pycppgen<>::for_each_var(o, [&](const member_variable_info& v, auto&& t)
+    printf("-> pycppgen_globals::for_each_enum_call([](auto&& e)\n");
+    pycppgen_globals::for_each_enum_call([](auto&& e)
         {
-            printf("%s = %s\n", v.FullName.data(), std::to_string(t).c_str());
+            printf("\t%s:\n", typeid(e).name());
+            pycppgen_of(e).for_each_enum_value([e](auto&& v)
+                {
+                    printf("\t\t*%s = %d\n", pycppgen_of(e).enum_to_string(v).data(), (uint32_t)v);
+                });
+        });
+
+    printf("---\n");
+    
+    printf("-> pycppgen_globals::for_each_type_call([](auto&& e)\n");
+    pycppgen_globals::for_each_type_call([](const auto& t)
+        {
+            printf("\t%s ->\n", typeid(decltype(t)).name());
+    
+            bool addSep = false;
+            pycppgen_of(t).for_each_var(
+                [&](const member_variable_info& v)
+                {
+                    printf("\t\t%s %s -> Offset: %llu Size: %llu", v.Type.data(), v.FullName.data(), v.Offset, v.TotalSize);
+                    if (v.ArrayRank > 0)
+                    {
+                        printf(" Array decl: ");
+                        for (auto i : v.ArrayExtents)
+                        {
+                            printf("[%llu]", i);
+                        }
+                    }
+                    printf("\n");
+                    addSep = true;
+                });
+
+            printf("---\n");
+        });
+    
+	CObject* o = new CChild();
+
+    printf("-> CObject* o = new CChild(); pycppgen<>::for_each_var(o, [](const member_variable_info& v, auto&& t)\n");
+    pycppgen<>::for_each_var(o, [](const member_variable_info& v, auto&& t)
+        {
+            printf("\t%s = %s\n", v.FullName.data(), std::to_string(t).c_str());
         }
     );
 
     printf("---\n");
 
     float rf;
+    printf("-> pycppgen<CObject>::call_function(\"Add\", o, rf, 1.f, 2.f)\n");
     pycppgen<CObject>::call_function("Add", o, rf, 1.f, 2.f);
-    printf("Add(1.f, 2.f) = %.2f\n", rf);
+    printf("\tAdd(1.f, 2.f) = %.2f\n", rf);
 
     const CObject co;
     short rs;
+    printf("-> const CObject co; pycppgen<CObject>::call_function(\"Get\", &co, rs)\n");
     pycppgen<CObject>::call_function("Get", &co, rs);
-    printf("Get() = %d\n", rs);
+    printf("\tGet() = %d\n", rs);
 
-    pycppgen<>("SStructTest").for_each_var([&](const member_variable_info& v)
+    printf("---\n");
+
+    printf("-> pycppgen<>(\"SStructTest\").for_each_var([](const member_variable_info& v)\n");
+    pycppgen<>("SStructTest").for_each_var([](const member_variable_info& v)
         {
-            printf("%s\n", v.FullName.data());
+            printf("\t%s\n", v.FullName.data());
         });
-
 
     return 0;
 }
