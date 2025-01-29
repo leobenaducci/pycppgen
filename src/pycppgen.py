@@ -744,7 +744,7 @@ def CodeGenOutputNode(hppCode, cppCode, node) :
                 hppCode += GenerateMemberInfo(node, var, infoName)
                 
                 #call visitor
-                hppCode += f"\t\tfn({infoName}, {var[ENodeName]});\n\n"
+                hppCode += f"\t\tfn({infoName}, access_helper().Get{var[ENodeName]}Ref());\n\n"
 
         hppCode += "\t}\n\n"
 
