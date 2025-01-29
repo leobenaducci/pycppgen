@@ -1289,9 +1289,6 @@ def main(args : list) :
         NodeTree = PerFileData[file]["NodeTree"]
         NodeStack = PerFileData[file]["NodeStack"]
 
-        if os.path.exists(file) :
-            os.remove(file)
-
         print("generating code for: " + file)
         CodeGen(file)
 
