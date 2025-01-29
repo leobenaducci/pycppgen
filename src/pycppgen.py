@@ -1132,35 +1132,39 @@ def CodeGenGlobal(path : str) :
     
     code += "void pycppgen<void>::for_each_var(const void* obj, auto fn) const\n"
     code += "{\n"
+    code += "\tif (false) {}\n"
     for _, node in NodeList.items() :
         if node[ENodeKind] == EKindClass or node[ENodeKind] == EKindStruct :
-            code += f"\tif (HashCode == typeid({node[ENodeFullName]}).hash_code())\n"
+            code += f"\telse if (HashCode == typeid({node[ENodeFullName]}).hash_code())\n"
             code += f"\t\tpycppgen<{node[ENodeFullName]}>::for_each_var((const {node[ENodeFullName]}*)obj, fn);\n"
     code += "}\n\n"
 
     code += "void pycppgen<void>::for_each_var(void* obj, auto fn) const\n"
     code += "{\n"
+    code += "\tif (false) {}\n"
     for _, node in NodeList.items() :
         if node[ENodeKind] == EKindClass or node[ENodeKind] == EKindStruct :
-            code += f"\tif (HashCode == typeid({node[ENodeFullName]}).hash_code())\n"
+            code += f"\telse if (HashCode == typeid({node[ENodeFullName]}).hash_code())\n"
             code += f"\t\tpycppgen<{node[ENodeFullName]}>::for_each_var(({node[ENodeFullName]}*)obj, fn);\n"
     code += "}\n\n"
 
     code += "template<typename T> void pycppgen<void>::for_each_var(const T* obj, auto fn)\n"
     code += "{\n"
     code += f"\tconst auto hashCode = obj ? typeid(*obj).hash_code() : 0;\n"
+    code += "\tif (false) {}\n"
     for _, node in NodeList.items() :
         if node[ENodeKind] == EKindClass or node[ENodeKind] == EKindStruct :
-            code += f"\tif (hashCode == typeid({node[ENodeFullName]}).hash_code())\n"
+            code += f"\telse if (hashCode == typeid({node[ENodeFullName]}).hash_code())\n"
             code += f"\t\tpycppgen<{node[ENodeFullName]}>::for_each_var((const {node[ENodeFullName]}*)obj, fn);\n"
     code += "}\n\n"
 
     code += "template<typename T> void pycppgen<void>::for_each_var(T* obj, auto fn)\n"
     code += "{\n"
     code += f"\tconst auto hashCode = obj ? typeid(*obj).hash_code() : 0;\n"
+    code += "\tif (false) {}\n"
     for _, node in NodeList.items() :
         if node[ENodeKind] == EKindClass or node[ENodeKind] == EKindStruct :
-            code += f"\tif (hashCode == typeid({node[ENodeFullName]}).hash_code())\n"
+            code += f"\telse if (hashCode == typeid({node[ENodeFullName]}).hash_code())\n"
             code += f"\t\tpycppgen<{node[ENodeFullName]}>::for_each_var(({node[ENodeFullName]}*)obj, fn);\n"
     code += "}\n\n"
 

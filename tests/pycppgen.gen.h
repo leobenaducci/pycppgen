@@ -33,59 +33,63 @@ namespace pycppgen_globals
 
 void pycppgen<void>::for_each_var(const void* obj, auto fn) const
 {
-	if (HashCode == typeid(CObject::SSubObject).hash_code())
+	if (false) {}
+	else if (HashCode == typeid(CObject::SSubObject).hash_code())
 		pycppgen<CObject::SSubObject>::for_each_var((const CObject::SSubObject*)obj, fn);
-	if (HashCode == typeid(CObject).hash_code())
+	else if (HashCode == typeid(CObject).hash_code())
 		pycppgen<CObject>::for_each_var((const CObject*)obj, fn);
-	if (HashCode == typeid(CChild).hash_code())
+	else if (HashCode == typeid(CChild).hash_code())
 		pycppgen<CChild>::for_each_var((const CChild*)obj, fn);
-	if (HashCode == typeid(TestNamespace::CNamespaceChild).hash_code())
+	else if (HashCode == typeid(TestNamespace::CNamespaceChild).hash_code())
 		pycppgen<TestNamespace::CNamespaceChild>::for_each_var((const TestNamespace::CNamespaceChild*)obj, fn);
-	if (HashCode == typeid(SStructTest).hash_code())
+	else if (HashCode == typeid(SStructTest).hash_code())
 		pycppgen<SStructTest>::for_each_var((const SStructTest*)obj, fn);
 }
 
 void pycppgen<void>::for_each_var(void* obj, auto fn) const
 {
-	if (HashCode == typeid(CObject::SSubObject).hash_code())
+	if (false) {}
+	else if (HashCode == typeid(CObject::SSubObject).hash_code())
 		pycppgen<CObject::SSubObject>::for_each_var((CObject::SSubObject*)obj, fn);
-	if (HashCode == typeid(CObject).hash_code())
+	else if (HashCode == typeid(CObject).hash_code())
 		pycppgen<CObject>::for_each_var((CObject*)obj, fn);
-	if (HashCode == typeid(CChild).hash_code())
+	else if (HashCode == typeid(CChild).hash_code())
 		pycppgen<CChild>::for_each_var((CChild*)obj, fn);
-	if (HashCode == typeid(TestNamespace::CNamespaceChild).hash_code())
+	else if (HashCode == typeid(TestNamespace::CNamespaceChild).hash_code())
 		pycppgen<TestNamespace::CNamespaceChild>::for_each_var((TestNamespace::CNamespaceChild*)obj, fn);
-	if (HashCode == typeid(SStructTest).hash_code())
+	else if (HashCode == typeid(SStructTest).hash_code())
 		pycppgen<SStructTest>::for_each_var((SStructTest*)obj, fn);
 }
 
-template<typename T> static void pycppgen<void>::for_each_var(const T* obj, auto fn)
+template<typename T> void pycppgen<void>::for_each_var(const T* obj, auto fn)
 {
 	const auto hashCode = obj ? typeid(*obj).hash_code() : 0;
-	if (hashCode == typeid(CObject::SSubObject).hash_code())
+	if (false) {}
+	else if (hashCode == typeid(CObject::SSubObject).hash_code())
 		pycppgen<CObject::SSubObject>::for_each_var((const CObject::SSubObject*)obj, fn);
-	if (hashCode == typeid(CObject).hash_code())
+	else if (hashCode == typeid(CObject).hash_code())
 		pycppgen<CObject>::for_each_var((const CObject*)obj, fn);
-	if (hashCode == typeid(CChild).hash_code())
+	else if (hashCode == typeid(CChild).hash_code())
 		pycppgen<CChild>::for_each_var((const CChild*)obj, fn);
-	if (hashCode == typeid(TestNamespace::CNamespaceChild).hash_code())
+	else if (hashCode == typeid(TestNamespace::CNamespaceChild).hash_code())
 		pycppgen<TestNamespace::CNamespaceChild>::for_each_var((const TestNamespace::CNamespaceChild*)obj, fn);
-	if (hashCode == typeid(SStructTest).hash_code())
+	else if (hashCode == typeid(SStructTest).hash_code())
 		pycppgen<SStructTest>::for_each_var((const SStructTest*)obj, fn);
 }
 
-template<typename T> static void pycppgen<void>::for_each_var(T* obj, auto fn)
+template<typename T> void pycppgen<void>::for_each_var(T* obj, auto fn)
 {
 	const auto hashCode = obj ? typeid(*obj).hash_code() : 0;
-	if (hashCode == typeid(CObject::SSubObject).hash_code())
+	if (false) {}
+	else if (hashCode == typeid(CObject::SSubObject).hash_code())
 		pycppgen<CObject::SSubObject>::for_each_var((CObject::SSubObject*)obj, fn);
-	if (hashCode == typeid(CObject).hash_code())
+	else if (hashCode == typeid(CObject).hash_code())
 		pycppgen<CObject>::for_each_var((CObject*)obj, fn);
-	if (hashCode == typeid(CChild).hash_code())
+	else if (hashCode == typeid(CChild).hash_code())
 		pycppgen<CChild>::for_each_var((CChild*)obj, fn);
-	if (hashCode == typeid(TestNamespace::CNamespaceChild).hash_code())
+	else if (hashCode == typeid(TestNamespace::CNamespaceChild).hash_code())
 		pycppgen<TestNamespace::CNamespaceChild>::for_each_var((TestNamespace::CNamespaceChild*)obj, fn);
-	if (hashCode == typeid(SStructTest).hash_code())
+	else if (hashCode == typeid(SStructTest).hash_code())
 		pycppgen<SStructTest>::for_each_var((SStructTest*)obj, fn);
 }
 
