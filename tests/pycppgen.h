@@ -43,6 +43,7 @@ struct member_function_info {
 template<typename T = void> struct pycppgen { static constexpr bool is_valid() { return false; } };
 template<> struct pycppgen<void> 
 {
+    pycppgen(std::string_view name);
     pycppgen(const std::type_info& info) : HashCode(info.hash_code()) {}
     void for_each_var(std::function<void(const member_variable_info&)> fn) const;
     void for_each_var(const void* obj, auto fn) const;

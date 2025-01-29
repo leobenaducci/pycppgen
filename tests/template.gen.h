@@ -16,15 +16,19 @@ struct pycppgen<Template::TVector<T>> {
 		};
 
 	static void for_each_var(std::function<void(const member_variable_info&)> fn) {
+		using namespace Template;
 	}
 
 	static void for_each_var(Template::TVector<T>* obj, auto visitor) {
+		using namespace Template;
 	}
 
 	static void for_each_var(const Template::TVector<T>* obj, auto visitor) {
+		using namespace Template;
 	}
 
 	static std::map<std::string, std::string> get_member_attributes(std::string_view name) {
+		using namespace Template;
 		return {};
 	}
 
@@ -41,9 +45,11 @@ struct pycppgen<Template::TVector<T>> {
 	}
 
 	static void for_each_function(std::function<void(const member_function_info&)> fn) {
+		using namespace Template;
 	}
 
 	static constexpr bool has_function(std::string_view name) {
+		using namespace Template;
 		return false;
 	}
 

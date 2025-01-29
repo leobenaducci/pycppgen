@@ -1015,6 +1015,7 @@ struct member_function_info {
 template<typename T = void> struct pycppgen { static constexpr bool is_valid() { return false; } };
 template<> struct pycppgen<void> 
 {
+    pycppgen(std::string_view name);
     pycppgen(const std::type_info& info) : HashCode(info.hash_code()) {}
     void for_each_var(std::function<void(const member_variable_info&)> fn) const;
     void for_each_var(const void* obj, auto fn) const;
@@ -1110,7 +1111,6 @@ def CodeGenGlobal(path : str) :
             code += f"\t\tpycppgen<{node[ENodeFullName]}>::for_each_var(({node[ENodeFullName]}*)obj, fn);\n"
     code += "}\n\n"
 
-
     if os.path.exists(path + "\\pycppgen.gen.h") :
         os.remove(path + "\\pycppgen.gen.h")
 
@@ -1128,7 +1128,17 @@ def CodeGenGlobal(path : str) :
         if node[ENodeKind] == EKindClass or node[ENodeKind] == EKindStruct :
             code += f"\tif (HashCode == typeid({node[ENodeFullName]}).hash_code())\n"
             code += f"\t\tpycppgen<{node[ENodeFullName]}>::for_each_var(fn);\n"
-    code += "}\n"
+    code += "}\n\n"
+    
+    code += "pycppgen<void>::pycppgen(std::string_view name)\n"
+    code += "{\n"
+    for _, node in NodeList.items() :
+        if node[ENodeKind] == EKindClass or node[ENodeKind] == EKindStruct :
+            if code.endswith("{\n") : code += "\t"
+            else : code += f"\telse "
+            code += f"if (name == \"{node[ENodeFullName]}\" || name == \"{node[ENodeName]}\")\n"
+            code += f"\t\tHashCode = typeid({node[ENodeFullName]}).hash_code();\n"
+    code += "}\n\n"
 
     if os.path.exists(path + "\\pycppgen.gen.cpp") :
         os.remove(path + "\\pycppgen.gen.cpp")

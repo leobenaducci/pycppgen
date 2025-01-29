@@ -78,14 +78,18 @@ int main()
 
     float rf;
     pycppgen<CObject>::call_function("Add", o, rf, 1.f, 2.f);
-
     printf("Add(1.f, 2.f) = %.2f\n", rf);
 
     const CObject co;
     short rs;
     pycppgen<CObject>::call_function("Get", &co, rs);
-
     printf("Get() = %d\n", rs);
+
+    pycppgen<>("SStructTest").for_each_var([&](const member_variable_info& v)
+        {
+            printf("%s\n", v.FullName.data());
+        });
+
 
     return 0;
 }
