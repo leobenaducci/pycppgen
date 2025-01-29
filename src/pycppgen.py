@@ -722,6 +722,32 @@ def CodeGenOutputNode(hppCode, cppCode, node) :
 
         hppCode += "\t}\n\n"
 
+        #variable's reflection
+        hppCode += "\tstatic void for_each_var(auto fn) {\n"
+        if ENodeNamespace in node and node[ENodeNamespace] != "" :
+            hppCode += f"\t\tusing namespace {node[ENodeNamespace]};\n"
+        
+        #parent variables
+        if ENodeParents in node :
+            for p in node[ENodeParents] :
+                hppCode += f"\t\tpycppgen<{p}>::for_each_var(fn);\n"
+            hppCode += "\n"
+
+        if ENodeVariables in node and len(node[ENodeVariables]) > 0 :
+            for _, var in node[ENodeVariables].items() :
+                #skip private variables
+                if var[ENodeAccess] == str(AccessSpecifier.PRIVATE) :
+                    continue
+                
+                #generate member_variable_info
+                infoName = f"{var[ENodeName]}_info_" + str(hppCode.count('\n'))
+                hppCode += GenerateMemberInfo(node, var, infoName)
+                
+                #call visitor
+                hppCode += f"\t\tfn({infoName}, {var[ENodeName]});\n\n"
+
+        hppCode += "\t}\n\n"
+
         hppCode += "\tstatic void for_each_var(" + node[ENodeType] + "* obj, auto visitor) {\n"
         if ENodeNamespace in node and node[ENodeNamespace] != "" :
             hppCode += f"\t\tusing namespace {node[ENodeNamespace]};\n"
