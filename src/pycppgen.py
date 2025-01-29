@@ -1146,7 +1146,7 @@ def CodeGenGlobal(path : str) :
             code += f"\t\tpycppgen<{node[ENodeFullName]}>::for_each_var(({node[ENodeFullName]}*)obj, fn);\n"
     code += "}\n\n"
 
-    code += "template<typename T> static void pycppgen<void>::for_each_var(const T* obj, auto fn)\n"
+    code += "template<typename T> void pycppgen<void>::for_each_var(const T* obj, auto fn)\n"
     code += "{\n"
     code += f"\tconst auto hashCode = obj ? typeid(*obj).hash_code() : 0;\n"
     for _, node in NodeList.items() :
@@ -1155,7 +1155,7 @@ def CodeGenGlobal(path : str) :
             code += f"\t\tpycppgen<{node[ENodeFullName]}>::for_each_var((const {node[ENodeFullName]}*)obj, fn);\n"
     code += "}\n\n"
 
-    code += "template<typename T> static void pycppgen<void>::for_each_var(T* obj, auto fn)\n"
+    code += "template<typename T> void pycppgen<void>::for_each_var(T* obj, auto fn)\n"
     code += "{\n"
     code += f"\tconst auto hashCode = obj ? typeid(*obj).hash_code() : 0;\n"
     for _, node in NodeList.items() :
@@ -1211,7 +1211,7 @@ def IsFileUpToDate(src : str, dst : str) :
 def IsOutputUpToDate(file : str) :
     outputFile = GetOutputFilePath(file)
 
-    IsFileUpToDate(file, outputFile)
+    return IsFileUpToDate(file, outputFile)
 
 def main(args : list) :
     global FilesToParse, NodesToInclude, NodeList, NodeTree, NodeStack, PerFileData, ProjectPath
@@ -1288,6 +1288,9 @@ def main(args : list) :
         NodeList = PerFileData[file]["NodeList"]
         NodeTree = PerFileData[file]["NodeTree"]
         NodeStack = PerFileData[file]["NodeStack"]
+
+        if os.path.exists(file) :
+            os.remove(file)
 
         print("generating code for: " + file)
         CodeGen(file)
