@@ -12,11 +12,16 @@
 namespace pycppgen_globals
 {
 	static void for_each_type_call(auto fn) {
-		fn(*(CObject::SSubObject*)0);
-		fn(*(CObject*)0);
-		fn(*(CChild*)0);
-		fn(*(TestNamespace::CNamespaceChild*)0);
-		fn(*(SStructTest*)0);
+		struct type_CObject__SSubObject { using type = CObject::SSubObject; const type* obj = nullptr; };
+		fn(type_CObject__SSubObject());
+		struct type_CObject { using type = CObject; const type* obj = nullptr; };
+		fn(type_CObject());
+		struct type_CChild { using type = CChild; const type* obj = nullptr; };
+		fn(type_CChild());
+		struct type_TestNamespace__CNamespaceChild { using type = TestNamespace::CNamespaceChild; const type* obj = nullptr; };
+		fn(type_TestNamespace__CNamespaceChild());
+		struct type_SStructTest { using type = SStructTest; const type* obj = nullptr; };
+		fn(type_SStructTest());
 	}
 
 	static void for_each_enum_call(auto fn)

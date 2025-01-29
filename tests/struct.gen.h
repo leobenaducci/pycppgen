@@ -99,7 +99,7 @@ struct pycppgen<SStructTest> {
 
 	}
 
-	static void for_each_var(SStructTest* obj, auto visitor) {
+	static void for_each_var_typed(auto fn) {
 		member_variable_info x_info_102;
 		x_info_102.Name = "x";
 		x_info_102.FullName = "SStructTest::x";
@@ -113,80 +113,128 @@ struct pycppgen<SStructTest> {
 			{ "visible", "" },
 			{ "serialize", "" }
 			};
-		visitor(x_info_102, ((access_helper*)obj)->GetxRef());
-		member_variable_info y_info_116;
-		y_info_116.Name = "y";
-		y_info_116.FullName = "SStructTest::y";
-		y_info_116.Type = access_helper().y_TypeName;
-		y_info_116.Offset = access_helper().y_Offset;
-		y_info_116.ElementSize = access_helper().y_ElementSize;
-		y_info_116.TotalSize = access_helper().y_TotalSize;
-		y_info_116.ArrayRank = access_helper().y_ArrayRank;
-		y_info_116.ArrayExtents = access_helper().y_ArrayExtents;
-		y_info_116.Attributes = {
+		fn(x_info_102, access_helper().GetxRef());
+
+		member_variable_info y_info_117;
+		y_info_117.Name = "y";
+		y_info_117.FullName = "SStructTest::y";
+		y_info_117.Type = access_helper().y_TypeName;
+		y_info_117.Offset = access_helper().y_Offset;
+		y_info_117.ElementSize = access_helper().y_ElementSize;
+		y_info_117.TotalSize = access_helper().y_TotalSize;
+		y_info_117.ArrayRank = access_helper().y_ArrayRank;
+		y_info_117.ArrayExtents = access_helper().y_ArrayExtents;
+		y_info_117.Attributes = {
 			{ "visible", "" },
 			{ "serialize", "" }
 			};
-		visitor(y_info_116, ((access_helper*)obj)->GetyRef());
-		member_variable_info z_info_130;
-		z_info_130.Name = "z";
-		z_info_130.FullName = "SStructTest::z";
-		z_info_130.Type = access_helper().z_TypeName;
-		z_info_130.Offset = access_helper().z_Offset;
-		z_info_130.ElementSize = access_helper().z_ElementSize;
-		z_info_130.TotalSize = access_helper().z_TotalSize;
-		z_info_130.ArrayRank = access_helper().z_ArrayRank;
-		z_info_130.ArrayExtents = access_helper().z_ArrayExtents;
-		z_info_130.Attributes = {
+		fn(y_info_117, access_helper().GetyRef());
+
+		member_variable_info z_info_132;
+		z_info_132.Name = "z";
+		z_info_132.FullName = "SStructTest::z";
+		z_info_132.Type = access_helper().z_TypeName;
+		z_info_132.Offset = access_helper().z_Offset;
+		z_info_132.ElementSize = access_helper().z_ElementSize;
+		z_info_132.TotalSize = access_helper().z_TotalSize;
+		z_info_132.ArrayRank = access_helper().z_ArrayRank;
+		z_info_132.ArrayExtents = access_helper().z_ArrayExtents;
+		z_info_132.Attributes = {
 			{ "visible", "" },
 			{ "serialize", "" }
 			};
-		visitor(z_info_130, ((access_helper*)obj)->GetzRef());
+		fn(z_info_132, access_helper().GetzRef());
+
+	}
+
+	static void for_each_var(SStructTest* obj, auto visitor) {
+		member_variable_info x_info_150;
+		x_info_150.Name = "x";
+		x_info_150.FullName = "SStructTest::x";
+		x_info_150.Type = access_helper().x_TypeName;
+		x_info_150.Offset = access_helper().x_Offset;
+		x_info_150.ElementSize = access_helper().x_ElementSize;
+		x_info_150.TotalSize = access_helper().x_TotalSize;
+		x_info_150.ArrayRank = access_helper().x_ArrayRank;
+		x_info_150.ArrayExtents = access_helper().x_ArrayExtents;
+		x_info_150.Attributes = {
+			{ "visible", "" },
+			{ "serialize", "" }
+			};
+		visitor(x_info_150, ((access_helper*)obj)->GetxRef());
+		member_variable_info y_info_164;
+		y_info_164.Name = "y";
+		y_info_164.FullName = "SStructTest::y";
+		y_info_164.Type = access_helper().y_TypeName;
+		y_info_164.Offset = access_helper().y_Offset;
+		y_info_164.ElementSize = access_helper().y_ElementSize;
+		y_info_164.TotalSize = access_helper().y_TotalSize;
+		y_info_164.ArrayRank = access_helper().y_ArrayRank;
+		y_info_164.ArrayExtents = access_helper().y_ArrayExtents;
+		y_info_164.Attributes = {
+			{ "visible", "" },
+			{ "serialize", "" }
+			};
+		visitor(y_info_164, ((access_helper*)obj)->GetyRef());
+		member_variable_info z_info_178;
+		z_info_178.Name = "z";
+		z_info_178.FullName = "SStructTest::z";
+		z_info_178.Type = access_helper().z_TypeName;
+		z_info_178.Offset = access_helper().z_Offset;
+		z_info_178.ElementSize = access_helper().z_ElementSize;
+		z_info_178.TotalSize = access_helper().z_TotalSize;
+		z_info_178.ArrayRank = access_helper().z_ArrayRank;
+		z_info_178.ArrayExtents = access_helper().z_ArrayExtents;
+		z_info_178.Attributes = {
+			{ "visible", "" },
+			{ "serialize", "" }
+			};
+		visitor(z_info_178, ((access_helper*)obj)->GetzRef());
 	}
 
 	static void for_each_var(const SStructTest* obj, auto visitor) {
-		member_variable_info x_info_147;
-		x_info_147.Name = "x";
-		x_info_147.FullName = "SStructTest::x";
-		x_info_147.Type = access_helper().x_TypeName;
-		x_info_147.Offset = access_helper().x_Offset;
-		x_info_147.ElementSize = access_helper().x_ElementSize;
-		x_info_147.TotalSize = access_helper().x_TotalSize;
-		x_info_147.ArrayRank = access_helper().x_ArrayRank;
-		x_info_147.ArrayExtents = access_helper().x_ArrayExtents;
-		x_info_147.Attributes = {
+		member_variable_info x_info_195;
+		x_info_195.Name = "x";
+		x_info_195.FullName = "SStructTest::x";
+		x_info_195.Type = access_helper().x_TypeName;
+		x_info_195.Offset = access_helper().x_Offset;
+		x_info_195.ElementSize = access_helper().x_ElementSize;
+		x_info_195.TotalSize = access_helper().x_TotalSize;
+		x_info_195.ArrayRank = access_helper().x_ArrayRank;
+		x_info_195.ArrayExtents = access_helper().x_ArrayExtents;
+		x_info_195.Attributes = {
 			{ "visible", "" },
 			{ "serialize", "" }
 			};
-		visitor(x_info_147, ((access_helper*)obj)->GetxRef());
-		member_variable_info y_info_161;
-		y_info_161.Name = "y";
-		y_info_161.FullName = "SStructTest::y";
-		y_info_161.Type = access_helper().y_TypeName;
-		y_info_161.Offset = access_helper().y_Offset;
-		y_info_161.ElementSize = access_helper().y_ElementSize;
-		y_info_161.TotalSize = access_helper().y_TotalSize;
-		y_info_161.ArrayRank = access_helper().y_ArrayRank;
-		y_info_161.ArrayExtents = access_helper().y_ArrayExtents;
-		y_info_161.Attributes = {
+		visitor(x_info_195, ((access_helper*)obj)->GetxRef());
+		member_variable_info y_info_209;
+		y_info_209.Name = "y";
+		y_info_209.FullName = "SStructTest::y";
+		y_info_209.Type = access_helper().y_TypeName;
+		y_info_209.Offset = access_helper().y_Offset;
+		y_info_209.ElementSize = access_helper().y_ElementSize;
+		y_info_209.TotalSize = access_helper().y_TotalSize;
+		y_info_209.ArrayRank = access_helper().y_ArrayRank;
+		y_info_209.ArrayExtents = access_helper().y_ArrayExtents;
+		y_info_209.Attributes = {
 			{ "visible", "" },
 			{ "serialize", "" }
 			};
-		visitor(y_info_161, ((access_helper*)obj)->GetyRef());
-		member_variable_info z_info_175;
-		z_info_175.Name = "z";
-		z_info_175.FullName = "SStructTest::z";
-		z_info_175.Type = access_helper().z_TypeName;
-		z_info_175.Offset = access_helper().z_Offset;
-		z_info_175.ElementSize = access_helper().z_ElementSize;
-		z_info_175.TotalSize = access_helper().z_TotalSize;
-		z_info_175.ArrayRank = access_helper().z_ArrayRank;
-		z_info_175.ArrayExtents = access_helper().z_ArrayExtents;
-		z_info_175.Attributes = {
+		visitor(y_info_209, ((access_helper*)obj)->GetyRef());
+		member_variable_info z_info_223;
+		z_info_223.Name = "z";
+		z_info_223.FullName = "SStructTest::z";
+		z_info_223.Type = access_helper().z_TypeName;
+		z_info_223.Offset = access_helper().z_Offset;
+		z_info_223.ElementSize = access_helper().z_ElementSize;
+		z_info_223.TotalSize = access_helper().z_TotalSize;
+		z_info_223.ArrayRank = access_helper().z_ArrayRank;
+		z_info_223.ArrayExtents = access_helper().z_ArrayExtents;
+		z_info_223.Attributes = {
 			{ "visible", "" },
 			{ "serialize", "" }
 			};
-		visitor(z_info_175, ((access_helper*)obj)->GetzRef());
+		visitor(z_info_223, ((access_helper*)obj)->GetzRef());
 	}
 
 	static std::map<std::string, std::string> get_member_attributes(std::string_view name) {

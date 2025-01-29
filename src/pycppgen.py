@@ -693,7 +693,9 @@ def CodeGenOutputNode(hppCode, cppCode, node) :
         hppCode += "\tstatic void for_each_parent(auto fn) {\n"
         if ENodeParents in node :
             for p in node[ENodeParents] :
-                hppCode += f"\t\tfn(*({p}*)0);\n"
+                typeName = "type_" + p.replace("::", "__")
+                hppCode += "\t\tstruct " + typeName + " { using type = " + p + "; const type* obj = nullptr; };\n"
+                hppCode += f"\t\tfn({typeName}());\n"
         hppCode += "\t};\n\n"
         
         #variable's reflection
@@ -723,14 +725,14 @@ def CodeGenOutputNode(hppCode, cppCode, node) :
         hppCode += "\t}\n\n"
 
         #variable's reflection
-        hppCode += "\tstatic void for_each_var(auto fn) {\n"
+        hppCode += "\tstatic void for_each_var_typed(auto fn) {\n"
         if ENodeNamespace in node and node[ENodeNamespace] != "" :
             hppCode += f"\t\tusing namespace {node[ENodeNamespace]};\n"
         
         #parent variables
         if ENodeParents in node :
             for p in node[ENodeParents] :
-                hppCode += f"\t\tpycppgen<{p}>::for_each_var(fn);\n"
+                hppCode += f"\t\tpycppgen<{p}>::for_each_var_typed(fn);\n"
             hppCode += "\n"
 
         if ENodeVariables in node and len(node[ENodeVariables]) > 0 :
@@ -1001,7 +1003,9 @@ def CodeGen(filePath : str) :
 #codegen: emit for each type call
 def CodeGenGlobalAddForEachTypeCall(code, node) :
     if node[ENodeKind] == EKindClass or node[ENodeKind] == EKindStruct : #or node[ENodeKind] == EKindClassTemplate:
-        code += f"\t\tfn(*({node[ENodeFullName]}*)0);\n"
+        typeName = "type_" + node[ENodeFullName].replace("::", "__")
+        code += "\t\tstruct " + typeName + " { using type = " + node[ENodeFullName] + "; const type* obj = nullptr; };\n"
+        code += f"\t\tfn({typeName}());\n"
     return code
 
 #codegen: output global file

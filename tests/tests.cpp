@@ -37,10 +37,10 @@ namespace std
 int main()
 {
     printf("-> pycppgen_globals::for_each_enum_call([](auto&& e)\n");
-    pycppgen_globals::for_each_enum_call([](auto&& e)
+    pycppgen_globals::for_each_enum_call([](auto e)
         {
             printf("\t%s:\n", typeid(e).name());
-            pycppgen_of(e).for_each_enum_value([e](auto&& v)
+            pycppgen_of(e).for_each_enum_value([e](auto v)
                 {
                     printf("\t\t*%s = %d\n", pycppgen_of(e).enum_to_string(v).data(), (uint32_t)v);
                 });
@@ -49,12 +49,11 @@ int main()
     printf("---\n");
     
     printf("-> pycppgen_globals::for_each_type_call([](auto&& e)\n");
-    pycppgen_globals::for_each_type_call([](const auto& t)
+    pycppgen_globals::for_each_type_call([](auto param)
         {
-            printf("\t%s ->\n", typeid(decltype(t)).name());
-    
-            bool addSep = false;
-            pycppgen_of(t).for_each_var(
+            printf("\t*%s\n", typeid(decltype(param)::type).name());
+            
+            pycppgen<decltype(param)::type>::for_each_var(
                 [&](const member_variable_info& v)
                 {
                     printf("\t\t%s %s -> Offset: %llu Size: %llu", v.Type.data(), v.FullName.data(), v.Offset, v.TotalSize);
@@ -67,10 +66,7 @@ int main()
                         }
                     }
                     printf("\n");
-                    addSep = true;
                 });
-
-            printf("---\n");
         });
     
 	CObject* o = new CChild();

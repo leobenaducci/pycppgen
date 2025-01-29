@@ -22,6 +22,10 @@ struct pycppgen<TestNamespace::CNamespaceChild> {
 		using namespace TestNamespace;
 	}
 
+	static void for_each_var_typed(auto fn) {
+		using namespace TestNamespace;
+	}
+
 	static void for_each_var(TestNamespace::CNamespaceChild* obj, auto visitor) {
 		using namespace TestNamespace;
 	}

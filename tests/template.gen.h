@@ -22,6 +22,10 @@ struct pycppgen<Template::TVector<T>> {
 		using namespace Template;
 	}
 
+	static void for_each_var_typed(auto fn) {
+		using namespace Template;
+	}
+
 	static void for_each_var(Template::TVector<T>* obj, auto visitor) {
 		using namespace Template;
 	}
