@@ -34,6 +34,36 @@ namespace std
     }
 }
 
+//sample serializer
+struct serializer_value_t
+{
+    std::string value;
+
+    template<typename T>
+    serializer_value_t& operator=(const T& a) { value = std::to_string(a); return *this; }
+
+    template<std::integral T> operator T () const { return std::atoi(value.c_str()); }
+    template<std::floating_point T> operator T () const { return std::atof(value.c_str()); }
+    operator std::string () const { return value; }
+    template<typename T, size_t N> operator std::array<T, N> () const { return std::array<T, N>(); }
+};
+
+struct serializer_t
+{
+    serializer_value_t operator[](std::string key) const 
+    {
+        auto it = data.find(key); 
+        return it != data.end() ? it->second : serializer_value_t{}; 
+    }
+
+    serializer_value_t& operator[](std::string key)
+    {
+        return data[key];
+    }
+
+    std::map<std::string, serializer_value_t> data;
+};
+
 int main()
 {
     printf("-> pycppgen_globals::for_each_enum_call([](auto&& e)\n");
@@ -53,8 +83,8 @@ int main()
         {
             printf("\t*%s\n", typeid(decltype(param)::type).name());
             
-            pycppgen<decltype(param)::type>::for_each_var(
-                [&](const member_variable_info& v)
+            pycppgen<decltype(param)::type>::for_each_var_typed(
+                [&](const member_variable_info& v, auto t)
                 {
                     printf("\t\t%s %s -> Offset: %llu Size: %llu", v.Type.data(), v.FullName.data(), v.Offset, v.TotalSize);
                     if (v.ArrayRank > 0)
@@ -98,6 +128,20 @@ int main()
         {
             printf("\t%s\n", v.FullName.data());
         });
+
+    printf("---\n");
+
+    //dump/parse
+    serializer_t data{};
+    pycppgen<>::dump(data, o);
+
+    {
+        CChild dst;
+        dst.PublicShort = 0;
+        ((pycppgen<CObject>::access_helper*) & dst)->SetProtectedUint(0);
+
+        pycppgen<>::parse(data, &dst);
+    }
 
     return 0;
 }

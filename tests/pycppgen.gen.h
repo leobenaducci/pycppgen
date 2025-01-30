@@ -98,3 +98,25 @@ template<typename T> void pycppgen<void>::for_each_var(T* obj, auto fn)
 		pycppgen<SStructTest>::for_each_var((SStructTest*)obj, fn);
 }
 
+template<typename T, typename R> static bool pycppgen<void>::dump(T& result, const R* obj)
+{
+	const auto hashCode = obj ? typeid(*obj).hash_code() : 0;
+	if (false) {}
+	else if (hashCode == typeid(CObject).hash_code())
+		return pycppgen<CObject>::dump(result, (const CObject*)obj);
+	else if (hashCode == typeid(CChild).hash_code())
+		return pycppgen<CChild>::dump(result, (const CChild*)obj);
+	return false;
+}
+
+template<typename T, typename R> static bool pycppgen<void>::parse(const T& data, R* obj)
+{
+	const auto hashCode = obj ? typeid(*obj).hash_code() : 0;
+	if (false) {}
+	else if (hashCode == typeid(CObject).hash_code())
+		return pycppgen<CObject>::parse(data, (const CObject*)obj);
+	else if (hashCode == typeid(CChild).hash_code())
+		return pycppgen<CChild>::parse(data, (const CChild*)obj);
+	return false;
+}
+

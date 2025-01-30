@@ -37,9 +37,8 @@ struct pycppgen<CObject::SSubObject> {
 	static void for_each_static_var(std::function<void(std::string_view name)> fn) {
 	}
 
-	template<typename T> static T dump(const CObject::SSubObject* object) {
-		T result;
-		return result;
+	template<typename T> static bool dump(T& result, const CObject::SSubObject* object) {
+		return true;
 	}
 
 	template<typename T, typename R> static bool parse(const T& data, R* object) {
@@ -76,7 +75,8 @@ template<>
 struct pycppgen<CObject> {
 	static constexpr bool is_valid() { return true; }
 	std::map<std::string_view, std::string_view> Attributes = {
-		{ "pure", "" }
+		{ "pure", "" },
+		{ "serialize", "" }
 		};
 
 	struct access_helper : public CObject {
@@ -156,7 +156,7 @@ struct pycppgen<CObject> {
 		PublicCharArray_info_148.ArrayRank = access_helper().PublicCharArray_ArrayRank;
 		PublicCharArray_info_148.ArrayExtents = access_helper().PublicCharArray_ArrayExtents;
 		PublicCharArray_info_148.Attributes = {
-
+			{ "serialize", "" }
 			};
 		fn(PublicCharArray_info_148);
 
@@ -203,7 +203,7 @@ struct pycppgen<CObject> {
 		PublicCharArray_info_195.ArrayRank = access_helper().PublicCharArray_ArrayRank;
 		PublicCharArray_info_195.ArrayExtents = access_helper().PublicCharArray_ArrayExtents;
 		PublicCharArray_info_195.Attributes = {
-
+			{ "serialize", "" }
 			};
 		fn(PublicCharArray_info_195, access_helper().GetPublicCharArrayRef());
 
@@ -248,7 +248,7 @@ struct pycppgen<CObject> {
 		PublicCharArray_info_240.ArrayRank = access_helper().PublicCharArray_ArrayRank;
 		PublicCharArray_info_240.ArrayExtents = access_helper().PublicCharArray_ArrayExtents;
 		PublicCharArray_info_240.Attributes = {
-
+			{ "serialize", "" }
 			};
 		visitor(PublicCharArray_info_240, ((access_helper*)obj)->GetPublicCharArrayRef());
 	}
@@ -292,7 +292,7 @@ struct pycppgen<CObject> {
 		PublicCharArray_info_284.ArrayRank = access_helper().PublicCharArray_ArrayRank;
 		PublicCharArray_info_284.ArrayExtents = access_helper().PublicCharArray_ArrayExtents;
 		PublicCharArray_info_284.Attributes = {
-
+			{ "serialize", "" }
 			};
 		visitor(PublicCharArray_info_284, ((access_helper*)obj)->GetPublicCharArrayRef());
 	}
@@ -315,7 +315,7 @@ struct pycppgen<CObject> {
 		if (name == "PublicCharArray")
 		{
 			return {
-
+				{ "serialize", "" }
 				};
 		}
 		return {};
@@ -324,59 +324,60 @@ struct pycppgen<CObject> {
 	static void for_each_static_var(std::function<void(std::string_view name)> fn) {
 	}
 
-	template<typename T> static T dump(const CObject* object) {
-		T result;
+	template<typename T> static bool dump(T& result, const CObject* object) {
 		result["ProtectedUint"] = ((access_helper*)object)->GetProtectedUint();
 		result["PublicShort"] = ((access_helper*)object)->GetPublicShort();
-		return result;
+		result["PublicCharArray"] = ((access_helper*)object)->GetPublicCharArray();
+		return true;
 	}
 
 	template<typename T, typename R> static bool parse(const T& data, R* object) {
 		((access_helper*)object)->SetProtectedUint(data["ProtectedUint"]);
 		((access_helper*)object)->SetPublicShort(data["PublicShort"]);
+		((access_helper*)object)->SetPublicCharArray(data["PublicCharArray"]);
 		return true;
 	}
 
 	static void for_each_function(std::function<void(const member_function_info&)> fn) {
-		member_function_info Func_info_340;
-		Func_info_340.Name = "Func";
-		Func_info_340.Declaration = "void ()";
-		Func_info_340.Attributes = {
+		member_function_info Func_info_341;
+		Func_info_341.Name = "Func";
+		Func_info_341.Declaration = "void ()";
+		Func_info_341.Attributes = {
 				{ "callable", "" }
 				};
-		Func_info_340.ReturnType = "void";
+		Func_info_341.ReturnType = "void";
 		//parameters
 		{
 		}
-		member_function_info Add_info_350;
-		Add_info_350.Name = "Add";
-		Add_info_350.Declaration = "float (float, double)";
-		Add_info_350.Attributes = {
+		member_function_info Add_info_351;
+		Add_info_351.Name = "Add";
+		Add_info_351.Declaration = "float (float, double)";
+		Add_info_351.Attributes = {
 				{ "callable", "" }
 				};
-		Add_info_350.ReturnType = "float";
+		Add_info_351.ReturnType = "float";
 		//parameters
 		{
-			function_parameter_info A_info_359;
-			A_info_359.Name = "A";
-			A_info_359.Type = "float";
-			A_info_359.DefaultValue = "";
-			A_info_359.Attributes = {};
-			Add_info_350.Parameters.push_back(A_info_359);
-			function_parameter_info B_info_365;
-			B_info_365.Name = "B";
-			B_info_365.Type = "double";
-			B_info_365.DefaultValue = "";
-			B_info_365.Attributes = {};
-			Add_info_350.Parameters.push_back(B_info_365);
+			function_parameter_info A_info_360;
+			A_info_360.Name = "A";
+			A_info_360.Type = "float";
+			A_info_360.DefaultValue = "";
+			A_info_360.Attributes = {};
+			Add_info_351.Parameters.push_back(A_info_360);
+			function_parameter_info B_info_366;
+			B_info_366.Name = "B";
+			B_info_366.Type = "double";
+			B_info_366.DefaultValue = "";
+			B_info_366.Attributes = {};
+			Add_info_351.Parameters.push_back(B_info_366);
 		}
-		member_function_info Get_info_372;
-		Get_info_372.Name = "Get";
-		Get_info_372.Declaration = "short () const";
-		Get_info_372.Attributes = {
+		member_function_info Get_info_373;
+		Get_info_373.Name = "Get";
+		Get_info_373.Declaration = "short () const";
+		Get_info_373.Attributes = {
 				{ "pure", "" }
 				};
-		Get_info_372.ReturnType = "short";
+		Get_info_373.ReturnType = "short";
 		//parameters
 		{
 		}
@@ -436,7 +437,8 @@ template<>
 struct pycppgen<CChild> {
 	static constexpr bool is_valid() { return true; }
 	std::map<std::string_view, std::string_view> Attributes = {
-		{ "pure", "" }
+		{ "pure", "" },
+		{ "serialize", "" }
 		};
 
 	struct access_helper : public CChild {
@@ -460,82 +462,82 @@ struct pycppgen<CChild> {
 	static void for_each_var(std::function<void(const member_variable_info&)> fn) {
 		pycppgen<CObject>::for_each_var(fn);
 
-		member_variable_info Matrix_info_462;
-		Matrix_info_462.Name = "Matrix";
-		Matrix_info_462.FullName = "CChild::Matrix";
-		Matrix_info_462.Type = access_helper().Matrix_TypeName;
-		Matrix_info_462.Offset = access_helper().Matrix_Offset;
-		Matrix_info_462.ElementSize = access_helper().Matrix_ElementSize;
-		Matrix_info_462.TotalSize = access_helper().Matrix_TotalSize;
-		Matrix_info_462.ArrayRank = access_helper().Matrix_ArrayRank;
-		Matrix_info_462.ArrayExtents = access_helper().Matrix_ArrayExtents;
-		Matrix_info_462.Attributes = {
-
+		member_variable_info Matrix_info_464;
+		Matrix_info_464.Name = "Matrix";
+		Matrix_info_464.FullName = "CChild::Matrix";
+		Matrix_info_464.Type = access_helper().Matrix_TypeName;
+		Matrix_info_464.Offset = access_helper().Matrix_Offset;
+		Matrix_info_464.ElementSize = access_helper().Matrix_ElementSize;
+		Matrix_info_464.TotalSize = access_helper().Matrix_TotalSize;
+		Matrix_info_464.ArrayRank = access_helper().Matrix_ArrayRank;
+		Matrix_info_464.ArrayExtents = access_helper().Matrix_ArrayExtents;
+		Matrix_info_464.Attributes = {
+			{ "serialize", "" }
 			};
-		fn(Matrix_info_462);
+		fn(Matrix_info_464);
 
 	}
 
 	static void for_each_var_typed(auto fn) {
 		pycppgen<CObject>::for_each_var_typed(fn);
 
-		member_variable_info Matrix_info_481;
-		Matrix_info_481.Name = "Matrix";
-		Matrix_info_481.FullName = "CChild::Matrix";
-		Matrix_info_481.Type = access_helper().Matrix_TypeName;
-		Matrix_info_481.Offset = access_helper().Matrix_Offset;
-		Matrix_info_481.ElementSize = access_helper().Matrix_ElementSize;
-		Matrix_info_481.TotalSize = access_helper().Matrix_TotalSize;
-		Matrix_info_481.ArrayRank = access_helper().Matrix_ArrayRank;
-		Matrix_info_481.ArrayExtents = access_helper().Matrix_ArrayExtents;
-		Matrix_info_481.Attributes = {
-
+		member_variable_info Matrix_info_483;
+		Matrix_info_483.Name = "Matrix";
+		Matrix_info_483.FullName = "CChild::Matrix";
+		Matrix_info_483.Type = access_helper().Matrix_TypeName;
+		Matrix_info_483.Offset = access_helper().Matrix_Offset;
+		Matrix_info_483.ElementSize = access_helper().Matrix_ElementSize;
+		Matrix_info_483.TotalSize = access_helper().Matrix_TotalSize;
+		Matrix_info_483.ArrayRank = access_helper().Matrix_ArrayRank;
+		Matrix_info_483.ArrayExtents = access_helper().Matrix_ArrayExtents;
+		Matrix_info_483.Attributes = {
+			{ "serialize", "" }
 			};
-		fn(Matrix_info_481, access_helper().GetMatrixRef());
+		fn(Matrix_info_483, access_helper().GetMatrixRef());
 
 	}
 
 	static void for_each_var(CChild* obj, auto visitor) {
 		pycppgen<CObject>::for_each_var(obj, visitor);
 
-		member_variable_info Matrix_info_500;
-		Matrix_info_500.Name = "Matrix";
-		Matrix_info_500.FullName = "CChild::Matrix";
-		Matrix_info_500.Type = access_helper().Matrix_TypeName;
-		Matrix_info_500.Offset = access_helper().Matrix_Offset;
-		Matrix_info_500.ElementSize = access_helper().Matrix_ElementSize;
-		Matrix_info_500.TotalSize = access_helper().Matrix_TotalSize;
-		Matrix_info_500.ArrayRank = access_helper().Matrix_ArrayRank;
-		Matrix_info_500.ArrayExtents = access_helper().Matrix_ArrayExtents;
-		Matrix_info_500.Attributes = {
-
+		member_variable_info Matrix_info_502;
+		Matrix_info_502.Name = "Matrix";
+		Matrix_info_502.FullName = "CChild::Matrix";
+		Matrix_info_502.Type = access_helper().Matrix_TypeName;
+		Matrix_info_502.Offset = access_helper().Matrix_Offset;
+		Matrix_info_502.ElementSize = access_helper().Matrix_ElementSize;
+		Matrix_info_502.TotalSize = access_helper().Matrix_TotalSize;
+		Matrix_info_502.ArrayRank = access_helper().Matrix_ArrayRank;
+		Matrix_info_502.ArrayExtents = access_helper().Matrix_ArrayExtents;
+		Matrix_info_502.Attributes = {
+			{ "serialize", "" }
 			};
-		visitor(Matrix_info_500, ((access_helper*)obj)->GetMatrixRef());
+		visitor(Matrix_info_502, ((access_helper*)obj)->GetMatrixRef());
 	}
 
 	static void for_each_var(const CChild* obj, auto visitor) {
 		pycppgen<CObject>::for_each_var(obj, visitor);
 
-		member_variable_info Matrix_info_518;
-		Matrix_info_518.Name = "Matrix";
-		Matrix_info_518.FullName = "CChild::Matrix";
-		Matrix_info_518.Type = access_helper().Matrix_TypeName;
-		Matrix_info_518.Offset = access_helper().Matrix_Offset;
-		Matrix_info_518.ElementSize = access_helper().Matrix_ElementSize;
-		Matrix_info_518.TotalSize = access_helper().Matrix_TotalSize;
-		Matrix_info_518.ArrayRank = access_helper().Matrix_ArrayRank;
-		Matrix_info_518.ArrayExtents = access_helper().Matrix_ArrayExtents;
-		Matrix_info_518.Attributes = {
-
+		member_variable_info Matrix_info_520;
+		Matrix_info_520.Name = "Matrix";
+		Matrix_info_520.FullName = "CChild::Matrix";
+		Matrix_info_520.Type = access_helper().Matrix_TypeName;
+		Matrix_info_520.Offset = access_helper().Matrix_Offset;
+		Matrix_info_520.ElementSize = access_helper().Matrix_ElementSize;
+		Matrix_info_520.TotalSize = access_helper().Matrix_TotalSize;
+		Matrix_info_520.ArrayRank = access_helper().Matrix_ArrayRank;
+		Matrix_info_520.ArrayExtents = access_helper().Matrix_ArrayExtents;
+		Matrix_info_520.Attributes = {
+			{ "serialize", "" }
 			};
-		visitor(Matrix_info_518, ((access_helper*)obj)->GetMatrixRef());
+		visitor(Matrix_info_520, ((access_helper*)obj)->GetMatrixRef());
 	}
 
 	static std::map<std::string, std::string> get_member_attributes(std::string_view name) {
 		if (name == "Matrix")
 		{
 			return {
-
+				{ "serialize", "" }
 				};
 		}
 
@@ -550,24 +552,27 @@ struct pycppgen<CChild> {
 	static void for_each_static_var(std::function<void(std::string_view name)> fn) {
 	}
 
-	template<typename T> static T dump(const CChild* object) {
-		T result;
-		return result;
+	template<typename T> static bool dump(T& result, const CChild* object) {
+		pycppgen<CObject>::dump(result, object);
+		result["Matrix"] = ((access_helper*)object)->GetMatrix();
+		return true;
 	}
 
 	template<typename T, typename R> static bool parse(const T& data, R* object) {
+		pycppgen<CObject>::parse(data, object);
+		((access_helper*)object)->SetMatrix(data["Matrix"]);
 		return true;
 	}
 
 	static void for_each_function(std::function<void(const member_function_info&)> fn) {
 		pycppgen<CObject>::for_each_function(fn);
-		member_function_info DoSomething_info_563;
-		DoSomething_info_563.Name = "DoSomething";
-		DoSomething_info_563.Declaration = "void ()";
-		DoSomething_info_563.Attributes = {
+		member_function_info DoSomething_info_568;
+		DoSomething_info_568.Name = "DoSomething";
+		DoSomething_info_568.Declaration = "void ()";
+		DoSomething_info_568.Attributes = {
 
 				};
-		DoSomething_info_563.ReturnType = "void";
+		DoSomething_info_568.ReturnType = "void";
 		//parameters
 		{
 		}

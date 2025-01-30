@@ -266,12 +266,11 @@ struct pycppgen<SStructTest> {
 		fn("size");
 	}
 
-	template<typename T> static T dump(const SStructTest* object) {
-		T result;
+	template<typename T> static bool dump(T& result, const SStructTest* object) {
 		result["x"] = ((access_helper*)object)->Getx();
 		result["y"] = ((access_helper*)object)->Gety();
 		result["z"] = ((access_helper*)object)->Getz();
-		return result;
+		return true;
 	}
 
 	template<typename T, typename R> static bool parse(const T& data, R* object) {

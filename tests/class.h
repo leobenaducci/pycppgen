@@ -4,7 +4,7 @@
 
 //$[[pycppgen-include CObject]]
 
-//$[[pycppgen pure]]
+//$[[pycppgen pure;serialize]]
 class CObject
 {
 private:
@@ -30,7 +30,7 @@ public:
     //$[[pycppgen serialize]]
     short PublicShort = 123;
 
-    //$[[pycppgen]]
+    //$[[pycppgen serialize]]
     std::array<char, 16> PublicCharArray;
 
     //$[[pycppgen callable]]
@@ -57,7 +57,7 @@ public:
     static void OnRegister() {}
 };
 
-//$[[pycppgen pure]]
+//$[[pycppgen pure;serialize]]
 class CChild : public CObject
 {
 public:
@@ -67,7 +67,7 @@ public:
     //$[[pycppgen]]
     virtual void DoSomething();
 
-    //$[[pycppgen]]
+    //$[[pycppgen serialize]]
     std::array<float, 16> Matrix;
 };
 

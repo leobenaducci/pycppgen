@@ -42,9 +42,8 @@ struct pycppgen<Template::TVector<T>> {
 	static void for_each_static_var(std::function<void(std::string_view name)> fn) {
 	}
 
-	template<typename T> static T dump(const Template::TVector<T>* object) {
-		T result;
-		return result;
+	template<typename T> static bool dump(T& result, const Template::TVector<T>* object) {
+		return true;
 	}
 
 	template<typename T, typename R> static bool parse(const T& data, R* object) {

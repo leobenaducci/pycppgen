@@ -830,23 +830,23 @@ def CodeGenOutputNode(hppCode, cppCode, node) :
         hppCode += "\t}\n\n"
 
         #serialization creates a dump (output) and parse (input) functions
-        hppCode += "\ttemplate<typename T> static T dump(const " + node[ENodeType] + "* object) {\n"
-        hppCode += "\t\tT result;\n"
+        hppCode += "\ttemplate<typename T> static bool dump(T& result, const " + node[ENodeType] + "* object) {\n"
+        if ENodeParents in node :
+            for parent in node[ENodeParents] :
+                hppCode += f"\t\tpycppgen<{parent}>::dump(result, object);\n"
 
-        if "for_each_var" in node[ENodeFunctions] :
-            hppCode += "\t\tfor_each_var([this](const std::string& name, const auto& value) {\n"
-            hppCode += "\t\t\tresult[name] = value;\n"
-            hppCode += "\t\t});\n"
-        elif ENodeVariables in node and len(node[ENodeVariables]) > 0 :
+        if ENodeVariables in node and len(node[ENodeVariables]) > 0 :
             #serialize the values
             for _, var in node[ENodeVariables].items() :
                 if "serialize" in var[ENodeAttributes] and (var[ENodeAccess] == str(AccessSpecifier.PUBLIC) or var[ENodeAccess] == str(AccessSpecifier.PROTECTED)) :
                     hppCode += f"\t\tresult[\"{var[ENodeName]}\"] = ((access_helper*)object)->Get{var[ENodeName]}();\n"
-
-        hppCode += "\t\treturn result;\n"
+        hppCode += "\t\treturn true;\n"
         hppCode += "\t}\n\n"
 
         hppCode += "\ttemplate<typename T, typename R> static bool parse(const T& data, R* object) {\n"
+        if ENodeParents in node :
+            for parent in node[ENodeParents] :
+                hppCode += f"\t\tpycppgen<{parent}>::parse(data, object);\n"
         if ENodeVariables in node and len(node[ENodeVariables]) > 0 :
             for _, var in node[ENodeVariables].items() :
                 if "serialize" in var[ENodeAttributes] and (var[ENodeAccess] == str(AccessSpecifier.PUBLIC) or var[ENodeAccess] == str(AccessSpecifier.PROTECTED)) :
@@ -1062,7 +1062,9 @@ template<> struct pycppgen<void>
     void for_each_var(const void* obj, auto fn) const;
     void for_each_var(void* obj, auto fn) const;    
     template<typename T> static void for_each_var(const T* obj, auto fn);
-    template<typename T> static void for_each_var(T* obj, auto fn);    
+    template<typename T> static void for_each_var(T* obj, auto fn);   
+    template<typename T, typename R> static bool dump(T& result, const R* object); 
+    template<typename T, typename R> static bool parse(const T& data, R* object); 
 
 protected:
     decltype(std::declval<std::type_info>().hash_code()) HashCode;
@@ -1203,6 +1205,28 @@ def CodeGenGlobal(path : str) :
         if node[ENodeKind] == EKindClass or node[ENodeKind] == EKindStruct :
             code += f"\telse if (hashCode == typeid({node[ENodeFullName]}).hash_code())\n"
             code += f"\t\tpycppgen<{node[ENodeFullName]}>::for_each_var(({node[ENodeFullName]}*)obj, fn);\n"
+    code += "}\n\n"
+
+    code += "template<typename T, typename R> static bool pycppgen<void>::dump(T& result, const R* obj)\n"
+    code += "{\n"
+    code += f"\tconst auto hashCode = obj ? typeid(*obj).hash_code() : 0;\n"
+    code += "\tif (false) {}\n"
+    for _, node in NodeList.items() :
+        if (node[ENodeKind] == EKindClass or node[ENodeKind] == EKindStruct) and "serialize" in node[ENodeAttributes] :
+            code += f"\telse if (hashCode == typeid({node[ENodeFullName]}).hash_code())\n"
+            code += f"\t\treturn pycppgen<{node[ENodeFullName]}>::dump(result, (const {node[ENodeFullName]}*)obj);\n"
+    code += "\treturn false;\n"
+    code += "}\n\n"
+
+    code += "template<typename T, typename R> static bool pycppgen<void>::parse(const T& data, const R* obj)\n"
+    code += "{\n"
+    code += f"\tconst auto hashCode = obj ? typeid(*obj).hash_code() : 0;\n"
+    code += "\tif (false) {}\n"
+    for _, node in NodeList.items() :
+        if (node[ENodeKind] == EKindClass or node[ENodeKind] == EKindStruct) and "serialize" in node[ENodeAttributes] :
+            code += f"\telse if (hashCode == typeid({node[ENodeFullName]}).hash_code())\n"
+            code += f"\t\treturn pycppgen<{node[ENodeFullName]}>::parse(data, (const {node[ENodeFullName]}*)obj);\n"
+    code += "\treturn false;\n"
     code += "}\n\n"
 
     if os.path.exists(path + "\\pycppgen.gen.h") :

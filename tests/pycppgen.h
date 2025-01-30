@@ -49,7 +49,9 @@ template<> struct pycppgen<void>
     void for_each_var(const void* obj, auto fn) const;
     void for_each_var(void* obj, auto fn) const;    
     template<typename T> static void for_each_var(const T* obj, auto fn);
-    template<typename T> static void for_each_var(T* obj, auto fn);    
+    template<typename T> static void for_each_var(T* obj, auto fn);   
+    template<typename T, typename R> static bool dump(T& result, const R* object); 
+    template<typename T, typename R> static bool parse(const T& data, R* object); 
 
 protected:
     decltype(std::declval<std::type_info>().hash_code()) HashCode;
