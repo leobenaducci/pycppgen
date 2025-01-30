@@ -1218,7 +1218,7 @@ def CodeGenGlobal(path : str) :
     code += "\treturn false;\n"
     code += "}\n\n"
 
-    code += "template<typename T, typename R> static bool pycppgen<void>::parse(const T& data, const R* obj)\n"
+    code += "template<typename T, typename R> static bool pycppgen<void>::parse(const T& data, R* obj)\n"
     code += "{\n"
     code += f"\tconst auto hashCode = obj ? typeid(*obj).hash_code() : 0;\n"
     code += "\tif (false) {}\n"
