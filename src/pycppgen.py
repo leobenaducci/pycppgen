@@ -4,8 +4,11 @@ import sys
 import clang.cindex
 import re
 import inspect
+from concurrent.futures import ThreadPoolExecutor
 from clang.cindex import CursorKind
 from clang.cindex import AccessSpecifier
+
+DebugMode = False
 
 ENodeName = "name"
 ENodeFullName = "full_name"
@@ -477,10 +480,19 @@ def GetOutputFileName(filePath : str, ext  : str = "h") :
     outputPath = pathlib.Path(GetOutputFilePath(filePath, ext))
     return str(outputPath.relative_to(outputPath.parent))
 
+ForcedValidHeaders = set()
+ForcedEmptyHeaders = set()
+
 #parse a header file
 def ParseFile(filePath : str, options : list) :
-    global NodesToInclude
-
+    global NodesToInclude, NodeList, NodeTree, NodeStack, ForcedEmptyHeaders, ForcedValidHeaders
+    
+    #initialize data
+    NodesToInclude = []
+    NodeList = {}
+    NodeTree = {}
+    NodeStack = [NodeTree] 
+    
     with open(filePath) as file:
         for line in file.readlines() :
             m = re.match(r"\s*\/\/\s*\$\[\[pycppgen-include\s+((?>\w|\W)*)\]\]", line, flags=re.MULTILINE|re.IGNORECASE)
@@ -488,23 +500,56 @@ def ParseFile(filePath : str, options : list) :
             for g in m.groups() :
                 NodesToInclude += g.replace(" ", ";").replace(",", ";").split(";")
 
-    with open(os.path.join(os.getcwd(), filePath)) as src :
-        with open("tmp.h__", "wt") as dst:
+    with open(filePath) as src :
+        with open(filePath + ".pycppgentmp", "wt") as dst:
             outlines = []
             for line in src.readlines() :
-                if re.match(r".*\#\s*include", line) != None:
-                    continue
+                #filter ?
                 outlines += [line]
             dst.writelines(outlines)
 
-    args = ['-x', 'c++', '-std=c++17'] + options
+    args = ['-x', 'c++', '-std=c++20'] + options
     idx = clang.cindex.Index.create()
-    tu = idx.parse("tmp.h__", args = args, options = clang.cindex.TranslationUnit.PARSE_INCOMPLETE | clang.cindex.TranslationUnit.PARSE_SKIP_FUNCTION_BODIES)
+    tu = idx.parse(filePath + ".pycppgentmp", args = args, options = clang.cindex.TranslationUnit.PARSE_INCOMPLETE | clang.cindex.TranslationUnit.PARSE_SKIP_FUNCTION_BODIES)
 
-    os.remove("tmp.h__")
+    forcedEmptyHeaders = []
+
+    for h in tu.get_includes() :
+        path = str(pathlib.Path(h.include.name).resolve())
+
+        if path in ForcedEmptyHeaders :
+            forcedEmptyHeaders.append( (path, "") )
+            continue
+
+        if path in ForcedValidHeaders :
+            continue
+
+        with open(path, "rt") as f :
+            if f.read().find("$[[pycppgen") == -1 :
+                forcedEmptyHeaders.append( (path, "") )
+                ForcedEmptyHeaders.add(path)
+            else :
+                ForcedValidHeaders.add(path)
+
+    tu = idx.parse(filePath + ".pycppgentmp", unsaved_files=forcedEmptyHeaders, args = args, options = clang.cindex.TranslationUnit.PARSE_INCOMPLETE | clang.cindex.TranslationUnit.PARSE_SKIP_FUNCTION_BODIES)
+
+    if DebugMode :
+        # Print diagnostics
+        for diag in tu.diagnostics:
+            print(diag)
+
+    os.remove(filePath + ".pycppgentmp")
     
     for cursor in tu.cursor.walk_preorder():
         ParseCursor(cursor)
+
+    return {
+            "NodeList": NodeList,
+            "NodesToInclude": NodesToInclude,
+            "NodeTree": NodeTree,
+            "NodeStack": NodeStack
+        }
+
 
 #codegen: common type header 
 def CodeGenOutputMetaHeader(code, node) :
@@ -689,7 +734,7 @@ def CodeGenOutputNode(hppCode, cppCode, node) :
                     hppCode += "\t\tauto& Get" + var[ENodeName] + "Ref() { return " + node[ENodeFullName] + "::" + var[ENodeName] + "; }\n"
             hppCode += "\t};\n\n"
 
-        #parent classes
+        #parent classes 
         hppCode += "\tstatic void for_each_parent(auto fn) {\n"
         if ENodeParents in node :
             for p in node[ENodeParents] :
@@ -1286,10 +1331,14 @@ def main(args : list) :
         exit(-1)
 
     ProjectPath = str(pathlib.Path(args[0]).resolve())
+
     FilesToParse = []
     OldGenFiles = []
     for root, _, files in os.walk(ProjectPath):
         for file in files:
+            if file.endswith(".pycppgentmp") :
+                os.remove(root + "\\" + file)
+                continue
             if re.match(r".*\.h", file) and not re.match(r".*\.gen.h", file) :
                 filePath = os.path.join(root, file)
                 with open(filePath) as f :
@@ -1310,7 +1359,8 @@ def main(args : list) :
             if os.path.exists(file) :
                 os.remove(file)
         OldGenFiles = []
-        with open(ProjectPath + "\\pycppgen.ver", "wt") as f :
+        err = ""
+        with open(ProjectPath + "\\pycppgen.ver", "wt", errors=err) as f :
             f.write("")
 
     FilesToRemove = list(set(OldGenFiles).difference(GenFiles))
@@ -1327,23 +1377,20 @@ def main(args : list) :
         return
     
     print("parsing path: " + ProjectPath)
-
     PerFileData = {}
-    for file in FilesToParse :
-        #initialize data
-        NodesToInclude = []
-        NodeList = {}
-        NodeTree = {}
-        NodeStack = [NodeTree]        
+    
+    futures = []
+    if DebugMode :
+        futures.append( (file, ParseFile(file, compilerOptions)) )
+    else :
+        with ThreadPoolExecutor() as pool :
+            for file in FilesToParse :
+                futures.append( (file, pool.submit(ParseFile, file, compilerOptions)))
+            pool.shutdown()
 
-        ParseFile(file, compilerOptions)
-        
-        PerFileData[file] = {
-            "NodeList": NodeList,
-            "NodesToInclude": NodesToInclude,
-            "NodeTree": NodeTree,
-            "NodeStack": NodeStack
-            }
+    for f in futures :
+        if f[1] :
+            PerFileData[f[0]] = f[1].result()
         
     for file in FilesToParse :
         if IsOutputUpToDate(file) :
