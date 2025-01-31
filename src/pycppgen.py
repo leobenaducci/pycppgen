@@ -4,11 +4,19 @@ import sys
 import clang.cindex
 import re
 import inspect
+import itertools
+import threading
 from concurrent.futures import ThreadPoolExecutor
 from clang.cindex import CursorKind
 from clang.cindex import AccessSpecifier
 
 DebugMode = False
+
+TLS = threading.current_thread()
+TLS.NodesToInclude = []
+TLS.NodeList = {}
+TLS.NodeTree = {}
+TLS.NodeStack = [TLS.NodeTree]
 
 ENodeName = "name"
 ENodeFullName = "full_name"
@@ -87,11 +95,6 @@ TypeAliases = dict(
         "unsigned char": "uint8_t"
     }
 )
-
-NodeList = {}
-NodeTree = {}
-NodeStack = [NodeTree]
-ProjectPath = ""
 
 #try to parse the comments before or after the cursor (hacky but, cursor.raw_comments isn't working as expected)
 def ParseComments(cursor, kind : str = EParseCommentsBeforeDecl) :
@@ -178,20 +181,20 @@ def GetFullName(cursor) :
 
 #append the current node to it's parent and optionally (appendToList) to the global list
 def AppendToStackTop(node, node_type : str, appendToList : bool = False) :
-    global NodeList, NodeTree, NodeStack
+    global TLS
+    
+    if not node_type in TLS.NodeStack[-1]:
+        TLS.NodeStack[-1][node_type] = dict()
 
-    if not node_type in NodeStack[-1]:
-        NodeStack[-1][node_type] = dict()
-
-    NodeStack[-1][node_type][node[ENodeFullName]] = node
+    TLS.NodeStack[-1][node_type][node[ENodeFullName]] = node
 
     if appendToList :
-        NodeList[node[ENodeFullName]] = node
+        TLS.NodeList[node[ENodeFullName]] = node
 
 #common node push code
 def PushNode(cursor, kind : str = EInvalid) :
-    global NodeStack
-    
+    global TLS
+
     node = dict()
     node[ENodeName] = str(cursor.spelling)
     node[ENodeFullName] = GetFullName(cursor)
@@ -203,22 +206,25 @@ def PushNode(cursor, kind : str = EInvalid) :
     node[ENodeAccess] = str(cursor.access_specifier)
     node[ENodeScope] = GetScope(cursor)
     node[ENodeAttributes] = ParseComments(cursor, kind)
-    node[ENodeCursor] = cursor
     node[ENodeNamespace] = ""
+    node[ENodeCursor] = cursor
 
-    for v in NodeStack :
-        if ENodeKind in v and v[ENodeKind] == EKindNamespace :
-            node[ENodeNamespace] += v[ENodeName] + "::"
-    if len(node[ENodeNamespace]) > 0 :
+    ns_parent = cursor.semantic_parent
+    while ns_parent and ns_parent.kind == CursorKind.NAMESPACE :
+        node[ENodeNamespace] = ns_parent.spelling + "::" + node[ENodeNamespace]
+        ns_parent = ns_parent.semantic_parent
+
+    if node[ENodeNamespace].endswith("::") :
         node[ENodeNamespace] = node[ENodeNamespace][:-2]
-
-    NodeStack.append(node)
-    return NodeStack[-1]
+    
+    TLS.NodeStack.append(node)
+    return TLS.NodeStack[-1]
 
 #common node pop code
 def PopNode() :
-    global NodeStack
-    NodeStack = NodeStack[:-1]
+    global TLS
+
+    TLS.NodeStack = TLS.NodeStack[:-1]
 
 #parse a function cursor
 def ParseFunction(cursor, isFreeFunction : bool = False) :
@@ -275,6 +281,7 @@ def ParseVar(cursor, isFreeVariable : bool = False) :
 
 #parse struct/class
 def ParseStruct(cursor) :
+    global TLS
 
     kind = EInvalid
     if cursor.kind == CursorKind.CLASS_TEMPLATE :
@@ -298,7 +305,7 @@ def ParseStruct(cursor) :
                 if "include" in flags : 
                     if str(flags["include"]) == "False" :
                         continue
-                elif not childFullName in NodesToInclude :
+                elif not childFullName in TLS.NodesToInclude :
                     continue
                 AppendToStackTop({ENodeFullName: childFullName, ENodeCursor: child.referenced}, ENodeParents)
             continue
@@ -387,8 +394,6 @@ def ParseEnum(cursor, isGlobal : bool = False) :
 
 #append to list and recurse
 def ParseNamespace(cursor) :
-    global NodeList, NodeTree, NodeStack
-
     node = PushNode(cursor, EKindNamespace)
     for child in cursor.get_children() :
         ParseCursor(child)
@@ -406,10 +411,7 @@ def ParseTypeAlias(cursor) :
 
 #generic parse call
 def ParseCursor(cursor, forceInclude = False) :
-    if cursor.kind.is_translation_unit() :
-        for child in cursor.get_children() :
-            ParseCursor(child)
-        return
+    global TLS
 
     #TODO
     if cursor.kind == CursorKind.UNION_DECL : return
@@ -424,7 +426,7 @@ def ParseCursor(cursor, forceInclude = False) :
     #allow namespaces to be "duplicated"
     if cursor.kind != CursorKind.NAMESPACE :
         #ignore already added
-        if fullName in NodeList :
+        if fullName in TLS.NodeList :
             return
     
     if cursor.kind == CursorKind.NAMESPACE :
@@ -437,7 +439,7 @@ def ParseCursor(cursor, forceInclude = False) :
         if "include" in flags : 
             if str(flags["include"]) == "False" :
                 return
-        elif not fullName in NodesToInclude :
+        elif not fullName in TLS.NodesToInclude :
             return
 
     #ignore this kind for now
@@ -450,7 +452,7 @@ def ParseCursor(cursor, forceInclude = False) :
         if cursor.is_definition() :
             node = ParseStruct(cursor)   
             AppendToStackTop(node, ENodeStructs)
-            NodeList[node[ENodeFullName]] = node
+            TLS.NodeList[node[ENodeFullName]] = node
         return
 
     if cursor.kind == CursorKind.ENUM_DECL :
@@ -480,76 +482,43 @@ def GetOutputFileName(filePath : str, ext  : str = "h") :
     outputPath = pathlib.Path(GetOutputFilePath(filePath, ext))
     return str(outputPath.relative_to(outputPath.parent))
 
-ForcedValidHeaders = set()
-ForcedEmptyHeaders = set()
-
 #parse a header file
 def ParseFile(filePath : str, options : list) :
-    global NodesToInclude, NodeList, NodeTree, NodeStack, ForcedEmptyHeaders, ForcedValidHeaders
+    global FilesToParse
     
     #initialize data
-    NodesToInclude = []
-    NodeList = {}
-    NodeTree = {}
-    NodeStack = [NodeTree] 
+    TLS.NodesToInclude = []
+    TLS.NodeList = {}
+    TLS.NodeTree = {}
+    TLS.NodeStack = [TLS.NodeTree] 
     
     with open(filePath) as file:
         for line in file.readlines() :
             m = re.match(r"\s*\/\/\s*\$\[\[pycppgen-include\s+((?>\w|\W)*)\]\]", line, flags=re.MULTILINE|re.IGNORECASE)
             if not m : continue
             for g in m.groups() :
-                NodesToInclude += g.replace(" ", ";").replace(",", ";").split(";")
-
-    with open(filePath) as src :
-        with open(filePath + ".pycppgentmp", "wt") as dst:
-            outlines = []
-            for line in src.readlines() :
-                #filter ?
-                outlines += [line]
-            dst.writelines(outlines)
+                TLS.NodesToInclude += g.replace(" ", ";").replace(",", ";").split(";")
 
     args = ['-x', 'c++', '-std=c++20'] + options
     idx = clang.cindex.Index.create()
-    tu = idx.parse(filePath + ".pycppgentmp", args = args, options = clang.cindex.TranslationUnit.PARSE_INCOMPLETE | clang.cindex.TranslationUnit.PARSE_SKIP_FUNCTION_BODIES)
-
-    forcedEmptyHeaders = []
-
-    for h in tu.get_includes() :
-        path = str(pathlib.Path(h.include.name).resolve())
-
-        if path in ForcedEmptyHeaders :
-            forcedEmptyHeaders.append( (path, "") )
-            continue
-
-        if path in ForcedValidHeaders :
-            continue
-
-        with open(path, "rt") as f :
-            if f.read().find("$[[pycppgen") == -1 :
-                forcedEmptyHeaders.append( (path, "") )
-                ForcedEmptyHeaders.add(path)
-            else :
-                ForcedValidHeaders.add(path)
-
-    tu = idx.parse(filePath + ".pycppgentmp", unsaved_files=forcedEmptyHeaders, args = args, options = clang.cindex.TranslationUnit.PARSE_INCOMPLETE | clang.cindex.TranslationUnit.PARSE_SKIP_FUNCTION_BODIES)
+    tu = idx.parse(filePath, args = args, options = clang.cindex.TranslationUnit.PARSE_INCOMPLETE | clang.cindex.TranslationUnit.PARSE_SKIP_FUNCTION_BODIES)
 
     if DebugMode :
         # Print diagnostics
         for diag in tu.diagnostics:
             print(diag)
 
-    os.remove(filePath + ".pycppgentmp")
-    
-    for cursor in tu.cursor.walk_preorder():
+    #first = next(x for x in tu.cursor.get_children() if x.location.file and x.location.file.name in FilesToParse)
+    filteredChildren = list(filter(lambda x: x.location.file and str(pathlib.Path(x.location.file.name).resolve()) in FilesToParse, tu.cursor.get_children()))
+    for cursor in  filteredChildren :
         ParseCursor(cursor)
 
     return {
-            "NodeList": NodeList,
-            "NodesToInclude": NodesToInclude,
-            "NodeTree": NodeTree,
-            "NodeStack": NodeStack
+            "NodeList": TLS.NodeList,
+            "NodesToInclude": TLS.NodesToInclude,
+            "NodeTree": TLS.NodeTree,
+            "NodeStack": TLS.NodeStack
         }
-
 
 #codegen: common type header 
 def CodeGenOutputMetaHeader(code, node) :
@@ -618,7 +587,7 @@ def CodeGenOutputAttributes(node, depth = 0) :
 
 #codegen: emit call_function definitions
 def CodeGenOutputAddFunctionDeclaration(declarations, node, funcNode, isStatic : bool) :
-    decl = f"static_{isStatic}__{funcNode[ENodeType]}"
+    decl = f"static_{isStatic}_{funcNode[ENodeType]}"
     numParams = len(funcNode[ENodeParameters])
     isConst = decl.endswith("const")
       
@@ -738,7 +707,7 @@ def CodeGenOutputNode(hppCode, cppCode, node) :
         hppCode += "\tstatic void for_each_parent(auto fn) {\n"
         if ENodeParents in node :
             for p in node[ENodeParents] :
-                typeName = "type_" + p.replace("::", "__")
+                typeName = "type_" + p.replace("::", "_")
                 hppCode += "\t\tstruct " + typeName + " { using type = " + p + "; const type* obj = nullptr; };\n"
                 hppCode += f"\t\tfn({typeName}());\n"
         hppCode += "\t};\n\n"
@@ -1016,22 +985,24 @@ def CodeGenOutputNode(hppCode, cppCode, node) :
 
 #codegen: output file
 def CodeGen(filePath : str) :
+    global TLS
+
     cppCode = ""
     hppCode = ""
     hppCode += "#pragma once\n\n"
     hppCode += "#include \"pycppgen.h\"\n"
     hppCode += "#include \"" + str(pathlib.Path(filePath).relative_to(pathlib.Path(filePath).parent)) + "\"\n\n"
 
-    for key in NodeList :
-        hppCode, cppCode = CodeGenOutputNode(hppCode, cppCode, NodeList[key])
+    for key in TLS.NodeList :
+        hppCode, cppCode = CodeGenOutputNode(hppCode, cppCode, TLS.NodeList[key])
 
     hppCode += "namespace pycppgen_globals {\n"
     
-    for _, func in NodeList.items() :
+    for _, func in TLS.NodeList.items() :
         if func[ENodeKind] == EKindFreeFunction :
             hppCode += "//" + func[ENodeFullName] + "\n"
 
-    for _, var in NodeList.items() :
+    for _, var in TLS.NodeList.items() :
         if var[ENodeKind] == EKindFreeVariable :
             hppCode += "//" + var[ENodeType] + " " + var[ENodeFullName] + "\n"
 
@@ -1048,7 +1019,7 @@ def CodeGen(filePath : str) :
 #codegen: emit for each type call
 def CodeGenGlobalAddForEachTypeCall(code, node) :
     if node[ENodeKind] == EKindClass or node[ENodeKind] == EKindStruct : #or node[ENodeKind] == EKindClassTemplate:
-        typeName = "type_" + node[ENodeFullName].replace("::", "__")
+        typeName = "type_" + node[ENodeFullName].replace("::", "_")
         code += "\t\tstruct " + typeName + " { using type = " + node[ENodeFullName] + "; const type* obj = nullptr; };\n"
         code += f"\t\tfn({typeName}());\n"
     return code
@@ -1176,7 +1147,7 @@ namespace pycppgen_detail
         output.write(code)
 
 def CodeGenGlobal(path : str) :
-    global PerFileData
+    global PerFileData, TLS
     
     CodeGenGlobalHeader(path)
 
@@ -1191,20 +1162,20 @@ def CodeGenGlobal(path : str) :
     code += "\nnamespace pycppgen_globals\n{\n"
 
     code += "\tstatic void for_each_type_call(auto fn) {\n"
-    for _, node in NodeList.items() :
+    for _, node in TLS.NodeList.items() :
         code = CodeGenGlobalAddForEachTypeCall(code, node)
     code += "\t}\n\n"
 
     code += "\tstatic void for_each_enum_call(auto fn)\n"
     code += "\t{\n"
-    for _, node in NodeList.items() :
+    for _, node in TLS.NodeList.items() :
         if node[ENodeKind] == EKindEnum :
             code += f"\t\tfn({node[ENodeFullName]}());\n"
     code += "\t}\n\n"
 
     #static function call by name
     code += "\tstatic void for_each_type_static_call_by_name(std::string_view funcName) {\n"
-    for _, node in NodeList.items() :
+    for _, node in TLS.NodeList.items() :
         if (node[ENodeKind] == EKindClass or node[ENodeKind] == EKindStruct) and ENodeStaticFunctions in node:
             for _, func in node[ENodeStaticFunctions].items() :
                 if (not ENodeParameters in func or len(func[ENodeParameters]) == 0) and (not ENodeReturnType in func or func[ENodeReturnType] == "void"):
@@ -1217,7 +1188,7 @@ def CodeGenGlobal(path : str) :
     code += "void pycppgen<void>::for_each_var(const void* obj, auto fn) const\n"
     code += "{\n"
     code += "\tif (false) {}\n"
-    for _, node in NodeList.items() :
+    for _, node in TLS.NodeList.items() :
         if node[ENodeKind] == EKindClass or node[ENodeKind] == EKindStruct :
             code += f"\telse if (HashCode == typeid({node[ENodeFullName]}).hash_code())\n"
             code += f"\t\tpycppgen<{node[ENodeFullName]}>::for_each_var((const {node[ENodeFullName]}*)obj, fn);\n"
@@ -1226,7 +1197,7 @@ def CodeGenGlobal(path : str) :
     code += "void pycppgen<void>::for_each_var(void* obj, auto fn) const\n"
     code += "{\n"
     code += "\tif (false) {}\n"
-    for _, node in NodeList.items() :
+    for _, node in TLS.NodeList.items() :
         if node[ENodeKind] == EKindClass or node[ENodeKind] == EKindStruct :
             code += f"\telse if (HashCode == typeid({node[ENodeFullName]}).hash_code())\n"
             code += f"\t\tpycppgen<{node[ENodeFullName]}>::for_each_var(({node[ENodeFullName]}*)obj, fn);\n"
@@ -1236,7 +1207,7 @@ def CodeGenGlobal(path : str) :
     code += "{\n"
     code += f"\tconst auto hashCode = obj ? typeid(*obj).hash_code() : 0;\n"
     code += "\tif (false) {}\n"
-    for _, node in NodeList.items() :
+    for _, node in TLS.NodeList.items() :
         if node[ENodeKind] == EKindClass or node[ENodeKind] == EKindStruct :
             code += f"\telse if (hashCode == typeid({node[ENodeFullName]}).hash_code())\n"
             code += f"\t\tpycppgen<{node[ENodeFullName]}>::for_each_var((const {node[ENodeFullName]}*)obj, fn);\n"
@@ -1246,7 +1217,7 @@ def CodeGenGlobal(path : str) :
     code += "{\n"
     code += f"\tconst auto hashCode = obj ? typeid(*obj).hash_code() : 0;\n"
     code += "\tif (false) {}\n"
-    for _, node in NodeList.items() :
+    for _, node in TLS.NodeList.items() :
         if node[ENodeKind] == EKindClass or node[ENodeKind] == EKindStruct :
             code += f"\telse if (hashCode == typeid({node[ENodeFullName]}).hash_code())\n"
             code += f"\t\tpycppgen<{node[ENodeFullName]}>::for_each_var(({node[ENodeFullName]}*)obj, fn);\n"
@@ -1256,7 +1227,7 @@ def CodeGenGlobal(path : str) :
     code += "{\n"
     code += f"\tconst auto hashCode = obj ? typeid(*obj).hash_code() : 0;\n"
     code += "\tif (false) {}\n"
-    for _, node in NodeList.items() :
+    for _, node in TLS.NodeList.items() :
         if (node[ENodeKind] == EKindClass or node[ENodeKind] == EKindStruct) and "serialize" in node[ENodeAttributes] :
             code += f"\telse if (hashCode == typeid({node[ENodeFullName]}).hash_code())\n"
             code += f"\t\treturn pycppgen<{node[ENodeFullName]}>::dump(result, (const {node[ENodeFullName]}*)obj);\n"
@@ -1267,7 +1238,7 @@ def CodeGenGlobal(path : str) :
     code += "{\n"
     code += f"\tconst auto hashCode = obj ? typeid(*obj).hash_code() : 0;\n"
     code += "\tif (false) {}\n"
-    for _, node in NodeList.items() :
+    for _, node in TLS.NodeList.items() :
         if (node[ENodeKind] == EKindClass or node[ENodeKind] == EKindStruct) and "serialize" in node[ENodeAttributes] :
             code += f"\telse if (hashCode == typeid({node[ENodeFullName]}).hash_code())\n"
             code += f"\t\treturn pycppgen<{node[ENodeFullName]}>::parse(data, (const {node[ENodeFullName]}*)obj);\n"
@@ -1287,7 +1258,7 @@ def CodeGenGlobal(path : str) :
     code += "\n"
     code += "void pycppgen<void>::for_each_var(std::function<void(const member_variable_info&)> fn) const\n"
     code += "{\n"
-    for _, node in NodeList.items() :
+    for _, node in TLS.NodeList.items() :
         if node[ENodeKind] == EKindClass or node[ENodeKind] == EKindStruct :
             code += f"\tif (HashCode == typeid({node[ENodeFullName]}).hash_code())\n"
             code += f"\t\tpycppgen<{node[ENodeFullName]}>::for_each_var(fn);\n"
@@ -1295,7 +1266,7 @@ def CodeGenGlobal(path : str) :
     
     code += "pycppgen<void>::pycppgen(std::string_view name)\n"
     code += "{\n"
-    for _, node in NodeList.items() :
+    for _, node in TLS.NodeList.items() :
         if node[ENodeKind] == EKindClass or node[ENodeKind] == EKindStruct :
             if code.endswith("{\n") : code += "\t"
             else : code += f"\telse "
@@ -1324,7 +1295,7 @@ def IsOutputUpToDate(file : str) :
     return IsFileUpToDate(file, outputFile)
 
 def main(args : list) :
-    global FilesToParse, NodesToInclude, NodeList, NodeTree, NodeStack, PerFileData, ProjectPath
+    global FilesToParse, PerFileData, ProjectPath, TLS
 
     if len(args) < 1 :
         print("usage py main.py <directory> <options>")
@@ -1379,39 +1350,29 @@ def main(args : list) :
     print("parsing path: " + ProjectPath)
     PerFileData = {}
     
-    futures = []
-    if DebugMode :
-        futures.append( (file, ParseFile(file, compilerOptions)) )
-    else :
-        with ThreadPoolExecutor() as pool :
-            for file in FilesToParse :
-                futures.append( (file, pool.submit(ParseFile, file, compilerOptions)))
-            pool.shutdown()
-
-    for f in futures :
-        if f[1] :
-            PerFileData[f[0]] = f[1].result()
+    for file in FilesToParse :
+        PerFileData[file] = ParseFile(file, compilerOptions)
         
     for file in FilesToParse :
         if IsOutputUpToDate(file) :
             continue
 
-        NodesToInclude = PerFileData[file]["NodesToInclude"]
-        NodeList = PerFileData[file]["NodeList"]
-        NodeTree = PerFileData[file]["NodeTree"]
-        NodeStack = PerFileData[file]["NodeStack"]
+        TLS.NodesToInclude = PerFileData[file]["NodesToInclude"]
+        TLS.NodeList = PerFileData[file]["NodeList"]
+        TLS.NodeTree = PerFileData[file]["NodeTree"]
+        TLS.NodeStack = PerFileData[file]["NodeStack"]
 
         print("generating code for: " + file)
         CodeGen(file)
 
     #clear data
-    NodesToInclude = []
-    NodeList = {}
-    NodeTree = {}
-    NodeStack = [NodeTree]   
+    TLS.NodesToInclude = []
+    TLS.NodeList = {}
+    TLS.NodeTree = {}
+    TLS.NodeStack = [TLS.NodeTree]   
 
     for _, v in PerFileData.items() : 
-        NodeList.update(v["NodeList"])
+        TLS.NodeList.update(v["NodeList"])
 
     print("global code gen step")
     FilesToParse.append(args[0] + "\\pycppgen.h")

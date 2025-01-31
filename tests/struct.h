@@ -1,5 +1,8 @@
 #pragma once
 
+#include <array>
+#include <vector>
+
 //$[[pycppgen visible]]
 struct SStructTest
 {

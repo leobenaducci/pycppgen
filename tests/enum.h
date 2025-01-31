@@ -1,5 +1,8 @@
 #pragma once
 
+#include <array>
+#include <vector>
+
 //$[[pycppgen bitmask]]
 enum class EEnum : unsigned
 {
