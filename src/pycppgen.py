@@ -673,11 +673,13 @@ def GenerateMemberInfo(node, var, infoName) :
     return result
 
 #codegen: emit a node5
-def CodeGenOutputNode(hppCode, cppCode, node) :
+def CodeGenOutputNode(node) :
    
+    hppCode = cppCode = ""
+
     #class or structs
     if node[ENodeKind] == EKindClass or node[ENodeKind] == EKindClassTemplate or node[ENodeKind] == EKindStruct :
-        hppCode = CodeGenOutputMetaHeader(hppCode, node)
+        hppCode += CodeGenOutputMetaHeader(hppCode, node)
 
         #declare the attribute map
         hppCode += "\tstd::map<std::string_view, std::string_view> Attributes = "
@@ -945,7 +947,7 @@ def CodeGenOutputNode(hppCode, cppCode, node) :
                     break
         
     elif node[ENodeKind] == EKindEnum :
-        hppCode = CodeGenOutputMetaHeader(hppCode, node)
+        hppCode += CodeGenOutputMetaHeader(hppCode, node)
 
         #append enum attributes
         hppCode += "\tstd::map<std::string, std::string> Attributes = "
@@ -993,7 +995,9 @@ def CodeGen(filePath : str) :
     hppCode += "#include \"" + str(pathlib.Path(filePath).relative_to(pathlib.Path(filePath).parent)) + "\"\n\n"
 
     for key in TLS().NodeList :
-        hppCode, cppCode = CodeGenOutputNode(hppCode, cppCode, TLS().NodeList[key])
+        newHppCode, newCppCode = CodeGenOutputNode(TLS().NodeList[key])
+        hppCode += newHppCode
+        cppCode += newCppCode
 
     hppCode += "namespace pycppgen_globals {\n"
     
