@@ -32,12 +32,47 @@ struct function_parameter_info {
 	std::map<std::string, std::string> Attributes;
 };
 
+template<typename T>
 struct member_function_info {
 	std::string Name;
 	std::string Declaration;
 	std::string ReturnType;
+    std::enable_if<!std::is_same_v<T, void>, T> Function = nullptr;
 	std::vector<function_parameter_info> Parameters;
 	std::map<std::string, std::string> Attributes;
+};
+
+template<>
+struct member_function_info<void> {
+	std::string Name;
+	std::string Declaration;
+	std::string ReturnType;
+ 	std::vector<function_parameter_info> Parameters;
+	std::map<std::string, std::string> Attributes;
+
+    member_function_info<void>() 
+    {
+    }
+    
+    template<typename T> member_function_info<void>(const member_function_info<T>& A)
+    {
+	    Name = A.Name;
+	    Declaration = A.Declaration;
+	    ReturnType = A.ReturnType;
+ 	    Parameters = A.Parameters;
+	    Attributes = A.Attributes;
+    }
+
+    template<typename T> member_function_info<void> operator=(const member_function_info<T>& A)
+    {
+	    Name = A.Name;
+	    Declaration = A.Declaration;
+	    ReturnType = A.ReturnType;
+ 	    Parameters = A.Parameters;
+	    Attributes = A.Attributes;
+
+        return *this;
+    }
 };
 
 template<typename T = void> struct pycppgen { static constexpr bool is_valid() { return false; } };

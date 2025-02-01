@@ -4,7 +4,7 @@
 #include "function.h"
 
 namespace pycppgen_globals {
-//FuncA()
-//FuncB(int)
-//FuncC()
+//FuncA
+//FuncB
+//FuncC
 }

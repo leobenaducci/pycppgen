@@ -166,13 +166,13 @@ def ParseComments(cursor, kind : str = EParseCommentsBeforeDecl) :
 
             kv = g.split("=")
             if len(kv) == 0 : continue
-            if len(kv) > 0 : key = kv[0].casefold()
-            if len(kv) > 1 : value = kv[1].casefold()
+            if len(kv) > 0 : key = kv[0]
+            if len(kv) > 1 : value = kv[1]
 
-            if key == "exclude" : result["include"] = str(bool(value != None and value == True))
+            if key.lower() == "exclude" : result["include"] = str(bool(value != None and value == True))
             else : result[key] = value
 
-    if oneMatch and not "include" in result :
+    if oneMatch and not "include".casefold() in result :
         result["include"] = True
 
     return result
@@ -240,7 +240,8 @@ def ParseFunction(cursor, isFreeFunction : bool = False) :
 
     #push this function to it's parent
     node = PushNode(cursor, EKindFunction)
-    
+    node[ENodeFullName] = node[ENodeFullName][:node[ENodeFullName].find("(")]
+
     #get the return type
     node[ENodeReturnType] = cursor.result_type.spelling
 
@@ -871,7 +872,7 @@ def CodeGenOutputNode(node) :
         hppCode += "\t}\n\n"
 
         #functions
-        hppCode += "\tstatic void for_each_function(std::function<void(const member_function_info&)> fn) {\n"
+        hppCode += "\tstatic void for_each_function(auto fn) {\n"
         if ENodeNamespace in node and node[ENodeNamespace] != "" :
             hppCode += f"\t\tusing namespace {node[ENodeNamespace]};\n"
 
@@ -884,11 +885,12 @@ def CodeGenOutputNode(node) :
                 if func[ENodeAccess] == str(AccessSpecifier.PUBLIC) or func[ENodeAccess] == str(AccessSpecifier.PROTECTED) :
                     funcName = func[ENodeName]
                     infoName = f"{funcName}_info_" + str(hppCode.count('\n'))
-                    hppCode += f"\t\tmember_function_info {infoName};\n"
+                    hppCode += f"\t\tmember_function_info<decltype(&{func[ENodeFullName]})> {infoName};\n"
                     hppCode += f"\t\t{infoName}.Name = \"{funcName}\";\n"
                     hppCode += f"\t\t{infoName}.Declaration = \"{func[ENodeType]}\";\n"
                     hppCode += f"\t\t{infoName}.Attributes = {CodeGenOutputAttributes(func, 3)};\n"
                     hppCode += f"\t\t{infoName}.ReturnType = \"{func[ENodeReturnType]}\";\n"
+                    hppCode += f"\t\t{infoName}.Function = &{func[ENodeFullName]};\n"
                     hppCode += "\t\t//parameters\n"
                     hppCode += "\t\t{\n"
                     for _, pv in func[ENodeParameters].items() :
@@ -900,8 +902,18 @@ def CodeGenOutputNode(node) :
                         hppCode += f"\t\t\t{paramInfoName}.Attributes = {CodeGenOutputAttributes(pv, 3)};\n"
                         hppCode += f"\t\t\t{infoName}.Parameters.push_back({paramInfoName});\n"
                     hppCode += "\t\t}\n"
+                    hppCode += f"\t\tfn({infoName});\n"
         hppCode += "\t}\n\n"
 
+        #functions
+        hppCode += "\tstatic bool find_function_by_name(std::string_view name, auto fn) {\n"
+        hppCode += "\t\tbool result = false;\n"
+        hppCode += "\t\tfor_each_function([&](const auto& info) {\n"
+        hppCode += "\t\t\tif (info.Name == name) { result = true; fn(info); } \n"
+        hppCode += "\t\t});\n"
+        hppCode += "\treturn result;\n"
+        hppCode += "\t}\n\n"
+        
         #has_function by name declaration
         hppCode += "\tstatic constexpr bool has_function(std::string_view name) {\n"
         if ENodeNamespace in node and node[ENodeNamespace] != "" :
@@ -1053,12 +1065,47 @@ struct function_parameter_info {
 	std::map<std::string, std::string> Attributes;
 };
 
+template<typename T>
 struct member_function_info {
 	std::string Name;
 	std::string Declaration;
 	std::string ReturnType;
+    T Function = nullptr;
 	std::vector<function_parameter_info> Parameters;
 	std::map<std::string, std::string> Attributes;
+};
+
+template<>
+struct member_function_info<void> {
+	std::string Name;
+	std::string Declaration;
+	std::string ReturnType;
+ 	std::vector<function_parameter_info> Parameters;
+	std::map<std::string, std::string> Attributes;
+
+    member_function_info() 
+    {
+    }
+
+    template<typename T> member_function_info(const member_function_info<T>& A)
+    {
+	    Name = A.Name;
+	    Declaration = A.Declaration;
+	    ReturnType = A.ReturnType;
+ 	    Parameters = A.Parameters;
+	    Attributes = A.Attributes;
+    }
+
+    template<typename T> member_function_info& operator=(const member_function_info<T>& A)
+    {
+	    Name = A.Name;
+	    Declaration = A.Declaration;
+	    ReturnType = A.ReturnType;
+ 	    Parameters = A.Parameters;
+	    Attributes = A.Attributes;
+
+        return *this;
+    }
 };
 
 template<typename T = void> struct pycppgen { static constexpr bool is_valid() { return false; } };

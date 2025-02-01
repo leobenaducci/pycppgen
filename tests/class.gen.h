@@ -45,7 +45,15 @@ struct pycppgen<CObject::SSubObject> {
 		return true;
 	}
 
-	static void for_each_function(std::function<void(const member_function_info&)> fn) {
+	static void for_each_function(auto fn) {
+	}
+
+	static auto get_function_by_name(std::string_view name) {
+		member_function_info<void> result = {};
+		for_each_function([&](const auto& fn) {
+			if (fn.Name == name) result = fn; 
+		});
+		return result;
 	}
 
 	static constexpr bool has_function(std::string_view name) {
@@ -338,49 +346,63 @@ struct pycppgen<CObject> {
 		return true;
 	}
 
-	static void for_each_function(std::function<void(const member_function_info&)> fn) {
-		member_function_info Func_info_273;
+	static void for_each_function(auto fn) {
+		member_function_info<decltype(&CObject::Func)> Func_info_273;
 		Func_info_273.Name = "Func";
 		Func_info_273.Declaration = "void ()";
 		Func_info_273.Attributes = {
 				{ "callable", "" }
 				};
 		Func_info_273.ReturnType = "void";
+		Func_info_273.Function = &CObject::Func;
 		//parameters
 		{
 		}
-		member_function_info Add_info_283;
-		Add_info_283.Name = "Add";
-		Add_info_283.Declaration = "float (float, double)";
-		Add_info_283.Attributes = {
+		fn(infoName);
+		member_function_info<decltype(&CObject::Add)> Add_info_285;
+		Add_info_285.Name = "Add";
+		Add_info_285.Declaration = "float (float, double)";
+		Add_info_285.Attributes = {
 				{ "callable", "" }
 				};
-		Add_info_283.ReturnType = "float";
+		Add_info_285.ReturnType = "float";
+		Add_info_285.Function = &CObject::Add;
 		//parameters
 		{
-			function_parameter_info A_info_292;
-			A_info_292.Name = "A";
-			A_info_292.Type = "float";
-			A_info_292.DefaultValue = "";
-			A_info_292.Attributes = {};
-			Add_info_283.Parameters.push_back(A_info_292);
-			function_parameter_info B_info_298;
-			B_info_298.Name = "B";
-			B_info_298.Type = "double";
-			B_info_298.DefaultValue = "";
-			B_info_298.Attributes = {};
-			Add_info_283.Parameters.push_back(B_info_298);
+			function_parameter_info A_info_295;
+			A_info_295.Name = "A";
+			A_info_295.Type = "float";
+			A_info_295.DefaultValue = "";
+			A_info_295.Attributes = {};
+			Add_info_285.Parameters.push_back(A_info_295);
+			function_parameter_info B_info_301;
+			B_info_301.Name = "B";
+			B_info_301.Type = "double";
+			B_info_301.DefaultValue = "";
+			B_info_301.Attributes = {};
+			Add_info_285.Parameters.push_back(B_info_301);
 		}
-		member_function_info Get_info_305;
-		Get_info_305.Name = "Get";
-		Get_info_305.Declaration = "short () const";
-		Get_info_305.Attributes = {
+		fn(infoName);
+		member_function_info<decltype(&CObject::Get)> Get_info_309;
+		Get_info_309.Name = "Get";
+		Get_info_309.Declaration = "short () const";
+		Get_info_309.Attributes = {
 				{ "pure", "" }
 				};
-		Get_info_305.ReturnType = "short";
+		Get_info_309.ReturnType = "short";
+		Get_info_309.Function = &CObject::Get;
 		//parameters
 		{
 		}
+		fn(infoName);
+	}
+
+	static auto get_function_by_name(std::string_view name) {
+		member_function_info<void> result = {};
+		for_each_function([&](const auto& fn) {
+			if (fn.Name == name) result = fn; 
+		});
+		return result;
 	}
 
 	static constexpr bool has_function(std::string_view name) {
@@ -565,18 +587,28 @@ struct pycppgen<CChild> {
 		return true;
 	}
 
-	static void for_each_function(std::function<void(const member_function_info&)> fn) {
+	static void for_each_function(auto fn) {
 		pycppgen<CObject>::for_each_function(fn);
-		member_function_info DoSomething_info_139;
+		member_function_info<decltype(&CChild::DoSomething)> DoSomething_info_139;
 		DoSomething_info_139.Name = "DoSomething";
 		DoSomething_info_139.Declaration = "void ()";
 		DoSomething_info_139.Attributes = {
 
 				};
 		DoSomething_info_139.ReturnType = "void";
+		DoSomething_info_139.Function = &CChild::DoSomething;
 		//parameters
 		{
 		}
+		fn(infoName);
+	}
+
+	static auto get_function_by_name(std::string_view name) {
+		member_function_info<void> result = {};
+		for_each_function([&](const auto& fn) {
+			if (fn.Name == name) result = fn; 
+		});
+		return result;
 	}
 
 	static constexpr bool has_function(std::string_view name) {

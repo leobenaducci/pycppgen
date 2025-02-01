@@ -50,8 +50,16 @@ struct pycppgen<TestNamespace::CNamespaceChild> {
 		return true;
 	}
 
-	static void for_each_function(std::function<void(const member_function_info&)> fn) {
+	static void for_each_function(auto fn) {
 		using namespace TestNamespace;
+	}
+
+	static auto get_function_by_name(std::string_view name) {
+		member_function_info<void> result = {};
+		for_each_function([&](const auto& fn) {
+			if (fn.Name == name) result = fn; 
+		});
+		return result;
 	}
 
 	static constexpr bool has_function(std::string_view name) {
@@ -65,7 +73,7 @@ struct pycppgen<TestNamespace::CNamespaceChild> {
 //</autogen__pycppgen_TestNamespace_CNamespaceChild>
 
 namespace pycppgen_globals {
-//TestNamespace::Func1()
-//TestNamespace::Func2(int)
-//TestNamespace::Func3()
+//TestNamespace::Func1
+//TestNamespace::Func2
+//TestNamespace::Func3
 }
