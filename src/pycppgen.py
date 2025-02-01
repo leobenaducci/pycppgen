@@ -494,7 +494,7 @@ def GetOutputFileName(filePath : str, ext  : str = "h") :
 
 #parse a header file
 def CompileFile(filePath : str, options : list) :
-    args = ['-x', 'c++', '-std=c++20'] + options
+    args = ['-x', 'c++', '-std=c++20', "-DPYCPPGEN"] + options
     idx = clang.cindex.Index.create()
     tu = idx.parse(filePath, args = args, options = clang.cindex.TranslationUnit.PARSE_INCOMPLETE | clang.cindex.TranslationUnit.PARSE_SKIP_FUNCTION_BODIES)
 
@@ -650,7 +650,7 @@ def CodeGenOutputAddFunctionDeclaration(declarations, node, funcNode, isStatic :
         declarations[decl] += f"{node[ENodeType]}::{funcNode[ENodeName]}("
     else :          
         #code 'object-><function_name>('
-        declarations[decl] += f"object->{funcNode[ENodeName]}("
+        declarations[decl] += f"((access_helper*)object)->{funcNode[ENodeName]}("
 
     #code '[_1, _2...]'
     if numParams > 0 :
@@ -722,6 +722,8 @@ def CodeGenOutputNode(node) :
                     hppCode += "\t\tconst void Set" + var[ENodeName] + "(const decltype(" + node[ENodeFullName] + "::" + var[ENodeName] +" )& value) { " +  node[ENodeFullName] + "::" + var[ENodeName] + " = value; }\n"
                     hppCode += "\t\tconst auto& Get" + var[ENodeName] + "() const { return " + node[ENodeFullName] + "::" + var[ENodeName] + "; }\n"
                     hppCode += "\t\tauto& Get" + var[ENodeName] + "Ref() { return " + node[ENodeFullName] + "::" + var[ENodeName] + "; }\n"
+            for _, fn in node[ENodeFunctions].items() :
+                    hppCode += f"\t\tusing {node[ENodeName]}::{fn[ENodeName]};\n"
             hppCode += "\t};\n\n"
 
         #parent classes 
@@ -921,12 +923,12 @@ def CodeGenOutputNode(node) :
                 if func[ENodeAccess] == str(AccessSpecifier.PUBLIC) or func[ENodeAccess] == str(AccessSpecifier.PROTECTED) :
                     funcName = func[ENodeName]
                     infoName = f"{funcName}_info_" + str(hppCode.count('\n'))
-                    hppCode += f"\t\tmember_function_info<decltype(&{func[ENodeFullName]})> {infoName};\n"
+                    hppCode += f"\t\tmember_function_info<decltype(&access_helper::{func[ENodeName]})> {infoName};\n"
                     hppCode += f"\t\t{infoName}.Name = \"{funcName}\";\n"
                     hppCode += f"\t\t{infoName}.Declaration = \"{func[ENodeType]}\";\n"
                     hppCode += f"\t\t{infoName}.Attributes = {CodeGenOutputAttributes(func, 3)};\n"
                     hppCode += f"\t\t{infoName}.ReturnType = \"{func[ENodeReturnType]}\";\n"
-                    hppCode += f"\t\t{infoName}.Function = &{func[ENodeFullName]};\n"
+                    hppCode += f"\t\t{infoName}.Function = &access_helper::{func[ENodeName]};\n"
                     hppCode += "\t\t//parameters\n"
                     hppCode += "\t\t{\n"
                     for _, pv in func[ENodeParameters].items() :
@@ -1373,7 +1375,7 @@ def ProcessFile(file : str, compilerOptions) :
     else : # check if any of the include files are dirty
         tu = CompileFile(file, compilerOptions)
         for f in tu.get_includes():
-            if IsFileUpToDate(file, f.include.name) : 
+            if not IsFileUpToDate(file, f.include.name) : 
                 PerFileData[file] = ParseTranslationUnit(tu)
                 outdatedIncludedFile = True
                 break 
@@ -1395,6 +1397,13 @@ def main(args : list) :
     if len(args) < 1 :
         print("usage py main.py <directory> <options>")
         exit(-1)
+
+    for arg in list(args) :
+        if arg.startswith("--I") :
+            args.remove(arg)
+            arg = arg[3:]
+            for i in arg.split(";") :
+                args.append(f"-I{i}")
 
     OutdatedFiles = set()
     ProjectPath = str(pathlib.Path(args[0]).resolve())
