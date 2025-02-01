@@ -173,3 +173,4 @@ cython_debug/
 /tests/cpp
 /.vscode
 /tests/tmp.h
+/tests/pycppgen.cache
