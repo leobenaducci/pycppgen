@@ -174,3 +174,12 @@ cython_debug/
 /.vscode
 /tests/tmp.h
 /tests/pycppgen.cache
+/tests/template.gen.h
+/tests/class.gen.h
+/tests/enum.gen.h
+/tests/function.gen.h
+/tests/namespace.gen.h
+/tests/pycppgen.gen.cpp
+/tests/pycppgen.gen.h
+/tests/pycppgen.h
+/tests/struct.gen.h

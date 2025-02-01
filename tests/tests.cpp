@@ -144,5 +144,17 @@ int main()
         pycppgen<>::parse(data, &dst);
     }
 
+    pycppgen<CObject>::find_function_by_name("Get", [](auto fn)
+        {
+            auto getFunc = fn.Function;
+            printf("%p", getFunc);
+        });
+
+    pycppgen<CChild>::find_function_by_name("Add", [](auto fn)
+        {
+            auto addFunc = fn.Function;
+            printf("%p", addFunc);
+        });
+
     return 0;
 }
