@@ -493,22 +493,7 @@ def GetOutputFileName(filePath : str, ext  : str = "h") :
     return str(outputPath.relative_to(outputPath.parent))
 
 #parse a header file
-def ParseFile(filePath : str, options : list) :
-    global FilesToParse
-    
-    #initialize data
-    TLS().NodesToInclude = []
-    TLS().NodeList = {}
-    TLS().NodeTree = {}
-    TLS().NodeStack = [TLS().NodeTree] 
-    
-    with open(filePath) as file:
-        for line in file.readlines() :
-            m = re.match(r"\s*\/\/\s*\$\[\[pycppgen-include\s+((?>\w|\W)*)\]\]", line, flags=re.MULTILINE|re.IGNORECASE)
-            if not m : continue
-            for g in m.groups() :
-                TLS().NodesToInclude += g.replace(" ", ";").replace(",", ";").split(";")
-
+def CompileFile(filePath : str, options : list) :
     args = ['-x', 'c++', '-std=c++20'] + options
     idx = clang.cindex.Index.create()
     tu = idx.parse(filePath, args = args, options = clang.cindex.TranslationUnit.PARSE_INCOMPLETE | clang.cindex.TranslationUnit.PARSE_SKIP_FUNCTION_BODIES)
@@ -518,6 +503,17 @@ def ParseFile(filePath : str, options : list) :
         for diag in tu.diagnostics:
             print(diag)
 
+    return tu
+
+def ParseTranslationUnit(tu) :
+    global FilesToParse
+
+    #initialize data
+    TLS().NodesToInclude = []
+    TLS().NodeList = {}
+    TLS().NodeTree = {}
+    TLS().NodeStack = [TLS().NodeTree] 
+    
     #first = next(x for x in tu.cursor.get_children() if x.location.file and x.location.file.name in FilesToParse)
     filteredChildren = list(filter(lambda x: x.location.file and str(pathlib.Path(x.location.file.name).resolve()) in FilesToParse, tu.cursor.get_children()))
     for cursor in  filteredChildren :
@@ -529,6 +525,19 @@ def ParseFile(filePath : str, options : list) :
             "NodeTree": TLS().NodeTree,
             "NodeStack": TLS().NodeStack
         }
+
+#parse a header file
+def ParseFile(filePath : str, options : list) :
+    with open(filePath) as file:
+        for line in file.readlines() :
+            m = re.match(r"\s*\/\/\s*\$\[\[pycppgen-include\s+((?>\w|\W)*)\]\]", line, flags=re.MULTILINE|re.IGNORECASE)
+            if not m : continue
+            for g in m.groups() :
+                TLS().NodesToInclude += g.replace(" ", ";").replace(",", ";").split(";")
+
+    tu = CompileFile(filePath, options)
+
+    return ParseTranslationUnit(tu)
 
 #codegen: common type header 
 def CodeGenOutputMetaHeader(code, node) :
@@ -616,12 +625,12 @@ def CodeGenOutputAddFunctionDeclaration(declarations, node, funcNode, isStatic :
 
         if funcNode[ENodeReturnType] != "void" :
             #code '<return_type>& result, '
-            declarations[decl] += funcNode[ENodeReturnType] + "& result, "
+            declarations[decl] += f"{funcNode[ENodeReturnType]}& result, "
 
         paramNum = 1
         for _, pv in funcNode[ENodeParameters].items() :
             #code '_<param_num, '
-            declarations[decl] += pv[ENodeType] + " _" + str(paramNum) + ", "
+            declarations[decl] += f"{pv[ENodeType]} _{str(paramNum)}, "
             paramNum += 1
 
         #remove last ', ' and close parenthesis 
@@ -1354,10 +1363,22 @@ def IsOutputUpToDate(file : str) :
     return IsFileUpToDate(file, outputFile)
 
 def ProcessFile(file : str, compilerOptions) :
+    global OutdatedFiles
+
+    outdatedIncludedFile = False
+
+    # if the input or output files are newer than the cache, force re-parsing
     if not IsFileUpToDate(file, CacheFile) or not IsFileUpToDate(GetOutputFilePath(file), CacheFile) :
         PerFileData[file] = ParseFile(file, compilerOptions)
+    else : # check if any of the include files are dirty
+        tu = CompileFile(file, compilerOptions)
+        for f in tu.get_includes():
+            if IsFileUpToDate(file, f.include.name) : 
+                PerFileData[file] = ParseTranslationUnit(tu)
+                outdatedIncludedFile = True
+                break 
 
-    if IsOutputUpToDate(file) :
+    if outdatedIncludedFile == False and IsOutputUpToDate(file) :
         return    
 
     TLS().NodesToInclude = PerFileData[file]["NodesToInclude"]
@@ -1369,14 +1390,17 @@ def ProcessFile(file : str, compilerOptions) :
     CodeGen(file)
 
 def main(args : list) :
-    global FilesToParse, PerFileData, ProjectPath, CacheFile
+    global FilesToParse, PerFileData, ProjectPath, CacheFile, OutdatedFiles
 
     if len(args) < 1 :
         print("usage py main.py <directory> <options>")
         exit(-1)
 
+    OutdatedFiles = set()
     ProjectPath = str(pathlib.Path(args[0]).resolve())
     CacheFile = os.path.join(ProjectPath, "pycppgen.cache")
+
+    print("parsing path: " + ProjectPath)
 
     FilesToParse = []
     OldGenFiles = []
@@ -1400,6 +1424,7 @@ def main(args : list) :
     GenFiles = list(map(lambda x : str(pathlib.Path(GetOutputFilePath(x)).resolve()), FilesToParse))
     OldGenFiles = list(map(lambda x : str(pathlib.Path(x).resolve()), OldGenFiles))
 
+    #if the script is newer than the cache, remove all files as we need to rebuild everything
     if not IsFileUpToDate(inspect.getsourcefile(sys.modules[__name__]), CacheFile) :
         for file in OldGenFiles :
             if os.path.exists(file) :
@@ -1414,12 +1439,12 @@ def main(args : list) :
     for file in FilesToParse :
         if not IsOutputUpToDate(file) :
             print("Outdated file detected: " + file)
+            OutdatedFiles.add(file)
             allFilesUpToDate = False
 
     if allFilesUpToDate :
         return
     
-    print("parsing path: " + ProjectPath)
     PerFileData = {}
     
     #load cache
@@ -1430,6 +1455,7 @@ def main(args : list) :
             except :
                 PerFileData = {}
 
+    DebugMode = True
     if DebugMode :
         for file in FilesToParse :
             ProcessFile(file, compilerOptions)
