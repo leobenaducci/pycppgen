@@ -6,6 +6,7 @@
 #include "class.h"
 #include "struct.h"
 
+
 namespace TestNamespace
 {
     //$[[pycppgen]]

@@ -6,6 +6,7 @@ import re
 import inspect
 import itertools
 import threading
+import json
 from concurrent.futures import ThreadPoolExecutor
 from clang.cindex import CursorKind
 from clang.cindex import AccessSpecifier
@@ -36,7 +37,6 @@ ENodeMetaTemplateDecl = "meta_template_decl"
 ENodeReturnType = "return_type"
 ENodeAttributes = "attributes"
 ENodeDefaultValue = "default_value"
-ENodeCursor = "clang_cursor"
 
 EKindUnknown = "kind_unknown"
 EKindNamespace = "kind_namespace"
@@ -215,7 +215,6 @@ def PushNode(cursor, kind : str = EInvalid) :
     node[ENodeScope] = GetScope(cursor)
     node[ENodeAttributes] = ParseComments(cursor, kind)
     node[ENodeNamespace] = ""
-    node[ENodeCursor] = cursor
 
     ns_parent = cursor.semantic_parent
     while ns_parent and ns_parent.kind == CursorKind.NAMESPACE :
@@ -311,7 +310,7 @@ def ParseStruct(cursor) :
                         continue
                 elif not childFullName in TLS().NodesToInclude :
                     continue
-                AppendToStackTop({ENodeFullName: childFullName, ENodeCursor: child.referenced}, ENodeParents)
+                AppendToStackTop({ENodeFullName: childFullName}, ENodeParents)
             continue
 
         #template parameters
@@ -936,16 +935,6 @@ def CodeGenOutputNode(node) :
 
         hppCode = CodeGenOutputMetaFooter(hppCode, node)
 
-        cursor = node[ENodeCursor]
-        if cursor.kind == CursorKind.STRUCT_DECL or cursor.kind == CursorKind.CLASS_DECL or cursor.kind == CursorKind.CLASS_TEMPLATE or cursor.kind == CursorKind.CLASS_TEMPLATE_PARTIAL_SPECIALIZATION :
-            for c in cursor.get_children() :
-                if c.spelling == "_PYCPPGEN_STRUCT" :
-                    cppCode += "void " + node[ENodeFullName] + "::for_each_var(std::function<void(const member_variable_info&)> fn) const\n"
-                    cppCode += "{\n"
-                    cppCode += "\treturn pycppgen<std::decay_t<decltype(*this)>>::for_each_var(fn);\n"
-                    cppCode += "}\n"
-                    break
-        
     elif node[ENodeKind] == EKindEnum :
         hppCode += CodeGenOutputMetaHeader(hppCode, node)
 
@@ -1298,7 +1287,8 @@ def IsOutputUpToDate(file : str) :
     return IsFileUpToDate(file, outputFile)
 
 def ProcessFile(file : str, compilerOptions) :
-    PerFileData[file] = ParseFile(file, compilerOptions)
+    if not IsFileUpToDate(file, CacheFile) or not IsFileUpToDate(GetOutputFilePath(file), CacheFile) :
+        PerFileData[file] = ParseFile(file, compilerOptions)
 
     if IsOutputUpToDate(file) :
         return    
@@ -1312,13 +1302,14 @@ def ProcessFile(file : str, compilerOptions) :
     CodeGen(file)
 
 def main(args : list) :
-    global FilesToParse, PerFileData, ProjectPath
+    global FilesToParse, PerFileData, ProjectPath, CacheFile
 
     if len(args) < 1 :
         print("usage py main.py <directory> <options>")
         exit(-1)
 
     ProjectPath = str(pathlib.Path(args[0]).resolve())
+    CacheFile = os.path.join(ProjectPath, "pycppver.cache")
 
     FilesToParse = []
     OldGenFiles = []
@@ -1342,19 +1333,19 @@ def main(args : list) :
     GenFiles = list(map(lambda x : str(pathlib.Path(GetOutputFilePath(x)).resolve()), FilesToParse))
     OldGenFiles = list(map(lambda x : str(pathlib.Path(x).resolve()), OldGenFiles))
 
-    if not IsFileUpToDate(inspect.getsourcefile(sys.modules[__name__]), ProjectPath + "\\pycppgen.ver") :
+    if not IsFileUpToDate(inspect.getsourcefile(sys.modules[__name__]), os.path.join(ProjectPath, "pycppgen.ver")) :
         for file in OldGenFiles :
             if os.path.exists(file) :
                 os.remove(file)
         OldGenFiles = []
         err = ""
-        with open(ProjectPath + "\\pycppgen.ver", "wt", errors=err) as f :
+        with open(os.path.join(ProjectPath, "pycppgen.ver"), "wt", errors=err) as f :
             f.write("")
 
     FilesToRemove = list(set(OldGenFiles).difference(GenFiles))
     FilesToAdd = list(set(GenFiles).difference(OldGenFiles))
 
-    allFilesUpToDate = len(FilesToRemove) == 0 and len(FilesToAdd) == 0 and os.path.exists(ProjectPath + "\\pycppgen.gen.h")
+    allFilesUpToDate = len(FilesToRemove) == 0 and len(FilesToAdd) == 0 and os.path.exists(os.path.join(ProjectPath, "pycppgen.gen.h"))
     for file in FilesToParse :
         if not IsOutputUpToDate(file) :
             print("Outdated file detected: " + file)
@@ -1367,6 +1358,14 @@ def main(args : list) :
     print("parsing path: " + ProjectPath)
     PerFileData = {}
     
+    #load cache
+    if os.path.exists(CacheFile) :
+        with open(CacheFile, "rt") as file :
+            try :
+                PerFileData = json.loads(file.read())
+            except :
+                PerFileData = {}
+
     if DebugMode :
         for file in FilesToParse :
             ProcessFile(file, compilerOptions)
@@ -1374,6 +1373,14 @@ def main(args : list) :
         with ThreadPoolExecutor() as pool :
             for file in FilesToParse :
                 pool.submit(ProcessFile, file, compilerOptions)
+
+    #clear removed files from the cache
+    for file in FilesToRemove :
+        PerFileData[file] = {}
+
+    #save cache
+    with open(CacheFile, "wt") as file :
+        file.write(json.dumps(PerFileData))
 
     #clear data
     TLS().NodesToInclude = []
@@ -1385,8 +1392,8 @@ def main(args : list) :
         TLS().NodeList.update(v["NodeList"])
 
     print("global code gen step")
-    FilesToParse.append(args[0] + "\\pycppgen.h")
-    CodeGenGlobal(args[0])
+    FilesToParse.append(os.path.join(ProjectPath, "\\pycppgen.h"))
+    CodeGenGlobal(ProjectPath)
     
     #remove old files
     for file in FilesToRemove :

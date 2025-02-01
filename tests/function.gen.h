@@ -5,4 +5,6 @@
 
 namespace pycppgen_globals {
 //FuncA()
+//FuncB(int)
+//FuncC()
 }
