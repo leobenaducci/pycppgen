@@ -102,8 +102,9 @@ int main()
 	CObject* o = new CChild();
 
     printf("-> CObject* o = new CChild(); pycppgen<>::for_each_var(o, [](const member_variable_info& v, auto&& t)\n");
-    pycppgen<>::for_each_var(o, [](const member_variable_info& v, auto&& t)
+    pycppgen<>::for_each_var(o, [o](const member_variable_info& v, auto&& t)
         {
+            auto attribs = pycppgen_of(o).get_var_attributes(v.Name);
             printf("\t%s = %s\n", v.FullName.data(), std::to_string(t).c_str());
         }
     );

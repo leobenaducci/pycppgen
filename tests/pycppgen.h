@@ -37,7 +37,7 @@ struct member_function_info {
 	std::string Name;
 	std::string Declaration;
 	std::string ReturnType;
-    std::enable_if<!std::is_same_v<T, void>, T> Function = nullptr;
+    T Function = nullptr;
 	std::vector<function_parameter_info> Parameters;
 	std::map<std::string, std::string> Attributes;
 };
@@ -50,11 +50,11 @@ struct member_function_info<void> {
  	std::vector<function_parameter_info> Parameters;
 	std::map<std::string, std::string> Attributes;
 
-    member_function_info<void>() 
+    member_function_info() 
     {
     }
-    
-    template<typename T> member_function_info<void>(const member_function_info<T>& A)
+
+    template<typename T> member_function_info(const member_function_info<T>& A)
     {
 	    Name = A.Name;
 	    Declaration = A.Declaration;
@@ -63,7 +63,7 @@ struct member_function_info<void> {
 	    Attributes = A.Attributes;
     }
 
-    template<typename T> member_function_info<void> operator=(const member_function_info<T>& A)
+    template<typename T> member_function_info& operator=(const member_function_info<T>& A)
     {
 	    Name = A.Name;
 	    Declaration = A.Declaration;
@@ -80,9 +80,8 @@ template<> struct pycppgen<void>
 {
     pycppgen(std::string_view name);
     pycppgen(const std::type_info& info) : HashCode(info.hash_code()) {}
+    std::map<std::string, std::string> get_var_attributes(std::string_view name) const;
     void for_each_var(std::function<void(const member_variable_info&)> fn) const;
-    void for_each_var(const void* obj, auto fn) const;
-    void for_each_var(void* obj, auto fn) const;    
     template<typename T> static void for_each_var(const T* obj, auto fn);
     template<typename T> static void for_each_var(T* obj, auto fn);   
     template<typename T, typename R> static bool dump(T& result, const R* object); 

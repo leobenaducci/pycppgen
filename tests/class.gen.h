@@ -30,8 +30,9 @@ struct pycppgen<CObject::SSubObject> {
 	static void for_each_var(const CObject::SSubObject* obj, auto visitor) {
 	}
 
-	static std::map<std::string, std::string> get_member_attributes(std::string_view name) {
-		return {};
+	static std::map<std::string, std::string> get_var_attributes(std::string_view name) {
+		std::map<std::string, std::string> result;
+		return result;
 	}
 
 	static void for_each_static_var(std::function<void(std::string_view name)> fn) {
@@ -48,12 +49,12 @@ struct pycppgen<CObject::SSubObject> {
 	static void for_each_function(auto fn) {
 	}
 
-	static auto get_function_by_name(std::string_view name) {
-		member_function_info<void> result = {};
-		for_each_function([&](const auto& fn) {
-			if (fn.Name == name) result = fn; 
+	static bool find_function_by_name(std::string_view name, auto fn) {
+		bool result = false;
+		for_each_function([&](const auto& info) {
+			if (info.Name == name) { result = true; fn(info); } 
 		});
-		return result;
+	return result;
 	}
 
 	static constexpr bool has_function(std::string_view name) {
@@ -133,200 +134,151 @@ struct pycppgen<CObject> {
 		ProtectedUint_info_50.TotalSize = access_helper().ProtectedUint_TotalSize;
 		ProtectedUint_info_50.ArrayRank = access_helper().ProtectedUint_ArrayRank;
 		ProtectedUint_info_50.ArrayExtents = access_helper().ProtectedUint_ArrayExtents;
-		ProtectedUint_info_50.Attributes = {
-			{ "min", "3" },
-			{ "max", "15" },
-			{ "serialize", "" }
-			};
 		fn(ProtectedUint_info_50);
 
-		member_variable_info PublicShort_info_66;
-		PublicShort_info_66.Name = "PublicShort";
-		PublicShort_info_66.FullName = "CObject::PublicShort";
-		PublicShort_info_66.Type = access_helper().PublicShort_TypeName;
-		PublicShort_info_66.Offset = access_helper().PublicShort_Offset;
-		PublicShort_info_66.ElementSize = access_helper().PublicShort_ElementSize;
-		PublicShort_info_66.TotalSize = access_helper().PublicShort_TotalSize;
-		PublicShort_info_66.ArrayRank = access_helper().PublicShort_ArrayRank;
-		PublicShort_info_66.ArrayExtents = access_helper().PublicShort_ArrayExtents;
-		PublicShort_info_66.Attributes = {
-			{ "serialize", "" }
-			};
-		fn(PublicShort_info_66);
+		member_variable_info PublicShort_info_61;
+		PublicShort_info_61.Name = "PublicShort";
+		PublicShort_info_61.FullName = "CObject::PublicShort";
+		PublicShort_info_61.Type = access_helper().PublicShort_TypeName;
+		PublicShort_info_61.Offset = access_helper().PublicShort_Offset;
+		PublicShort_info_61.ElementSize = access_helper().PublicShort_ElementSize;
+		PublicShort_info_61.TotalSize = access_helper().PublicShort_TotalSize;
+		PublicShort_info_61.ArrayRank = access_helper().PublicShort_ArrayRank;
+		PublicShort_info_61.ArrayExtents = access_helper().PublicShort_ArrayExtents;
+		fn(PublicShort_info_61);
 
-		member_variable_info PublicCharArray_info_80;
-		PublicCharArray_info_80.Name = "PublicCharArray";
-		PublicCharArray_info_80.FullName = "CObject::PublicCharArray";
-		PublicCharArray_info_80.Type = access_helper().PublicCharArray_TypeName;
-		PublicCharArray_info_80.Offset = access_helper().PublicCharArray_Offset;
-		PublicCharArray_info_80.ElementSize = access_helper().PublicCharArray_ElementSize;
-		PublicCharArray_info_80.TotalSize = access_helper().PublicCharArray_TotalSize;
-		PublicCharArray_info_80.ArrayRank = access_helper().PublicCharArray_ArrayRank;
-		PublicCharArray_info_80.ArrayExtents = access_helper().PublicCharArray_ArrayExtents;
-		PublicCharArray_info_80.Attributes = {
-			{ "serialize", "" }
-			};
-		fn(PublicCharArray_info_80);
+		member_variable_info PublicCharArray_info_72;
+		PublicCharArray_info_72.Name = "PublicCharArray";
+		PublicCharArray_info_72.FullName = "CObject::PublicCharArray";
+		PublicCharArray_info_72.Type = access_helper().PublicCharArray_TypeName;
+		PublicCharArray_info_72.Offset = access_helper().PublicCharArray_Offset;
+		PublicCharArray_info_72.ElementSize = access_helper().PublicCharArray_ElementSize;
+		PublicCharArray_info_72.TotalSize = access_helper().PublicCharArray_TotalSize;
+		PublicCharArray_info_72.ArrayRank = access_helper().PublicCharArray_ArrayRank;
+		PublicCharArray_info_72.ArrayExtents = access_helper().PublicCharArray_ArrayExtents;
+		fn(PublicCharArray_info_72);
 
 	}
 
 	static void for_each_var_typed(auto fn) {
-		member_variable_info ProtectedUint_info_97;
-		ProtectedUint_info_97.Name = "ProtectedUint";
-		ProtectedUint_info_97.FullName = "CObject::ProtectedUint";
-		ProtectedUint_info_97.Type = access_helper().ProtectedUint_TypeName;
-		ProtectedUint_info_97.Offset = access_helper().ProtectedUint_Offset;
-		ProtectedUint_info_97.ElementSize = access_helper().ProtectedUint_ElementSize;
-		ProtectedUint_info_97.TotalSize = access_helper().ProtectedUint_TotalSize;
-		ProtectedUint_info_97.ArrayRank = access_helper().ProtectedUint_ArrayRank;
-		ProtectedUint_info_97.ArrayExtents = access_helper().ProtectedUint_ArrayExtents;
-		ProtectedUint_info_97.Attributes = {
-			{ "min", "3" },
-			{ "max", "15" },
-			{ "serialize", "" }
-			};
-		fn(ProtectedUint_info_97, access_helper().GetProtectedUintRef());
+		member_variable_info ProtectedUint_info_86;
+		ProtectedUint_info_86.Name = "ProtectedUint";
+		ProtectedUint_info_86.FullName = "CObject::ProtectedUint";
+		ProtectedUint_info_86.Type = access_helper().ProtectedUint_TypeName;
+		ProtectedUint_info_86.Offset = access_helper().ProtectedUint_Offset;
+		ProtectedUint_info_86.ElementSize = access_helper().ProtectedUint_ElementSize;
+		ProtectedUint_info_86.TotalSize = access_helper().ProtectedUint_TotalSize;
+		ProtectedUint_info_86.ArrayRank = access_helper().ProtectedUint_ArrayRank;
+		ProtectedUint_info_86.ArrayExtents = access_helper().ProtectedUint_ArrayExtents;
+		fn(ProtectedUint_info_86, access_helper().GetProtectedUintRef());
 
-		member_variable_info PublicShort_info_113;
-		PublicShort_info_113.Name = "PublicShort";
-		PublicShort_info_113.FullName = "CObject::PublicShort";
-		PublicShort_info_113.Type = access_helper().PublicShort_TypeName;
-		PublicShort_info_113.Offset = access_helper().PublicShort_Offset;
-		PublicShort_info_113.ElementSize = access_helper().PublicShort_ElementSize;
-		PublicShort_info_113.TotalSize = access_helper().PublicShort_TotalSize;
-		PublicShort_info_113.ArrayRank = access_helper().PublicShort_ArrayRank;
-		PublicShort_info_113.ArrayExtents = access_helper().PublicShort_ArrayExtents;
-		PublicShort_info_113.Attributes = {
-			{ "serialize", "" }
-			};
-		fn(PublicShort_info_113, access_helper().GetPublicShortRef());
+		member_variable_info PublicShort_info_97;
+		PublicShort_info_97.Name = "PublicShort";
+		PublicShort_info_97.FullName = "CObject::PublicShort";
+		PublicShort_info_97.Type = access_helper().PublicShort_TypeName;
+		PublicShort_info_97.Offset = access_helper().PublicShort_Offset;
+		PublicShort_info_97.ElementSize = access_helper().PublicShort_ElementSize;
+		PublicShort_info_97.TotalSize = access_helper().PublicShort_TotalSize;
+		PublicShort_info_97.ArrayRank = access_helper().PublicShort_ArrayRank;
+		PublicShort_info_97.ArrayExtents = access_helper().PublicShort_ArrayExtents;
+		fn(PublicShort_info_97, access_helper().GetPublicShortRef());
 
-		member_variable_info PublicCharArray_info_127;
-		PublicCharArray_info_127.Name = "PublicCharArray";
-		PublicCharArray_info_127.FullName = "CObject::PublicCharArray";
-		PublicCharArray_info_127.Type = access_helper().PublicCharArray_TypeName;
-		PublicCharArray_info_127.Offset = access_helper().PublicCharArray_Offset;
-		PublicCharArray_info_127.ElementSize = access_helper().PublicCharArray_ElementSize;
-		PublicCharArray_info_127.TotalSize = access_helper().PublicCharArray_TotalSize;
-		PublicCharArray_info_127.ArrayRank = access_helper().PublicCharArray_ArrayRank;
-		PublicCharArray_info_127.ArrayExtents = access_helper().PublicCharArray_ArrayExtents;
-		PublicCharArray_info_127.Attributes = {
-			{ "serialize", "" }
-			};
-		fn(PublicCharArray_info_127, access_helper().GetPublicCharArrayRef());
+		member_variable_info PublicCharArray_info_108;
+		PublicCharArray_info_108.Name = "PublicCharArray";
+		PublicCharArray_info_108.FullName = "CObject::PublicCharArray";
+		PublicCharArray_info_108.Type = access_helper().PublicCharArray_TypeName;
+		PublicCharArray_info_108.Offset = access_helper().PublicCharArray_Offset;
+		PublicCharArray_info_108.ElementSize = access_helper().PublicCharArray_ElementSize;
+		PublicCharArray_info_108.TotalSize = access_helper().PublicCharArray_TotalSize;
+		PublicCharArray_info_108.ArrayRank = access_helper().PublicCharArray_ArrayRank;
+		PublicCharArray_info_108.ArrayExtents = access_helper().PublicCharArray_ArrayExtents;
+		fn(PublicCharArray_info_108, access_helper().GetPublicCharArrayRef());
 
 	}
 
 	static void for_each_var(CObject* obj, auto visitor) {
-		member_variable_info ProtectedUint_info_144;
-		ProtectedUint_info_144.Name = "ProtectedUint";
-		ProtectedUint_info_144.FullName = "CObject::ProtectedUint";
-		ProtectedUint_info_144.Type = access_helper().ProtectedUint_TypeName;
-		ProtectedUint_info_144.Offset = access_helper().ProtectedUint_Offset;
-		ProtectedUint_info_144.ElementSize = access_helper().ProtectedUint_ElementSize;
-		ProtectedUint_info_144.TotalSize = access_helper().ProtectedUint_TotalSize;
-		ProtectedUint_info_144.ArrayRank = access_helper().ProtectedUint_ArrayRank;
-		ProtectedUint_info_144.ArrayExtents = access_helper().ProtectedUint_ArrayExtents;
-		ProtectedUint_info_144.Attributes = {
-			{ "min", "3" },
-			{ "max", "15" },
-			{ "serialize", "" }
-			};
-		visitor(ProtectedUint_info_144, ((access_helper*)obj)->GetProtectedUintRef());
-		member_variable_info PublicShort_info_159;
-		PublicShort_info_159.Name = "PublicShort";
-		PublicShort_info_159.FullName = "CObject::PublicShort";
-		PublicShort_info_159.Type = access_helper().PublicShort_TypeName;
-		PublicShort_info_159.Offset = access_helper().PublicShort_Offset;
-		PublicShort_info_159.ElementSize = access_helper().PublicShort_ElementSize;
-		PublicShort_info_159.TotalSize = access_helper().PublicShort_TotalSize;
-		PublicShort_info_159.ArrayRank = access_helper().PublicShort_ArrayRank;
-		PublicShort_info_159.ArrayExtents = access_helper().PublicShort_ArrayExtents;
-		PublicShort_info_159.Attributes = {
-			{ "serialize", "" }
-			};
-		visitor(PublicShort_info_159, ((access_helper*)obj)->GetPublicShortRef());
-		member_variable_info PublicCharArray_info_172;
-		PublicCharArray_info_172.Name = "PublicCharArray";
-		PublicCharArray_info_172.FullName = "CObject::PublicCharArray";
-		PublicCharArray_info_172.Type = access_helper().PublicCharArray_TypeName;
-		PublicCharArray_info_172.Offset = access_helper().PublicCharArray_Offset;
-		PublicCharArray_info_172.ElementSize = access_helper().PublicCharArray_ElementSize;
-		PublicCharArray_info_172.TotalSize = access_helper().PublicCharArray_TotalSize;
-		PublicCharArray_info_172.ArrayRank = access_helper().PublicCharArray_ArrayRank;
-		PublicCharArray_info_172.ArrayExtents = access_helper().PublicCharArray_ArrayExtents;
-		PublicCharArray_info_172.Attributes = {
-			{ "serialize", "" }
-			};
-		visitor(PublicCharArray_info_172, ((access_helper*)obj)->GetPublicCharArrayRef());
+		member_variable_info ProtectedUint_info_122;
+		ProtectedUint_info_122.Name = "ProtectedUint";
+		ProtectedUint_info_122.FullName = "CObject::ProtectedUint";
+		ProtectedUint_info_122.Type = access_helper().ProtectedUint_TypeName;
+		ProtectedUint_info_122.Offset = access_helper().ProtectedUint_Offset;
+		ProtectedUint_info_122.ElementSize = access_helper().ProtectedUint_ElementSize;
+		ProtectedUint_info_122.TotalSize = access_helper().ProtectedUint_TotalSize;
+		ProtectedUint_info_122.ArrayRank = access_helper().ProtectedUint_ArrayRank;
+		ProtectedUint_info_122.ArrayExtents = access_helper().ProtectedUint_ArrayExtents;
+		visitor(ProtectedUint_info_122, ((access_helper*)obj)->GetProtectedUintRef());
+		member_variable_info PublicShort_info_132;
+		PublicShort_info_132.Name = "PublicShort";
+		PublicShort_info_132.FullName = "CObject::PublicShort";
+		PublicShort_info_132.Type = access_helper().PublicShort_TypeName;
+		PublicShort_info_132.Offset = access_helper().PublicShort_Offset;
+		PublicShort_info_132.ElementSize = access_helper().PublicShort_ElementSize;
+		PublicShort_info_132.TotalSize = access_helper().PublicShort_TotalSize;
+		PublicShort_info_132.ArrayRank = access_helper().PublicShort_ArrayRank;
+		PublicShort_info_132.ArrayExtents = access_helper().PublicShort_ArrayExtents;
+		visitor(PublicShort_info_132, ((access_helper*)obj)->GetPublicShortRef());
+		member_variable_info PublicCharArray_info_142;
+		PublicCharArray_info_142.Name = "PublicCharArray";
+		PublicCharArray_info_142.FullName = "CObject::PublicCharArray";
+		PublicCharArray_info_142.Type = access_helper().PublicCharArray_TypeName;
+		PublicCharArray_info_142.Offset = access_helper().PublicCharArray_Offset;
+		PublicCharArray_info_142.ElementSize = access_helper().PublicCharArray_ElementSize;
+		PublicCharArray_info_142.TotalSize = access_helper().PublicCharArray_TotalSize;
+		PublicCharArray_info_142.ArrayRank = access_helper().PublicCharArray_ArrayRank;
+		PublicCharArray_info_142.ArrayExtents = access_helper().PublicCharArray_ArrayExtents;
+		visitor(PublicCharArray_info_142, ((access_helper*)obj)->GetPublicCharArrayRef());
 	}
 
 	static void for_each_var(const CObject* obj, auto visitor) {
-		member_variable_info ProtectedUint_info_188;
-		ProtectedUint_info_188.Name = "ProtectedUint";
-		ProtectedUint_info_188.FullName = "CObject::ProtectedUint";
-		ProtectedUint_info_188.Type = access_helper().ProtectedUint_TypeName;
-		ProtectedUint_info_188.Offset = access_helper().ProtectedUint_Offset;
-		ProtectedUint_info_188.ElementSize = access_helper().ProtectedUint_ElementSize;
-		ProtectedUint_info_188.TotalSize = access_helper().ProtectedUint_TotalSize;
-		ProtectedUint_info_188.ArrayRank = access_helper().ProtectedUint_ArrayRank;
-		ProtectedUint_info_188.ArrayExtents = access_helper().ProtectedUint_ArrayExtents;
-		ProtectedUint_info_188.Attributes = {
-			{ "min", "3" },
-			{ "max", "15" },
-			{ "serialize", "" }
-			};
-		visitor(ProtectedUint_info_188, ((access_helper*)obj)->GetProtectedUintRef());
-		member_variable_info PublicShort_info_203;
-		PublicShort_info_203.Name = "PublicShort";
-		PublicShort_info_203.FullName = "CObject::PublicShort";
-		PublicShort_info_203.Type = access_helper().PublicShort_TypeName;
-		PublicShort_info_203.Offset = access_helper().PublicShort_Offset;
-		PublicShort_info_203.ElementSize = access_helper().PublicShort_ElementSize;
-		PublicShort_info_203.TotalSize = access_helper().PublicShort_TotalSize;
-		PublicShort_info_203.ArrayRank = access_helper().PublicShort_ArrayRank;
-		PublicShort_info_203.ArrayExtents = access_helper().PublicShort_ArrayExtents;
-		PublicShort_info_203.Attributes = {
-			{ "serialize", "" }
-			};
-		visitor(PublicShort_info_203, ((access_helper*)obj)->GetPublicShortRef());
-		member_variable_info PublicCharArray_info_216;
-		PublicCharArray_info_216.Name = "PublicCharArray";
-		PublicCharArray_info_216.FullName = "CObject::PublicCharArray";
-		PublicCharArray_info_216.Type = access_helper().PublicCharArray_TypeName;
-		PublicCharArray_info_216.Offset = access_helper().PublicCharArray_Offset;
-		PublicCharArray_info_216.ElementSize = access_helper().PublicCharArray_ElementSize;
-		PublicCharArray_info_216.TotalSize = access_helper().PublicCharArray_TotalSize;
-		PublicCharArray_info_216.ArrayRank = access_helper().PublicCharArray_ArrayRank;
-		PublicCharArray_info_216.ArrayExtents = access_helper().PublicCharArray_ArrayExtents;
-		PublicCharArray_info_216.Attributes = {
-			{ "serialize", "" }
-			};
-		visitor(PublicCharArray_info_216, ((access_helper*)obj)->GetPublicCharArrayRef());
+		member_variable_info ProtectedUint_info_155;
+		ProtectedUint_info_155.Name = "ProtectedUint";
+		ProtectedUint_info_155.FullName = "CObject::ProtectedUint";
+		ProtectedUint_info_155.Type = access_helper().ProtectedUint_TypeName;
+		ProtectedUint_info_155.Offset = access_helper().ProtectedUint_Offset;
+		ProtectedUint_info_155.ElementSize = access_helper().ProtectedUint_ElementSize;
+		ProtectedUint_info_155.TotalSize = access_helper().ProtectedUint_TotalSize;
+		ProtectedUint_info_155.ArrayRank = access_helper().ProtectedUint_ArrayRank;
+		ProtectedUint_info_155.ArrayExtents = access_helper().ProtectedUint_ArrayExtents;
+		visitor(ProtectedUint_info_155, ((access_helper*)obj)->GetProtectedUintRef());
+		member_variable_info PublicShort_info_165;
+		PublicShort_info_165.Name = "PublicShort";
+		PublicShort_info_165.FullName = "CObject::PublicShort";
+		PublicShort_info_165.Type = access_helper().PublicShort_TypeName;
+		PublicShort_info_165.Offset = access_helper().PublicShort_Offset;
+		PublicShort_info_165.ElementSize = access_helper().PublicShort_ElementSize;
+		PublicShort_info_165.TotalSize = access_helper().PublicShort_TotalSize;
+		PublicShort_info_165.ArrayRank = access_helper().PublicShort_ArrayRank;
+		PublicShort_info_165.ArrayExtents = access_helper().PublicShort_ArrayExtents;
+		visitor(PublicShort_info_165, ((access_helper*)obj)->GetPublicShortRef());
+		member_variable_info PublicCharArray_info_175;
+		PublicCharArray_info_175.Name = "PublicCharArray";
+		PublicCharArray_info_175.FullName = "CObject::PublicCharArray";
+		PublicCharArray_info_175.Type = access_helper().PublicCharArray_TypeName;
+		PublicCharArray_info_175.Offset = access_helper().PublicCharArray_Offset;
+		PublicCharArray_info_175.ElementSize = access_helper().PublicCharArray_ElementSize;
+		PublicCharArray_info_175.TotalSize = access_helper().PublicCharArray_TotalSize;
+		PublicCharArray_info_175.ArrayRank = access_helper().PublicCharArray_ArrayRank;
+		PublicCharArray_info_175.ArrayExtents = access_helper().PublicCharArray_ArrayExtents;
+		visitor(PublicCharArray_info_175, ((access_helper*)obj)->GetPublicCharArrayRef());
 	}
 
-	static std::map<std::string, std::string> get_member_attributes(std::string_view name) {
+	static std::map<std::string, std::string> get_var_attributes(std::string_view name) {
+		std::map<std::string, std::string> result;
 		if (name == "ProtectedUint")
-		{
-			return {
+			 result = {
 				{ "min", "3" },
 				{ "max", "15" },
 				{ "serialize", "" }
 				};
-		}
 		if (name == "PublicShort")
-		{
-			return {
+			 result = {
 				{ "serialize", "" }
 				};
-		}
 		if (name == "PublicCharArray")
-		{
-			return {
+			 result = {
 				{ "serialize", "" }
 				};
-		}
-		return {};
+		return result;
 	}
 
 	static void for_each_static_var(std::function<void(std::string_view name)> fn) {
@@ -347,62 +299,62 @@ struct pycppgen<CObject> {
 	}
 
 	static void for_each_function(auto fn) {
-		member_function_info<decltype(&CObject::Func)> Func_info_273;
-		Func_info_273.Name = "Func";
-		Func_info_273.Declaration = "void ()";
-		Func_info_273.Attributes = {
+		member_function_info<decltype(&CObject::Func)> Func_info_224;
+		Func_info_224.Name = "Func";
+		Func_info_224.Declaration = "void ()";
+		Func_info_224.Attributes = {
 				{ "callable", "" }
 				};
-		Func_info_273.ReturnType = "void";
-		Func_info_273.Function = &CObject::Func;
+		Func_info_224.ReturnType = "void";
+		Func_info_224.Function = &CObject::Func;
 		//parameters
 		{
 		}
-		fn(infoName);
-		member_function_info<decltype(&CObject::Add)> Add_info_285;
-		Add_info_285.Name = "Add";
-		Add_info_285.Declaration = "float (float, double)";
-		Add_info_285.Attributes = {
+		fn(Func_info_224);
+		member_function_info<decltype(&CObject::Add)> Add_info_236;
+		Add_info_236.Name = "Add";
+		Add_info_236.Declaration = "float (float, double)";
+		Add_info_236.Attributes = {
 				{ "callable", "" }
 				};
-		Add_info_285.ReturnType = "float";
-		Add_info_285.Function = &CObject::Add;
+		Add_info_236.ReturnType = "float";
+		Add_info_236.Function = &CObject::Add;
 		//parameters
 		{
-			function_parameter_info A_info_295;
-			A_info_295.Name = "A";
-			A_info_295.Type = "float";
-			A_info_295.DefaultValue = "";
-			A_info_295.Attributes = {};
-			Add_info_285.Parameters.push_back(A_info_295);
-			function_parameter_info B_info_301;
-			B_info_301.Name = "B";
-			B_info_301.Type = "double";
-			B_info_301.DefaultValue = "";
-			B_info_301.Attributes = {};
-			Add_info_285.Parameters.push_back(B_info_301);
+			function_parameter_info A_info_246;
+			A_info_246.Name = "A";
+			A_info_246.Type = "float";
+			A_info_246.DefaultValue = "";
+			A_info_246.Attributes = {};
+			Add_info_236.Parameters.push_back(A_info_246);
+			function_parameter_info B_info_252;
+			B_info_252.Name = "B";
+			B_info_252.Type = "double";
+			B_info_252.DefaultValue = "";
+			B_info_252.Attributes = {};
+			Add_info_236.Parameters.push_back(B_info_252);
 		}
-		fn(infoName);
-		member_function_info<decltype(&CObject::Get)> Get_info_309;
-		Get_info_309.Name = "Get";
-		Get_info_309.Declaration = "short () const";
-		Get_info_309.Attributes = {
+		fn(Add_info_236);
+		member_function_info<decltype(&CObject::Get)> Get_info_260;
+		Get_info_260.Name = "Get";
+		Get_info_260.Declaration = "short () const";
+		Get_info_260.Attributes = {
 				{ "pure", "" }
 				};
-		Get_info_309.ReturnType = "short";
-		Get_info_309.Function = &CObject::Get;
+		Get_info_260.ReturnType = "short";
+		Get_info_260.Function = &CObject::Get;
 		//parameters
 		{
 		}
-		fn(infoName);
+		fn(Get_info_260);
 	}
 
-	static auto get_function_by_name(std::string_view name) {
-		member_function_info<void> result = {};
-		for_each_function([&](const auto& fn) {
-			if (fn.Name == name) result = fn; 
+	static bool find_function_by_name(std::string_view name, auto fn) {
+		bool result = false;
+		for_each_function([&](const auto& info) {
+			if (info.Name == name) { result = true; fn(info); } 
 		});
-		return result;
+	return result;
 	}
 
 	static constexpr bool has_function(std::string_view name) {
@@ -494,9 +446,6 @@ struct pycppgen<CChild> {
 		Matrix_info_35.TotalSize = access_helper().Matrix_TotalSize;
 		Matrix_info_35.ArrayRank = access_helper().Matrix_ArrayRank;
 		Matrix_info_35.ArrayExtents = access_helper().Matrix_ArrayExtents;
-		Matrix_info_35.Attributes = {
-			{ "serialize", "" }
-			};
 		fn(Matrix_info_35);
 
 	}
@@ -504,72 +453,66 @@ struct pycppgen<CChild> {
 	static void for_each_var_typed(auto fn) {
 		pycppgen<CObject>::for_each_var_typed(fn);
 
-		member_variable_info Matrix_info_54;
-		Matrix_info_54.Name = "Matrix";
-		Matrix_info_54.FullName = "CChild::Matrix";
-		Matrix_info_54.Type = access_helper().Matrix_TypeName;
-		Matrix_info_54.Offset = access_helper().Matrix_Offset;
-		Matrix_info_54.ElementSize = access_helper().Matrix_ElementSize;
-		Matrix_info_54.TotalSize = access_helper().Matrix_TotalSize;
-		Matrix_info_54.ArrayRank = access_helper().Matrix_ArrayRank;
-		Matrix_info_54.ArrayExtents = access_helper().Matrix_ArrayExtents;
-		Matrix_info_54.Attributes = {
-			{ "serialize", "" }
-			};
-		fn(Matrix_info_54, access_helper().GetMatrixRef());
+		member_variable_info Matrix_info_51;
+		Matrix_info_51.Name = "Matrix";
+		Matrix_info_51.FullName = "CChild::Matrix";
+		Matrix_info_51.Type = access_helper().Matrix_TypeName;
+		Matrix_info_51.Offset = access_helper().Matrix_Offset;
+		Matrix_info_51.ElementSize = access_helper().Matrix_ElementSize;
+		Matrix_info_51.TotalSize = access_helper().Matrix_TotalSize;
+		Matrix_info_51.ArrayRank = access_helper().Matrix_ArrayRank;
+		Matrix_info_51.ArrayExtents = access_helper().Matrix_ArrayExtents;
+		fn(Matrix_info_51, access_helper().GetMatrixRef());
 
 	}
 
 	static void for_each_var(CChild* obj, auto visitor) {
 		pycppgen<CObject>::for_each_var(obj, visitor);
 
-		member_variable_info Matrix_info_73;
-		Matrix_info_73.Name = "Matrix";
-		Matrix_info_73.FullName = "CChild::Matrix";
-		Matrix_info_73.Type = access_helper().Matrix_TypeName;
-		Matrix_info_73.Offset = access_helper().Matrix_Offset;
-		Matrix_info_73.ElementSize = access_helper().Matrix_ElementSize;
-		Matrix_info_73.TotalSize = access_helper().Matrix_TotalSize;
-		Matrix_info_73.ArrayRank = access_helper().Matrix_ArrayRank;
-		Matrix_info_73.ArrayExtents = access_helper().Matrix_ArrayExtents;
-		Matrix_info_73.Attributes = {
-			{ "serialize", "" }
-			};
-		visitor(Matrix_info_73, ((access_helper*)obj)->GetMatrixRef());
+		member_variable_info Matrix_info_67;
+		Matrix_info_67.Name = "Matrix";
+		Matrix_info_67.FullName = "CChild::Matrix";
+		Matrix_info_67.Type = access_helper().Matrix_TypeName;
+		Matrix_info_67.Offset = access_helper().Matrix_Offset;
+		Matrix_info_67.ElementSize = access_helper().Matrix_ElementSize;
+		Matrix_info_67.TotalSize = access_helper().Matrix_TotalSize;
+		Matrix_info_67.ArrayRank = access_helper().Matrix_ArrayRank;
+		Matrix_info_67.ArrayExtents = access_helper().Matrix_ArrayExtents;
+		visitor(Matrix_info_67, ((access_helper*)obj)->GetMatrixRef());
 	}
 
 	static void for_each_var(const CChild* obj, auto visitor) {
 		pycppgen<CObject>::for_each_var(obj, visitor);
 
-		member_variable_info Matrix_info_91;
-		Matrix_info_91.Name = "Matrix";
-		Matrix_info_91.FullName = "CChild::Matrix";
-		Matrix_info_91.Type = access_helper().Matrix_TypeName;
-		Matrix_info_91.Offset = access_helper().Matrix_Offset;
-		Matrix_info_91.ElementSize = access_helper().Matrix_ElementSize;
-		Matrix_info_91.TotalSize = access_helper().Matrix_TotalSize;
-		Matrix_info_91.ArrayRank = access_helper().Matrix_ArrayRank;
-		Matrix_info_91.ArrayExtents = access_helper().Matrix_ArrayExtents;
-		Matrix_info_91.Attributes = {
-			{ "serialize", "" }
-			};
-		visitor(Matrix_info_91, ((access_helper*)obj)->GetMatrixRef());
+		member_variable_info Matrix_info_82;
+		Matrix_info_82.Name = "Matrix";
+		Matrix_info_82.FullName = "CChild::Matrix";
+		Matrix_info_82.Type = access_helper().Matrix_TypeName;
+		Matrix_info_82.Offset = access_helper().Matrix_Offset;
+		Matrix_info_82.ElementSize = access_helper().Matrix_ElementSize;
+		Matrix_info_82.TotalSize = access_helper().Matrix_TotalSize;
+		Matrix_info_82.ArrayRank = access_helper().Matrix_ArrayRank;
+		Matrix_info_82.ArrayExtents = access_helper().Matrix_ArrayExtents;
+		visitor(Matrix_info_82, ((access_helper*)obj)->GetMatrixRef());
 	}
 
-	static std::map<std::string, std::string> get_member_attributes(std::string_view name) {
+	static std::map<std::string, std::string> get_var_attributes(std::string_view name) {
+		std::map<std::string, std::string> result;
 		if (name == "Matrix")
-		{
-			return {
+			 result = {
 				{ "serialize", "" }
 				};
-		}
 
+		if (result.empty())
+			result = pycppgen<CObject>::get_var_attributes(name);
+
+		//overrides
+		if (name == "ProtectedUint")
 		{
-			const auto m = pycppgen<CObject>::get_member_attributes(name);
-			if (!m.empty()) return m;
+			result["min"] = "1";
+			result["include"] = "True";
 		}
-
-		return {};
+		return result;
 	}
 
 	static void for_each_static_var(std::function<void(std::string_view name)> fn) {
@@ -589,26 +532,26 @@ struct pycppgen<CChild> {
 
 	static void for_each_function(auto fn) {
 		pycppgen<CObject>::for_each_function(fn);
-		member_function_info<decltype(&CChild::DoSomething)> DoSomething_info_139;
-		DoSomething_info_139.Name = "DoSomething";
-		DoSomething_info_139.Declaration = "void ()";
-		DoSomething_info_139.Attributes = {
+		member_function_info<decltype(&CChild::DoSomething)> DoSomething_info_130;
+		DoSomething_info_130.Name = "DoSomething";
+		DoSomething_info_130.Declaration = "void ()";
+		DoSomething_info_130.Attributes = {
 
 				};
-		DoSomething_info_139.ReturnType = "void";
-		DoSomething_info_139.Function = &CChild::DoSomething;
+		DoSomething_info_130.ReturnType = "void";
+		DoSomething_info_130.Function = &CChild::DoSomething;
 		//parameters
 		{
 		}
-		fn(infoName);
+		fn(DoSomething_info_130);
 	}
 
-	static auto get_function_by_name(std::string_view name) {
-		member_function_info<void> result = {};
-		for_each_function([&](const auto& fn) {
-			if (fn.Name == name) result = fn; 
+	static bool find_function_by_name(std::string_view name, auto fn) {
+		bool result = false;
+		for_each_function([&](const auto& info) {
+			if (info.Name == name) { result = true; fn(info); } 
 		});
-		return result;
+	return result;
 	}
 
 	static constexpr bool has_function(std::string_view name) {

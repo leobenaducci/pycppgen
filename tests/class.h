@@ -70,5 +70,8 @@ public:
 
     //$[[pycppgen serialize]]
     std::array<float, 16> Matrix;
+
+    //$[[pycppgen min=1]]
+    using CObject::ProtectedUint;
 };
 

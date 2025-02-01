@@ -61,205 +61,152 @@ struct pycppgen<SStructTest> {
 		x_info_49.TotalSize = access_helper().x_TotalSize;
 		x_info_49.ArrayRank = access_helper().x_ArrayRank;
 		x_info_49.ArrayExtents = access_helper().x_ArrayExtents;
-		x_info_49.Attributes = {
-			{ "visible", "" },
-			{ "serialize", "" }
-			};
 		fn(x_info_49);
 
-		member_variable_info y_info_64;
-		y_info_64.Name = "y";
-		y_info_64.FullName = "SStructTest::y";
-		y_info_64.Type = access_helper().y_TypeName;
-		y_info_64.Offset = access_helper().y_Offset;
-		y_info_64.ElementSize = access_helper().y_ElementSize;
-		y_info_64.TotalSize = access_helper().y_TotalSize;
-		y_info_64.ArrayRank = access_helper().y_ArrayRank;
-		y_info_64.ArrayExtents = access_helper().y_ArrayExtents;
-		y_info_64.Attributes = {
-			{ "visible", "" },
-			{ "serialize", "" }
-			};
-		fn(y_info_64);
+		member_variable_info y_info_60;
+		y_info_60.Name = "y";
+		y_info_60.FullName = "SStructTest::y";
+		y_info_60.Type = access_helper().y_TypeName;
+		y_info_60.Offset = access_helper().y_Offset;
+		y_info_60.ElementSize = access_helper().y_ElementSize;
+		y_info_60.TotalSize = access_helper().y_TotalSize;
+		y_info_60.ArrayRank = access_helper().y_ArrayRank;
+		y_info_60.ArrayExtents = access_helper().y_ArrayExtents;
+		fn(y_info_60);
 
-		member_variable_info z_info_79;
-		z_info_79.Name = "z";
-		z_info_79.FullName = "SStructTest::z";
-		z_info_79.Type = access_helper().z_TypeName;
-		z_info_79.Offset = access_helper().z_Offset;
-		z_info_79.ElementSize = access_helper().z_ElementSize;
-		z_info_79.TotalSize = access_helper().z_TotalSize;
-		z_info_79.ArrayRank = access_helper().z_ArrayRank;
-		z_info_79.ArrayExtents = access_helper().z_ArrayExtents;
-		z_info_79.Attributes = {
-			{ "visible", "" },
-			{ "serialize", "" }
-			};
-		fn(z_info_79);
+		member_variable_info z_info_71;
+		z_info_71.Name = "z";
+		z_info_71.FullName = "SStructTest::z";
+		z_info_71.Type = access_helper().z_TypeName;
+		z_info_71.Offset = access_helper().z_Offset;
+		z_info_71.ElementSize = access_helper().z_ElementSize;
+		z_info_71.TotalSize = access_helper().z_TotalSize;
+		z_info_71.ArrayRank = access_helper().z_ArrayRank;
+		z_info_71.ArrayExtents = access_helper().z_ArrayExtents;
+		fn(z_info_71);
 
 	}
 
 	static void for_each_var_typed(auto fn) {
-		member_variable_info x_info_97;
-		x_info_97.Name = "x";
-		x_info_97.FullName = "SStructTest::x";
-		x_info_97.Type = access_helper().x_TypeName;
-		x_info_97.Offset = access_helper().x_Offset;
-		x_info_97.ElementSize = access_helper().x_ElementSize;
-		x_info_97.TotalSize = access_helper().x_TotalSize;
-		x_info_97.ArrayRank = access_helper().x_ArrayRank;
-		x_info_97.ArrayExtents = access_helper().x_ArrayExtents;
-		x_info_97.Attributes = {
-			{ "visible", "" },
-			{ "serialize", "" }
-			};
-		fn(x_info_97, access_helper().GetxRef());
+		member_variable_info x_info_85;
+		x_info_85.Name = "x";
+		x_info_85.FullName = "SStructTest::x";
+		x_info_85.Type = access_helper().x_TypeName;
+		x_info_85.Offset = access_helper().x_Offset;
+		x_info_85.ElementSize = access_helper().x_ElementSize;
+		x_info_85.TotalSize = access_helper().x_TotalSize;
+		x_info_85.ArrayRank = access_helper().x_ArrayRank;
+		x_info_85.ArrayExtents = access_helper().x_ArrayExtents;
+		fn(x_info_85, access_helper().GetxRef());
 
-		member_variable_info y_info_112;
-		y_info_112.Name = "y";
-		y_info_112.FullName = "SStructTest::y";
-		y_info_112.Type = access_helper().y_TypeName;
-		y_info_112.Offset = access_helper().y_Offset;
-		y_info_112.ElementSize = access_helper().y_ElementSize;
-		y_info_112.TotalSize = access_helper().y_TotalSize;
-		y_info_112.ArrayRank = access_helper().y_ArrayRank;
-		y_info_112.ArrayExtents = access_helper().y_ArrayExtents;
-		y_info_112.Attributes = {
-			{ "visible", "" },
-			{ "serialize", "" }
-			};
-		fn(y_info_112, access_helper().GetyRef());
+		member_variable_info y_info_96;
+		y_info_96.Name = "y";
+		y_info_96.FullName = "SStructTest::y";
+		y_info_96.Type = access_helper().y_TypeName;
+		y_info_96.Offset = access_helper().y_Offset;
+		y_info_96.ElementSize = access_helper().y_ElementSize;
+		y_info_96.TotalSize = access_helper().y_TotalSize;
+		y_info_96.ArrayRank = access_helper().y_ArrayRank;
+		y_info_96.ArrayExtents = access_helper().y_ArrayExtents;
+		fn(y_info_96, access_helper().GetyRef());
 
-		member_variable_info z_info_127;
-		z_info_127.Name = "z";
-		z_info_127.FullName = "SStructTest::z";
-		z_info_127.Type = access_helper().z_TypeName;
-		z_info_127.Offset = access_helper().z_Offset;
-		z_info_127.ElementSize = access_helper().z_ElementSize;
-		z_info_127.TotalSize = access_helper().z_TotalSize;
-		z_info_127.ArrayRank = access_helper().z_ArrayRank;
-		z_info_127.ArrayExtents = access_helper().z_ArrayExtents;
-		z_info_127.Attributes = {
-			{ "visible", "" },
-			{ "serialize", "" }
-			};
-		fn(z_info_127, access_helper().GetzRef());
+		member_variable_info z_info_107;
+		z_info_107.Name = "z";
+		z_info_107.FullName = "SStructTest::z";
+		z_info_107.Type = access_helper().z_TypeName;
+		z_info_107.Offset = access_helper().z_Offset;
+		z_info_107.ElementSize = access_helper().z_ElementSize;
+		z_info_107.TotalSize = access_helper().z_TotalSize;
+		z_info_107.ArrayRank = access_helper().z_ArrayRank;
+		z_info_107.ArrayExtents = access_helper().z_ArrayExtents;
+		fn(z_info_107, access_helper().GetzRef());
 
 	}
 
 	static void for_each_var(SStructTest* obj, auto visitor) {
-		member_variable_info x_info_145;
-		x_info_145.Name = "x";
-		x_info_145.FullName = "SStructTest::x";
-		x_info_145.Type = access_helper().x_TypeName;
-		x_info_145.Offset = access_helper().x_Offset;
-		x_info_145.ElementSize = access_helper().x_ElementSize;
-		x_info_145.TotalSize = access_helper().x_TotalSize;
-		x_info_145.ArrayRank = access_helper().x_ArrayRank;
-		x_info_145.ArrayExtents = access_helper().x_ArrayExtents;
-		x_info_145.Attributes = {
-			{ "visible", "" },
-			{ "serialize", "" }
-			};
-		visitor(x_info_145, ((access_helper*)obj)->GetxRef());
-		member_variable_info y_info_159;
-		y_info_159.Name = "y";
-		y_info_159.FullName = "SStructTest::y";
-		y_info_159.Type = access_helper().y_TypeName;
-		y_info_159.Offset = access_helper().y_Offset;
-		y_info_159.ElementSize = access_helper().y_ElementSize;
-		y_info_159.TotalSize = access_helper().y_TotalSize;
-		y_info_159.ArrayRank = access_helper().y_ArrayRank;
-		y_info_159.ArrayExtents = access_helper().y_ArrayExtents;
-		y_info_159.Attributes = {
-			{ "visible", "" },
-			{ "serialize", "" }
-			};
-		visitor(y_info_159, ((access_helper*)obj)->GetyRef());
-		member_variable_info z_info_173;
-		z_info_173.Name = "z";
-		z_info_173.FullName = "SStructTest::z";
-		z_info_173.Type = access_helper().z_TypeName;
-		z_info_173.Offset = access_helper().z_Offset;
-		z_info_173.ElementSize = access_helper().z_ElementSize;
-		z_info_173.TotalSize = access_helper().z_TotalSize;
-		z_info_173.ArrayRank = access_helper().z_ArrayRank;
-		z_info_173.ArrayExtents = access_helper().z_ArrayExtents;
-		z_info_173.Attributes = {
-			{ "visible", "" },
-			{ "serialize", "" }
-			};
-		visitor(z_info_173, ((access_helper*)obj)->GetzRef());
+		member_variable_info x_info_121;
+		x_info_121.Name = "x";
+		x_info_121.FullName = "SStructTest::x";
+		x_info_121.Type = access_helper().x_TypeName;
+		x_info_121.Offset = access_helper().x_Offset;
+		x_info_121.ElementSize = access_helper().x_ElementSize;
+		x_info_121.TotalSize = access_helper().x_TotalSize;
+		x_info_121.ArrayRank = access_helper().x_ArrayRank;
+		x_info_121.ArrayExtents = access_helper().x_ArrayExtents;
+		visitor(x_info_121, ((access_helper*)obj)->GetxRef());
+		member_variable_info y_info_131;
+		y_info_131.Name = "y";
+		y_info_131.FullName = "SStructTest::y";
+		y_info_131.Type = access_helper().y_TypeName;
+		y_info_131.Offset = access_helper().y_Offset;
+		y_info_131.ElementSize = access_helper().y_ElementSize;
+		y_info_131.TotalSize = access_helper().y_TotalSize;
+		y_info_131.ArrayRank = access_helper().y_ArrayRank;
+		y_info_131.ArrayExtents = access_helper().y_ArrayExtents;
+		visitor(y_info_131, ((access_helper*)obj)->GetyRef());
+		member_variable_info z_info_141;
+		z_info_141.Name = "z";
+		z_info_141.FullName = "SStructTest::z";
+		z_info_141.Type = access_helper().z_TypeName;
+		z_info_141.Offset = access_helper().z_Offset;
+		z_info_141.ElementSize = access_helper().z_ElementSize;
+		z_info_141.TotalSize = access_helper().z_TotalSize;
+		z_info_141.ArrayRank = access_helper().z_ArrayRank;
+		z_info_141.ArrayExtents = access_helper().z_ArrayExtents;
+		visitor(z_info_141, ((access_helper*)obj)->GetzRef());
 	}
 
 	static void for_each_var(const SStructTest* obj, auto visitor) {
-		member_variable_info x_info_190;
-		x_info_190.Name = "x";
-		x_info_190.FullName = "SStructTest::x";
-		x_info_190.Type = access_helper().x_TypeName;
-		x_info_190.Offset = access_helper().x_Offset;
-		x_info_190.ElementSize = access_helper().x_ElementSize;
-		x_info_190.TotalSize = access_helper().x_TotalSize;
-		x_info_190.ArrayRank = access_helper().x_ArrayRank;
-		x_info_190.ArrayExtents = access_helper().x_ArrayExtents;
-		x_info_190.Attributes = {
-			{ "visible", "" },
-			{ "serialize", "" }
-			};
-		visitor(x_info_190, ((access_helper*)obj)->GetxRef());
-		member_variable_info y_info_204;
-		y_info_204.Name = "y";
-		y_info_204.FullName = "SStructTest::y";
-		y_info_204.Type = access_helper().y_TypeName;
-		y_info_204.Offset = access_helper().y_Offset;
-		y_info_204.ElementSize = access_helper().y_ElementSize;
-		y_info_204.TotalSize = access_helper().y_TotalSize;
-		y_info_204.ArrayRank = access_helper().y_ArrayRank;
-		y_info_204.ArrayExtents = access_helper().y_ArrayExtents;
-		y_info_204.Attributes = {
-			{ "visible", "" },
-			{ "serialize", "" }
-			};
-		visitor(y_info_204, ((access_helper*)obj)->GetyRef());
-		member_variable_info z_info_218;
-		z_info_218.Name = "z";
-		z_info_218.FullName = "SStructTest::z";
-		z_info_218.Type = access_helper().z_TypeName;
-		z_info_218.Offset = access_helper().z_Offset;
-		z_info_218.ElementSize = access_helper().z_ElementSize;
-		z_info_218.TotalSize = access_helper().z_TotalSize;
-		z_info_218.ArrayRank = access_helper().z_ArrayRank;
-		z_info_218.ArrayExtents = access_helper().z_ArrayExtents;
-		z_info_218.Attributes = {
-			{ "visible", "" },
-			{ "serialize", "" }
-			};
-		visitor(z_info_218, ((access_helper*)obj)->GetzRef());
+		member_variable_info x_info_154;
+		x_info_154.Name = "x";
+		x_info_154.FullName = "SStructTest::x";
+		x_info_154.Type = access_helper().x_TypeName;
+		x_info_154.Offset = access_helper().x_Offset;
+		x_info_154.ElementSize = access_helper().x_ElementSize;
+		x_info_154.TotalSize = access_helper().x_TotalSize;
+		x_info_154.ArrayRank = access_helper().x_ArrayRank;
+		x_info_154.ArrayExtents = access_helper().x_ArrayExtents;
+		visitor(x_info_154, ((access_helper*)obj)->GetxRef());
+		member_variable_info y_info_164;
+		y_info_164.Name = "y";
+		y_info_164.FullName = "SStructTest::y";
+		y_info_164.Type = access_helper().y_TypeName;
+		y_info_164.Offset = access_helper().y_Offset;
+		y_info_164.ElementSize = access_helper().y_ElementSize;
+		y_info_164.TotalSize = access_helper().y_TotalSize;
+		y_info_164.ArrayRank = access_helper().y_ArrayRank;
+		y_info_164.ArrayExtents = access_helper().y_ArrayExtents;
+		visitor(y_info_164, ((access_helper*)obj)->GetyRef());
+		member_variable_info z_info_174;
+		z_info_174.Name = "z";
+		z_info_174.FullName = "SStructTest::z";
+		z_info_174.Type = access_helper().z_TypeName;
+		z_info_174.Offset = access_helper().z_Offset;
+		z_info_174.ElementSize = access_helper().z_ElementSize;
+		z_info_174.TotalSize = access_helper().z_TotalSize;
+		z_info_174.ArrayRank = access_helper().z_ArrayRank;
+		z_info_174.ArrayExtents = access_helper().z_ArrayExtents;
+		visitor(z_info_174, ((access_helper*)obj)->GetzRef());
 	}
 
-	static std::map<std::string, std::string> get_member_attributes(std::string_view name) {
+	static std::map<std::string, std::string> get_var_attributes(std::string_view name) {
+		std::map<std::string, std::string> result;
 		if (name == "x")
-		{
-			return {
+			 result = {
 				{ "visible", "" },
 				{ "serialize", "" }
 				};
-		}
 		if (name == "y")
-		{
-			return {
+			 result = {
 				{ "visible", "" },
 				{ "serialize", "" }
 				};
-		}
 		if (name == "z")
-		{
-			return {
+			 result = {
 				{ "visible", "" },
 				{ "serialize", "" }
 				};
-		}
-		return {};
+		return result;
 	}
 
 	static void for_each_static_var(std::function<void(std::string_view name)> fn) {
@@ -283,12 +230,12 @@ struct pycppgen<SStructTest> {
 	static void for_each_function(auto fn) {
 	}
 
-	static auto get_function_by_name(std::string_view name) {
-		member_function_info<void> result = {};
-		for_each_function([&](const auto& fn) {
-			if (fn.Name == name) result = fn; 
+	static bool find_function_by_name(std::string_view name, auto fn) {
+		bool result = false;
+		for_each_function([&](const auto& info) {
+			if (info.Name == name) { result = true; fn(info); } 
 		});
-		return result;
+	return result;
 	}
 
 	static constexpr bool has_function(std::string_view name) {

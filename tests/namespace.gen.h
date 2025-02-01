@@ -34,9 +34,10 @@ struct pycppgen<TestNamespace::CNamespaceChild> {
 		using namespace TestNamespace;
 	}
 
-	static std::map<std::string, std::string> get_member_attributes(std::string_view name) {
+	static std::map<std::string, std::string> get_var_attributes(std::string_view name) {
 		using namespace TestNamespace;
-		return {};
+		std::map<std::string, std::string> result;
+		return result;
 	}
 
 	static void for_each_static_var(std::function<void(std::string_view name)> fn) {
@@ -54,12 +55,12 @@ struct pycppgen<TestNamespace::CNamespaceChild> {
 		using namespace TestNamespace;
 	}
 
-	static auto get_function_by_name(std::string_view name) {
-		member_function_info<void> result = {};
-		for_each_function([&](const auto& fn) {
-			if (fn.Name == name) result = fn; 
+	static bool find_function_by_name(std::string_view name, auto fn) {
+		bool result = false;
+		for_each_function([&](const auto& info) {
+			if (info.Name == name) { result = true; fn(info); } 
 		});
-		return result;
+	return result;
 	}
 
 	static constexpr bool has_function(std::string_view name) {
