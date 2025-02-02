@@ -104,7 +104,7 @@ PrintLock = threading.Lock()
 
 def atomic_print(text : str) :
     with PrintLock :
-        print(text)
+        print(f"pycppgen: {text}")
 
 #try to parse the comments before or after the cursor (hacky but, cursor.raw_comments isn't working as expected)
 def ParseComments(cursor, kind : str = EParseCommentsBeforeDecl) :
@@ -1028,17 +1028,18 @@ def CodeGen(filePath : str) :
 
     TLS().NodeList = PerFileData[filePath]["NodeList"]
 
-    if "IncludedFiles" in PerFileData[filePath] :
-        for f in PerFileData[filePath]["IncludedFiles"] :
-            if f in PerFileData and "NodeList" in PerFileData[f] :
-                TLS().NodeList = PerFileData[f]["NodeList"] | TLS().NodeList
-        
-
     cppCode = ""
     hppCode = ""
     hppCode += "#pragma once\n\n"
     hppCode += "#include \"pycppgen.h\"\n"
-    hppCode += "#include \"" + str(pathlib.Path(filePath).relative_to(pathlib.Path(filePath).parent)) + "\"\n\n"
+
+    parentPath = pathlib.Path(filePath).parent
+    if "IncludedFiles" in PerFileData[filePath] :
+        for f in PerFileData[filePath]["IncludedFiles"] :
+            if f in PerFileData and "NodeList" in PerFileData[f] :
+                hppCode += f"#include \"{pathlib.Path(GetOutputFilePath(f)).relative_to(ProjectPath, walk_up=True)}\"\n"
+
+    hppCode += "#include \"" + str(pathlib.Path(filePath).relative_to(ProjectPath)) + "\"\n\n"
 
     for key in TLS().NodeList :
         newHppCode, newCppCode = CodeGenOutputNode(TLS().NodeList[key])
