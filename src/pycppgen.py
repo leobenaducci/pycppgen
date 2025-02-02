@@ -80,16 +80,7 @@ ParseCommentsMode = {
     EKindTemplateTemplateParameter : EParseCommentsBeforeDecl,
 }
 
-#unused
-TypeAliases = dict(
-    {
-        "int": "int32_t",
-        "unsigned int": "uint32_t",
-        "short": "int16_t",
-        "unsigned short": "uint16_t",
-        "unsigned char": "uint8_t"
-    }
-)
+FilesWithPyCppGenTag = dict()
 
 TLS_Dict = {}
 
@@ -1364,6 +1355,21 @@ def IsOutputUpToDate(file : str) :
 
     return IsFileUpToDate(file, outputFile)
 
+def FileContainsPyCppGenTag(file : str) :
+    global FilesWithPyCppGenTag
+
+    if file in FilesWithPyCppGenTag :
+        return FilesWithPyCppGenTag[file]
+
+    if os.path.exists(file) :
+        with open(file) as f :
+            if f.read().find("$[[pycppgen") != -1 :
+                FilesWithPyCppGenTag[file] = True
+                return True
+
+    FilesWithPyCppGenTag[file] = False
+    return False
+
 def ProcessFile(file : str, compilerOptions) :
     global OutdatedFiles
 
@@ -1371,14 +1377,23 @@ def ProcessFile(file : str, compilerOptions) :
 
     # if the input or output files are newer than the cache, force re-parsing
     if not IsFileUpToDate(file, CacheFile) or not IsFileUpToDate(GetOutputFilePath(file), CacheFile) :
+        if not file in OutdatedFiles :
+            print(f"outdated cache entry for {file}") 
         PerFileData[file] = ParseFile(file, compilerOptions)
     else : # check if any of the include files are dirty
         tu = CompileFile(file, compilerOptions)
+        includeSet = set()
         for f in tu.get_includes():
-            if not IsFileUpToDate(file, f.include.name) : 
-                PerFileData[file] = ParseTranslationUnit(tu)
+            includeSet.add(f.include.name)
+
+        for f in includeSet :
+            if FileContainsPyCppGenTag(f) and not IsFileUpToDate(f, GetOutputFilePath(file)) :
+                print(f"outdated include {f} in {file}") 
                 outdatedIncludedFile = True
                 break 
+
+        if outdatedIncludedFile:
+            PerFileData[file] = ParseTranslationUnit(tu)
 
     if outdatedIncludedFile == False and IsOutputUpToDate(file) :
         return    
@@ -1420,9 +1435,8 @@ def main(args : list) :
                 continue
             if re.match(r".*\.h", file) and not re.match(r".*\.gen.h", file) :
                 filePath = os.path.join(root, file)
-                with open(filePath) as f :
-                    if f.read().find("$[[pycppgen") != -1:
-                        FilesToParse.append(os.path.join(root, file))
+                if FileContainsPyCppGenTag(filePath) :
+                    FilesToParse.append(os.path.join(root, file))
             if file != "pycppgen.gen.h" and re.match(r".*\.gen.h", file) :
                 OldGenFiles += [os.path.join(root, file)]
     
@@ -1435,28 +1449,28 @@ def main(args : list) :
 
     #if the script is newer than the cache, remove all files as we need to rebuild everything
     if not IsFileUpToDate(inspect.getsourcefile(sys.modules[__name__]), CacheFile) :
+        print("Outdated file cache")
         for file in OldGenFiles :
             if os.path.exists(file) :
                 os.remove(file)
         OldGenFiles = []
-        err = ""
+        OutdatedFiles = set(FilesToParse)
+    else :
+        allFilesUpToDate = OldGenFiles == GenFiles and os.path.exists(os.path.join(ProjectPath, "pycppgen.gen.h"))
+        for file in FilesToParse :
+            if not IsOutputUpToDate(file) :
+                print("Outdated file: " + file)
+                OutdatedFiles.add(file)
+                allFilesUpToDate = False
 
+        if allFilesUpToDate :
+            return
+    
     FilesToRemove = list(set(OldGenFiles).difference(GenFiles))
     FilesToAdd = list(set(GenFiles).difference(OldGenFiles))
-
-    allFilesUpToDate = len(FilesToRemove) == 0 and len(FilesToAdd) == 0 and os.path.exists(os.path.join(ProjectPath, "pycppgen.gen.h"))
-    for file in FilesToParse :
-        if not IsOutputUpToDate(file) :
-            print("Outdated file detected: " + file)
-            OutdatedFiles.add(file)
-            allFilesUpToDate = False
-
-    if allFilesUpToDate :
-        return
-    
-    PerFileData = {}
-    
+     
     #load cache
+    PerFileData = {}
     if os.path.exists(CacheFile) :
         with open(CacheFile, "rt") as file :
             try :
@@ -1464,7 +1478,6 @@ def main(args : list) :
             except :
                 PerFileData = {}
 
-    DebugMode = True
     if DebugMode :
         for file in FilesToParse :
             ProcessFile(file, compilerOptions)
