@@ -2,7 +2,6 @@
 
 #include <array>
 
-
 //$[[pycppgen visible]]
 struct SStructTest
 {

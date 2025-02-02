@@ -1543,20 +1543,23 @@ def main(args : list) :
             for file in FilesToCodeGen :
                 pool.submit(CodeGen, file)
 
-    #save cache
-    with open(CacheFile, "wt") as file :
-        file.write(json.dumps(PerFileData))
-
     #clear data
     TLS().NodeList = {}
 
     for _, v in PerFileData.items() : 
         TLS().NodeList.update(v["NodeList"])
 
-    atomic_print("global code gen step")
-    FilesToParse.append(os.path.join(ProjectPath, "\\pycppgen.h"))
-    CodeGenGlobal(ProjectPath)
-    
+    if not "pycppgen.gen.h" in CachedPerFileData or CachedPerFileData["pycppgen.gen.h"] != TLS().NodeList :
+        atomic_print("global code gen step")
+        FilesToParse.append(os.path.join(ProjectPath, "\\pycppgen.h"))
+        CodeGenGlobal(ProjectPath)
+
+    PerFileData["pycppgen.gen.h"] = TLS().NodeList
+
+    #save cache
+    with open(CacheFile, "wt") as file :
+        file.write(json.dumps(PerFileData))
+
     #remove old files
     for file in FilesToRemove :
         if os.path.exists(file) :
