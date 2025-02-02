@@ -1252,7 +1252,8 @@ def CodeGenGlobal(path : str) :
     code += "\n"
     code += "#include \"pycppgen.h\"\n"
     for k in PerFileData :
-        code += f"#include \"{str(pathlib.Path(GetOutputFilePath(k)).relative_to(ProjectPath)).replace("\\", "/")}\"\n"
+        if not k.endswith(".gen.h") :
+            code += f"#include \"{str(pathlib.Path(GetOutputFilePath(k)).relative_to(ProjectPath, walk_up=True)).replace("\\", "/")}\"\n"
 
     code += "\nnamespace pycppgen_globals\n{\n"
 
@@ -1268,6 +1269,13 @@ def CodeGenGlobal(path : str) :
             code += f"\t\tfn({node[ENodeFullName]}());\n"
     code += "\t}\n\n"
 
+    code += "\tstatic void for_each_type_static_call_by_name(std::string_view funcName) {\n"
+    for _, node in TLS().NodeList.items() :
+        if (node[ENodeKind] == EKindClass or node[ENodeKind] == EKindStruct) and ENodeStaticFunctions in node:
+            for _, func in node[ENodeStaticFunctions].items() :
+                if (not ENodeParameters in func or len(func[ENodeParameters]) == 0) and (not ENodeReturnType in func or func[ENodeReturnType] == "void"):
+                    code += f"\t\tpycppgen<{node[ENodeFullName]}>::call_function(funcName);\n"
+    code += "\t}\n"
     code += "}\n\n"
 
     code += "template<typename T> void pycppgen<void>::for_each_var(const T* obj, auto fn, uint32_t maxDepth)\n"
@@ -1312,19 +1320,8 @@ def CodeGenGlobal(path : str) :
     code += "\treturn false;\n"
     code += "}\n\n"
 
-    if os.path.exists(path + "\\pycppgen.gen.h") :
-        os.remove(path + "\\pycppgen.gen.h")
 
-    with open(path + "\\pycppgen.gen.h", mode="wt") as file :
-        file.write(code)
-
-    #pycppgen.gen.cpp
-    code = ""
-    code += "#include \"pycppgen.h\"\n"
-    code += "#include \"pycppgen.gen.h\"\n"
-    code += "\n"
-
-    code += "pycppgen<void>::pycppgen(std::string_view name)\n"
+    code += "inline pycppgen<void>::pycppgen(std::string_view name)\n"
     code += "{\n"
     for _, node in TLS().NodeList.items() :
         if node[ENodeKind] == EKindClass or node[ENodeKind] == EKindStruct :
@@ -1333,17 +1330,8 @@ def CodeGenGlobal(path : str) :
             code += f"if (name == \"{node[ENodeFullName]}\" || name == \"{node[ENodeName]}\")\n"
             code += f"\t\tHashCode = typeid({node[ENodeFullName]}).hash_code();\n"
     code += "}\n\n"
-
-    #static function call by name
-    code += "static void for_each_type_static_call_by_name(std::string_view funcName) {\n"
-    for _, node in TLS().NodeList.items() :
-        if (node[ENodeKind] == EKindClass or node[ENodeKind] == EKindStruct) and ENodeStaticFunctions in node:
-            for _, func in node[ENodeStaticFunctions].items() :
-                if (not ENodeParameters in func or len(func[ENodeParameters]) == 0) and (not ENodeReturnType in func or func[ENodeReturnType] == "void"):
-                    code += f"\tpycppgen<{node[ENodeFullName]}>::call_function(funcName);\n"
-    code += "}\n\n"
     
-    code += "std::map<std::string, std::string> pycppgen<void>::get_var_attributes(std::string_view name) const\n"
+    code += "inline std::map<std::string, std::string> pycppgen<void>::get_var_attributes(std::string_view name) const\n"
     code += "{\n"
     code += "\tif (false) {}\n"
     for _, node in TLS().NodeList.items() :
@@ -1353,8 +1341,7 @@ def CodeGenGlobal(path : str) :
     code += "\treturn {};\n"
     code += "}\n\n"
 
-
-    code += "void pycppgen<void>::for_each_var(std::function<void(const member_variable_info&)> fn, uint32_t maxDepth) const\n"
+    code += "inline void pycppgen<void>::for_each_var(std::function<void(const member_variable_info&)> fn, uint32_t maxDepth) const\n"
     code += "{\n"
     for _, node in TLS().NodeList.items() :
         if node[ENodeKind] == EKindClass or node[ENodeKind] == EKindStruct :
@@ -1362,11 +1349,9 @@ def CodeGenGlobal(path : str) :
             code += f"\t\tpycppgen<{node[ENodeFullName]}>::for_each_var(fn, maxDepth - 1);\n"
     code += "}\n\n"
 
-    if os.path.exists(path + "\\pycppgen.gen.cpp") :
-        os.remove(path + "\\pycppgen.gen.cpp")
-
-    with open(path + "\\pycppgen.gen.cpp", mode="wt") as file :
-        file.write(code)
+    if IsFileDifferent(path + "\\pycppgen.gen.h", code) :
+        with open(path + "\\pycppgen.gen.h", mode="wt") as file :
+            file.write(code)
 
 def IsFileUpToDate(src : str, dst : str) :
     if not os.path.exists(dst) or not os.path.exists(src) :
@@ -1463,12 +1448,18 @@ def main(args : list) :
         atomic_print("usage py main.py <directory> <options>")
         exit(-1)
 
+    Dependencies = []
     for arg in list(args) :
         if arg.startswith("--I") :
             args.remove(arg)
             arg = arg[3:]
             for i in arg.split(";") :
                 args.append(f"-I{i}")
+        if arg.startswith("--D") :
+            args.remove(arg)
+            arg = arg[3:]
+            for i in arg.split(";") :
+                Dependencies.append(i)
 
     OutdatedFiles = set()
     FilesToCodeGen = set()
@@ -1476,6 +1467,9 @@ def main(args : list) :
     CacheFile = os.path.join(ProjectPath, "pycppgen.cache")
 
     atomic_print("parsing path: " + ProjectPath)
+
+    if os.path.exists(ProjectPath + "\\pycppgen.gen.cpp"):
+        os.remove(ProjectPath + "\\pycppgen.gen.cpp")
 
     #find headers with the pycppgen tag and the previously generated files
     FilesToParse = []
@@ -1518,6 +1512,7 @@ def main(args : list) :
     FilesToAdd = list(set(GenFiles).difference(OldGenFiles))
      
     #load cache
+    CachedPerFileData = {}
     if os.path.exists(CacheFile) :
         with open(CacheFile, "rt") as file :
             try :
@@ -1543,18 +1538,28 @@ def main(args : list) :
             for file in FilesToCodeGen :
                 pool.submit(CodeGen, file)
 
+    for dep in Dependencies :
+        depPath = ResolvePath(os.path.join(ProjectPath, dep, "pycppgen.cache"))
+        if os.path.exists(depPath) :
+            with open(depPath, "rt") as file :
+                try :
+                    depCachedData = json.loads(file.read())
+                    PerFileData.update(depCachedData)
+                except :
+                    atomic_print("failed to load dependency data: " + dep)
+
     #clear data
     TLS().NodeList = {}
 
     for _, v in PerFileData.items() : 
-        TLS().NodeList.update(v["NodeList"])
+        if "NodeList" in v :
+            TLS().NodeList.update(v["NodeList"])
 
     if not "pycppgen.gen.h" in CachedPerFileData or CachedPerFileData["pycppgen.gen.h"] != TLS().NodeList :
         atomic_print("global code gen step")
         FilesToParse.append(os.path.join(ProjectPath, "\\pycppgen.h"))
         CodeGenGlobal(ProjectPath)
-
-    PerFileData["pycppgen.gen.h"] = TLS().NodeList
+        PerFileData["pycppgen.gen.h"] = TLS().NodeList
 
     #save cache
     with open(CacheFile, "wt") as file :
