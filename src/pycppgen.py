@@ -100,6 +100,12 @@ def TLS() :
 
     return TLS_Dict[ident]
 
+PrintLock = threading.Lock()
+
+def atomic_print(text : str) :
+    with PrintLock :
+        print(text)
+
 #try to parse the comments before or after the cursor (hacky but, cursor.raw_comments isn't working as expected)
 def ParseComments(cursor, kind : str = EParseCommentsBeforeDecl) :
    
@@ -473,30 +479,20 @@ def ParseCursor(cursor, forceInclude = False) :
         ParseTypeAlias(cursor)
         return
 
+def ResolvePath(file : str) :
+    return str(pathlib.Path(file).resolve())
+
 def GetOutputFilePath(filePath : str, ext : str = "h") :
     extStart = filePath.rfind(".")
     outputPath = filePath[:extStart]
     outputPath += f".gen.{ext}"
-    return str(pathlib.Path(outputPath).resolve())
+    return ResolvePath(outputPath)
 
 def GetOutputFileName(filePath : str, ext  : str = "h") :
     outputPath = pathlib.Path(GetOutputFilePath(filePath, ext))
-    return str(outputPath.relative_to(outputPath.parent))
+    return ResolvePath(outputPath.relative_to(outputPath.parent))
 
-#parse a header file
-def CompileFile(filePath : str, options : list) :
-    args = ['-x', 'c++', '-std=c++20', "-DPYCPPGEN"] + options
-    idx = clang.cindex.Index.create()
-    tu = idx.parse(filePath, args = args, options = clang.cindex.TranslationUnit.PARSE_INCOMPLETE | clang.cindex.TranslationUnit.PARSE_SKIP_FUNCTION_BODIES)
-
-    if DebugMode :
-        # Print diagnostics
-        for diag in tu.diagnostics:
-            print(diag)
-
-    return tu
-
-def ParseTranslationUnit(tu) :
+def ParseTranslationUnit(tu, file) :
     global FilesToParse
 
     #initialize data
@@ -505,17 +501,14 @@ def ParseTranslationUnit(tu) :
     TLS().NodeTree = {}
     TLS().NodeStack = [TLS().NodeTree] 
     
+    currentFile = str(pathlib.Path(file).resolve())
     #first = next(x for x in tu.cursor.get_children() if x.location.file and x.location.file.name in FilesToParse)
-    filteredChildren = list(filter(lambda x: x.location.file and str(pathlib.Path(x.location.file.name).resolve()) in FilesToParse, tu.cursor.get_children()))
+    #filteredChildren = list(filter(lambda x: x.location.file and str(pathlib.Path(x.location.file.name).resolve()) in FilesToParse, tu.cursor.get_children()))
+    filteredChildren = list(filter(lambda x: x.location.file and str(pathlib.Path(x.location.file.name).resolve()) == file, tu.cursor.get_children()))
     for cursor in  filteredChildren :
         ParseCursor(cursor)
 
-    return {
-            "NodeList": TLS().NodeList,
-            "NodesToInclude": TLS().NodesToInclude,
-            "NodeTree": TLS().NodeTree,
-            "NodeStack": TLS().NodeStack
-        }
+    return TLS().NodeList
 
 #parse a header file
 def ParseFile(filePath : str, options : list) :
@@ -526,9 +519,16 @@ def ParseFile(filePath : str, options : list) :
             for g in m.groups() :
                 TLS().NodesToInclude += g.replace(" ", ";").replace(",", ";").split(";")
 
-    tu = CompileFile(filePath, options)
+    args = ['-x', 'c++', '-std=c++20', "-DPYCPPGEN"] + options
+    idx = clang.cindex.Index.create()
+    tu = idx.parse(filePath, args = args, options = clang.cindex.TranslationUnit.PARSE_INCOMPLETE | clang.cindex.TranslationUnit.PARSE_SKIP_FUNCTION_BODIES)
 
-    return ParseTranslationUnit(tu)
+    if DebugMode :
+        # Print diagnostics
+        for diag in tu.diagnostics:
+            atomic_print(diag)
+
+    return tu
 
 #codegen: common type header 
 def CodeGenOutputMetaHeader(code, node) :
@@ -1020,6 +1020,20 @@ def CodeGenOutputNode(node) :
 
 #codegen: output file
 def CodeGen(filePath : str) :
+
+    #clear data
+    TLS().NodesToInclude = []
+    TLS().NodeTree = {}
+    TLS().NodeStack = [TLS().NodeTree]   
+
+    TLS().NodeList = PerFileData[filePath]["NodeList"]
+
+    if "IncludedFiles" in PerFileData[filePath] :
+        for f in PerFileData[filePath]["IncludedFiles"] :
+            if f in PerFileData and "NodeList" in PerFileData[f] :
+                TLS().NodeList = PerFileData[f]["NodeList"] | TLS().NodeList
+        
+
     cppCode = ""
     hppCode = ""
     hppCode += "#pragma once\n\n"
@@ -1043,12 +1057,24 @@ def CodeGen(filePath : str) :
 
     hppCode += "}\n"
 
-    with open(GetOutputFilePath(filePath, "h"), mode="wt") as output :
-        output.write(hppCode)
+    hppFile = GetOutputFilePath(filePath, "h")
+    cppFile = GetOutputFilePath(filePath, "cpp")
+    
+    if hppCode == "" :
+        if os.path.exists(hppFile) :
+            os.remove(hppFile)
+    else :
+        atomic_print("generating code for: " + hppFile)
+        with open(hppFile, mode="wt") as output :
+            output.write(hppCode)
 
-    if len(cppCode) > 0 :
-        with open(GetOutputFilePath(filePath, "cpp"), mode="wt") as output :
-            output.write(f"#include \"{GetOutputFileName(filePath, 'h')}\"\n\n")
+    if cppCode == "" :
+        if os.path.exists(cppFile) :
+            os.remove(cppFile)
+    else :
+        atomic_print("generating code for: " + cppFile)
+        cppCode = f"#include \"{hppFile}\"\n\n" + cppCode
+        with open(cppFile, mode="wt") as output :
             output.write(cppCode)
 
 #codegen: emit for each type call
@@ -1370,51 +1396,70 @@ def FileContainsPyCppGenTag(file : str) :
     FilesWithPyCppGenTag[file] = False
     return False
 
-def ProcessFile(file : str, compilerOptions) :
-    global OutdatedFiles
+def IsFileDifferent(file, content) :
+    if not os.path.exists(file) :
+        return content != ""
 
-    outdatedIncludedFile = False
+    fileContent = ""
+    with open(file) as f :
+        fileContent = f.read()
+    
+    return fileContent != content
+
+def ProcessFile(file : str, compilerOptions) :
+    global OutdatedFiles, FilesToCodeGen, PerFileData
+
+    file = ResolvePath(file)
+
+    if file in CachedPerFileData :
+        PerFileData[file] = CachedPerFileData[file]
+    else :
+        PerFileData[file] = {}
+
+    if not "IncludedFiles" in PerFileData[file] :
+        PerFileData[file]["IncludedFiles"] = []
+
+    fileTime = 0
+    if os.path.exists(GetOutputFilePath(file)) :
+        fileTime = os.path.getmtime(GetOutputFilePath(file))
+
+    isOutdated = file in OutdatedFiles
+    needsCodeGen = isOutdated
+    needsParseTU = False
 
     # if the input or output files are newer than the cache, force re-parsing
     if not IsFileUpToDate(file, CacheFile) or not IsFileUpToDate(GetOutputFilePath(file), CacheFile) :
-        if not file in OutdatedFiles :
-            print(f"outdated cache entry for {file}") 
-        PerFileData[file] = ParseFile(file, compilerOptions)
-    else : # check if any of the include files are dirty
-        tu = CompileFile(file, compilerOptions)
-        
-        fileTime = tu.get_file(file).time
+        needsParseTU = True
+        if not isOutdated :
+            atomic_print(f"outdated cache entry for {file}") 
 
-        includeSet = set()
-        for f in tu.get_includes():
-            if f.include.time > fileTime :
-                includeSet.add(f.include.name)
+    if needsParseTU :
+        tu = ParseFile(file, compilerOptions)
 
-        for f in includeSet :
-            if FileContainsPyCppGenTag(f) :
-                print(f"outdated include {f} in {file}") 
-                outdatedIncludedFile = True
-                break 
+        includedFiles = []
+        for f in tu.get_includes() :
+            includedFiles.append(ResolvePath(f.include.name))
+        PerFileData[file]["IncludedFiles"] = list(set(includedFiles))
 
-        if outdatedIncludedFile:
-            PerFileData[file] = ParseTranslationUnit(tu)
+    for f in PerFileData[file]["IncludedFiles"] :
+        if os.path.getmtime(f) > fileTime :
+            needsCodeGen = True
+            if not f in FilesToParse and FileContainsPyCppGenTag(f) :
+                FilesToParse.append(f)
+            if not isOutdated : 
+                atomic_print(f"outdated include {f} in {file}")
 
-    if outdatedIncludedFile == False and IsOutputUpToDate(file) :
-        return    
+    if needsParseTU : 
+        PerFileData[file]["NodeList"] = ParseTranslationUnit(tu, file)
 
-    TLS().NodesToInclude = PerFileData[file]["NodesToInclude"]
-    TLS().NodeList = PerFileData[file]["NodeList"]
-    TLS().NodeTree = PerFileData[file]["NodeTree"]
-    TLS().NodeStack = PerFileData[file]["NodeStack"]    
-    
-    print("generating code for: " + file)
-    CodeGen(file)
+    if needsParseTU or needsCodeGen :
+        FilesToCodeGen.add(file)
 
 def main(args : list) :
-    global FilesToParse, PerFileData, ProjectPath, CacheFile, OutdatedFiles
+    global FilesToParse, PerFileData, ProjectPath, CacheFile, OutdatedFiles, CachedPerFileData, FilesToCodeGen
 
     if len(args) < 1 :
-        print("usage py main.py <directory> <options>")
+        atomic_print("usage py main.py <directory> <options>")
         exit(-1)
 
     for arg in list(args) :
@@ -1425,11 +1470,13 @@ def main(args : list) :
                 args.append(f"-I{i}")
 
     OutdatedFiles = set()
+    FilesToCodeGen = set()
     ProjectPath = str(pathlib.Path(args[0]).resolve())
     CacheFile = os.path.join(ProjectPath, "pycppgen.cache")
 
-    print("parsing path: " + ProjectPath)
+    atomic_print("parsing path: " + ProjectPath)
 
+    #find headers with the pycppgen tag and the previously generated files
     FilesToParse = []
     OldGenFiles = []
     for root, _, files in os.walk(ProjectPath):
@@ -1448,39 +1495,36 @@ def main(args : list) :
     if len(args) > 1 :
         compilerOptions = args[1:]
 
-    GenFiles = list(map(lambda x : str(pathlib.Path(GetOutputFilePath(x)).resolve()), FilesToParse))
-    OldGenFiles = list(map(lambda x : str(pathlib.Path(x).resolve()), OldGenFiles))
+    GenFiles = list(map(lambda x : GetOutputFilePath(x), FilesToParse))
+    OldGenFiles = list(map(lambda x : ResolvePath(x), OldGenFiles))
 
     #if the script is newer than the cache, remove all files as we need to rebuild everything
     if not IsFileUpToDate(inspect.getsourcefile(sys.modules[__name__]), CacheFile) :
-        print("Outdated file cache")
+        atomic_print("Outdated file cache")
         for file in OldGenFiles :
             if os.path.exists(file) :
                 os.remove(file)
         OldGenFiles = []
         OutdatedFiles = set(FilesToParse)
     else :
-        allFilesUpToDate = OldGenFiles == GenFiles and os.path.exists(os.path.join(ProjectPath, "pycppgen.gen.h"))
+        #mark the outdated files
         for file in FilesToParse :
             if not IsOutputUpToDate(file) :
-                print("Outdated file: " + file)
+                atomic_print("Outdated file: " + file)
                 OutdatedFiles.add(file)
-                allFilesUpToDate = False
 
-        if allFilesUpToDate :
-            return
-    
     FilesToRemove = list(set(OldGenFiles).difference(GenFiles))
     FilesToAdd = list(set(GenFiles).difference(OldGenFiles))
      
     #load cache
-    PerFileData = {}
     if os.path.exists(CacheFile) :
         with open(CacheFile, "rt") as file :
             try :
-                PerFileData = json.loads(file.read())
+                CachedPerFileData = json.loads(file.read())
             except :
-                PerFileData = {}
+                CachedPerFileData = {}
+
+    PerFileData = {}
 
     if DebugMode :
         for file in FilesToParse :
@@ -1490,24 +1534,25 @@ def main(args : list) :
             for file in FilesToParse :
                 pool.submit(ProcessFile, file, compilerOptions)
 
-    #clear removed files from the cache
-    for file in FilesToRemove :
-        PerFileData[file] = {}
+    if DebugMode :
+        for file in FilesToCodeGen :
+            CodeGen(file)
+    else :
+        with ThreadPoolExecutor() as pool :
+            for file in FilesToCodeGen :
+                pool.submit(CodeGen, file)
 
     #save cache
     with open(CacheFile, "wt") as file :
         file.write(json.dumps(PerFileData))
 
     #clear data
-    TLS().NodesToInclude = []
     TLS().NodeList = {}
-    TLS().NodeTree = {}
-    TLS().NodeStack = [TLS().NodeTree]   
 
     for _, v in PerFileData.items() : 
         TLS().NodeList.update(v["NodeList"])
 
-    print("global code gen step")
+    atomic_print("global code gen step")
     FilesToParse.append(os.path.join(ProjectPath, "\\pycppgen.h"))
     CodeGenGlobal(ProjectPath)
     
