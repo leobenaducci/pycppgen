@@ -1382,12 +1382,16 @@ def ProcessFile(file : str, compilerOptions) :
         PerFileData[file] = ParseFile(file, compilerOptions)
     else : # check if any of the include files are dirty
         tu = CompileFile(file, compilerOptions)
+        
+        fileTime = tu.get_file(file).time
+
         includeSet = set()
         for f in tu.get_includes():
-            includeSet.add(f.include.name)
+            if f.include.time > fileTime :
+                includeSet.add(f.include.name)
 
         for f in includeSet :
-            if FileContainsPyCppGenTag(f) and not IsFileUpToDate(f, GetOutputFilePath(file)) :
+            if FileContainsPyCppGenTag(f) :
                 print(f"outdated include {f} in {file}") 
                 outdatedIncludedFile = True
                 break 
