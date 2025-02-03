@@ -1,4 +1,4 @@
-![image](https://github.com/user-attachments/assets/c62f2509-363a-4515-ab39-af35a83a3c10)# pycppgen
+# pycppgen
 
 ## Overview
 `pycppgen` is a Python script designed to parse and generate C++ reflection code based on user-defined tags. By embedding specific tags within your C++ code, the script dynamically generates reflection-ready templates and attributes to streamline your development workflow.
