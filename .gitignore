@@ -171,6 +171,6 @@ cython_debug/
 /intermediate
 /tests/build
 /.vscode
-/tests/*.gen.h
-/tests/pycppgen.cache
-/tests/pycppgen.h
+/tests/*/*.gen.h
+/tests/*/pycppgen.cache
+/tests/*/pycppgen.h
