@@ -1253,7 +1253,9 @@ def CodeGenGlobal(path : str) :
     code += "#include \"pycppgen.h\"\n"
     for k in PerFileData :
         if not k.endswith(".gen.h") :
-            code += f"#include \"{str(pathlib.Path(GetOutputFilePath(k)).relative_to(ProjectPath, walk_up=True)).replace("\\", "/")}\"\n"
+            relPath = pathlib.Path(GetOutputFilePath(k)).relative_to(ProjectPath, walk_up=True)
+            relPath = str(relPath).replace('\\', '/')
+            code += f"#include \"{relPath}\"\n"
 
     code += "\nnamespace pycppgen_globals\n{\n"
 
