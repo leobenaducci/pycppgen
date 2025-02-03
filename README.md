@@ -27,7 +27,27 @@ This project was created as:
 - Iterate over all reflected types and its members
 ![{9C197E77-9F82-488A-8910-D680E4C75A80}](https://github.com/user-attachments/assets/3547d9a1-2a7d-4b4b-91f7-525797294ebc)
 
+- Dynamic reflection
+![{F11EB6A1-489F-4380-83D4-FEE78BE3EB53}](https://github.com/user-attachments/assets/048ec28d-aae9-4ea5-bd37-c1d95c98faae)
 
+## Real world usage
+Previous vkfw reflection was macro based:
+![{26B317D4-074B-4812-8B0B-B27243EAB703}](https://github.com/user-attachments/assets/10f9bf32-23e8-476e-9422-35c7487fb947)
+
+And the macros weren't nice:
+![{7FB17E0D-64B1-4670-9606-02C58EDC015F}](https://github.com/user-attachments/assets/b8d86a31-c4e7-4c55-9ed1-6cd758e8846b)
+
+It was replaced by a single function:
+![{E788CEAC-4C75-4804-8D20-6CB41503319F}](https://github.com/user-attachments/assets/92810a0c-603d-4230-9424-3f597e7065b8)
+
+And tags to the members:
+![Uploading {20226652-9AD7-4EC7-BC5B-0B4961B27BEC}.png…]()
+
+Which generated the members info
+![{60D868EA-1C97-4B28-A9FB-7E7A83512ABB}](https://github.com/user-attachments/assets/4346d83c-d0f7-4836-954a-d469e904d349)
+
+And function wrappers
+![{DAAB85FD-9644-4F9D-A87E-35CC4EF38342}](https://github.com/user-attachments/assets/798f4808-3de5-4a11-ba4a-feca16a3c5af)
 
 ## Usage
 1. Clone the repository:
