@@ -1558,8 +1558,8 @@ def main(args : list) :
     #clear data
     TLS().NodeList = {}
 
-    for _, v in PerFileData.items() : 
-        if "NodeList" in v :
+    for n, v in PerFileData.items() : 
+        if n != "pycppgen.gen.h" and "NodeList" in v :
             TLS().NodeList.update(v["NodeList"])
 
     if not "pycppgen.gen.h" in CachedPerFileData or CachedPerFileData["pycppgen.gen.h"] != TLS().NodeList :
