@@ -41,7 +41,7 @@ It was replaced by a single function:
 ![{E788CEAC-4C75-4804-8D20-6CB41503319F}](https://github.com/user-attachments/assets/92810a0c-603d-4230-9424-3f597e7065b8)
 
 And tags to the members:
-![Uploading {20226652-9AD7-4EC7-BC5B-0B4961B27BEC}.png…]()
+![{B9920904-38C1-461A-907A-7191A5924D27}](https://github.com/user-attachments/assets/4a5d9fc2-f843-4d6b-b376-d80c85c1ccb2)
 
 Which generated the members info
 ![{60D868EA-1C97-4B28-A9FB-7E7A83512ABB}](https://github.com/user-attachments/assets/4346d83c-d0f7-4836-954a-d469e904d349)
