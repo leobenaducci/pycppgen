@@ -10,7 +10,7 @@ if not path.endswith("tests") :
     exit(-1)
 
 main(["../tests/lib"])
-main(["../tests/app", "--D../lib", "--I../lib"])
+main(["../tests/app", "--P../lib", "--I../lib"])
 
 os.makedirs("build", exist_ok=True)
 os.chdir("build")

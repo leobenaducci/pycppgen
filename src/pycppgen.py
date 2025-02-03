@@ -1459,6 +1459,11 @@ def main(args : list) :
             args.remove(arg)
             arg = arg[3:]
             for i in arg.split(";") :
+                args.append(f"-D{i}")
+        if arg.startswith("--P") :
+            args.remove(arg)
+            arg = arg[3:]
+            for i in arg.split(";") :
                 Dependencies.append(i)
 
     OutdatedFiles = set()
