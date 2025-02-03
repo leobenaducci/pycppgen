@@ -9,11 +9,9 @@ path = os.getcwd()
 if not path.endswith("tests") :
     exit(-1)
 
-path = "C:/Leo/VkFramework/intermediate/../source/vkfw"
+main(["../tests/lib"])
+main(["../tests/app", "--D../lib", "--I../lib"])
 
-main([path, "-DVKFW=1", "-I..\\"])
-#main(["../tests"])
-
-os.makedirs("cpp", exist_ok=True)
-os.chdir("cpp")
+os.makedirs("build", exist_ok=True)
+os.chdir("build")
 os.system("cmake .\\..\\")

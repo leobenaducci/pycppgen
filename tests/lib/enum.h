@@ -1,5 +1,8 @@
 #pragma once
 
+#include <array>
+#include <vector>
+
 //$[[pycppgen bitmask]]
 enum class EEnum : unsigned
 {
@@ -7,4 +10,14 @@ enum class EEnum : unsigned
     Something, //$[[pycppgen disabled;visible=True]]
     Value,  //$[[pycppgen hidden;selectable]]
     Test = 10,
+};
+
+//$[[pycppgen]]
+enum class EAnotherEnum : unsigned
+{
+    Zero,
+    One,
+    Two,
+    Three,
+    COUNT, //$[[pycppgen hidden]
 };

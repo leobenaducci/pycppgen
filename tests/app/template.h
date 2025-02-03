@@ -1,5 +1,7 @@
+#pragma once
 
-#include "template.gen.h"
+#include <array>
+#include <vector>
 
 namespace Template
 {

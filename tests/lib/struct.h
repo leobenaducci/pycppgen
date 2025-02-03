@@ -1,8 +1,9 @@
+#pragma once
 
-#include "struct.gen.h"
+#include <array>
 
 //$[[pycppgen visible]]
-struct SVector
+struct SStructTest
 {
     //$[[pycppgen visible]]
     static inline const int size = 3;
