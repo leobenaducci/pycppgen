@@ -14,7 +14,6 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
 lib64/
 parts/
 sdist/
@@ -170,16 +169,8 @@ cython_debug/
 # PyPI configuration file
 .pypirc
 /intermediate
-/tests/cpp
+/tests/build
 /.vscode
-/tests/tmp.h
+/tests/*.gen.h
 /tests/pycppgen.cache
-/tests/template.gen.h
-/tests/class.gen.h
-/tests/enum.gen.h
-/tests/function.gen.h
-/tests/namespace.gen.h
-/tests/pycppgen.gen.cpp
-/tests/pycppgen.gen.h
 /tests/pycppgen.h
-/tests/struct.gen.h

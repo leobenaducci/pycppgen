@@ -7,7 +7,13 @@ set(CMAKE_CXX_STANDARD 20)
 
 file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 
-file(GLOB PROJ_SOURCES "*.cpp")
-file(GLOB PROJ_HEADERS "*.h")
+file(GLOB PROJ_SOURCES "lib/*.cpp")
+file(GLOB PROJ_HEADERS "lib/*.h")
 
-add_executable(pycppgen_test ${PROJ_SOURCES} ${PROJ_HEADERS})
+add_library(lib STATIC ${PROJ_SOURCES} ${PROJ_HEADERS})
+
+file(GLOB PROJ_SOURCES "app/*.cpp")
+file(GLOB PROJ_HEADERS "app/*.h")
+
+add_executable(app ${PROJ_SOURCES} ${PROJ_HEADERS})
+target_include_directories(app PUBLIC lib)

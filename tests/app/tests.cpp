@@ -146,14 +146,12 @@ int main()
 
     pycppgen<CObject>::find_function_by_name("Get", [](auto fn)
         {
-            auto getFunc = fn.Function;
-            printf("%p", getFunc);
+            printf("CObject::Get -> %s\n", typeid(fn.Function).name());
         });
 
     pycppgen<CChild>::find_function_by_name("Add", [](auto fn)
         {
-            auto addFunc = fn.Function;
-            printf("%p", addFunc);
+            printf("CChild::Add -> %s\n", typeid(fn.Function).name());
         });
 
     return 0;
