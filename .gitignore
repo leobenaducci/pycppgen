@@ -174,3 +174,4 @@ cython_debug/
 /tests/*/*.gen.h
 /tests/*/pycppgen.cache
 /tests/*/pycppgen.h
+/tests/chaiscript

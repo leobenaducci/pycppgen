@@ -6,6 +6,8 @@
 #include <map>
 #include <string>
 
+#include "chaiscript/chaiscript.hpp"
+
 #include "class.gen.h"
 #include "enum.gen.h"
 #include "pycppgen.gen.h"
@@ -63,6 +65,15 @@ struct serializer_t
 
     std::map<std::string, serializer_value_t> data;
 };
+
+void RegisterChaiScriptTypes()
+{
+    pycppgen_globals::for_each_type_call([](auto param)
+        {
+            using T = decltype(param)::type;
+        });
+
+}
 
 int main()
 {
