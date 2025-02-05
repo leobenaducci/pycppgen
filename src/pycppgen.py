@@ -691,7 +691,7 @@ def CodeGenOutputNode(node) :
         hppCode += CodeGenOutputMetaHeader(hppCode, node)
 
         #declare the attribute map
-        hppCode += "\tstd::map<std::string_view, std::string_view> Attributes = "
+        hppCode += "\tstd::unordered_map<std::string_view, std::string_view> Attributes = "
         hppCode += CodeGenOutputAttributes(node, 1) 
         hppCode += ";\n\n"
 
@@ -803,11 +803,11 @@ def CodeGenOutputNode(node) :
                 hppCode += f"\t\tvisitor({infoName}, ((access_helper*)obj)->Get{var[ENodeName]}Ref());\n"
         hppCode += "\t}\n\n"
 
-        hppCode += "\tstatic std::map<std::string, std::string> get_var_attributes(std::string_view name) {\n"
+        hppCode += "\tstatic std::unordered_map<std::string, std::string> get_var_attributes(std::string_view name) {\n"
         if ENodeNamespace in node and node[ENodeNamespace] != "" :
             hppCode += f"\t\tusing namespace {node[ENodeNamespace]};\n"
         
-        hppCode += f"\t\tstd::map<std::string, std::string> result;\n"
+        hppCode += f"\t\tstd::unordered_map<std::string, std::string> result;\n"
 
         if ENodeVariables in node and len(node[ENodeVariables]) > 0 :
             for _, var in node[ENodeVariables].items() :
@@ -955,7 +955,7 @@ def CodeGenOutputNode(node) :
         hppCode += CodeGenOutputMetaHeader(hppCode, node)
 
         #append enum attributes
-        hppCode += "\tstd::map<std::string, std::string> Attributes = "
+        hppCode += "\tstd::unordered_map<std::string, std::string> Attributes = "
         hppCode += CodeGenOutputAttributes(node, 1) 
         hppCode += ";\n\n"
 
@@ -981,7 +981,7 @@ def CodeGenOutputNode(node) :
             hppCode += "\t}\n"
 
             #enum value attributes
-            hppCode += "\tstatic std::map<std::string, std::string> enum_value_attributes(" + node[ENodeFullName] + " value) {\n"
+            hppCode += "\tstatic std::unordered_map<std::string, std::string> enum_value_attributes(" + node[ENodeFullName] + " value) {\n"
             for k, v in node[ENodeEnumValues].items() :
                 hppCode += "\t\tif (value == " + node[ENodeFullName] + "::" + k + ") {\n\t\t\treturn " + CodeGenOutputAttributes(v, 3) + ";\n\t\t}\n"
             hppCode += "\t\treturn {};\n"
@@ -1073,14 +1073,12 @@ def CodeGenGlobalHeader(path : str) :
 #include <array>
 #include <vector>
 #include <map>
+#include <unordered_map>
 #include <functional>
 #include <type_traits>
 #include <any>
 
-template<typename C, typename T>
-struct member_variable_info {
-    using type_t = T;
-    member_variable_info(T C::* memberVar) : MemberVar(memberVar) {}
+struct member_variable_info_base {
 	std::string Name;
 	std::string FullName;
 	std::string Type;
@@ -1089,6 +1087,12 @@ struct member_variable_info {
 	size_t TotalSize = 0;
 	size_t ArrayRank = 0;
 	std::vector<size_t> ArrayExtents;
+};
+
+template<typename C, typename T>
+struct member_variable_info : member_variable_info_base {
+    using type_t = T;
+    member_variable_info(T C::* memberVar) : MemberVar(memberVar) {}
     T C::* MemberVar;
 };
 
@@ -1096,50 +1100,20 @@ struct function_parameter_info {
 	std::string Name;
 	std::string Type;
 	std::string DefaultValue;
-	std::map<std::string, std::string> Attributes;
+	std::unordered_map<std::string, std::string> Attributes;
+};
+
+struct member_function_info_base {
+	std::string Name;
+	std::string Declaration;
+	std::string ReturnType;
+	std::vector<function_parameter_info> Parameters;
+	std::unordered_map<std::string, std::string> Attributes;
 };
 
 template<typename T>
-struct member_function_info {
-	std::string Name;
-	std::string Declaration;
-	std::string ReturnType;
+struct member_function_info : member_function_info_base {
     T Function = nullptr;
-	std::vector<function_parameter_info> Parameters;
-	std::map<std::string, std::string> Attributes;
-};
-
-template<>
-struct member_function_info<void> {
-	std::string Name;
-	std::string Declaration;
-	std::string ReturnType;
- 	std::vector<function_parameter_info> Parameters;
-	std::map<std::string, std::string> Attributes;
-
-    member_function_info() 
-    {
-    }
-
-    template<typename T> member_function_info(const member_function_info<T>& A)
-    {
-	    Name = A.Name;
-	    Declaration = A.Declaration;
-	    ReturnType = A.ReturnType;
- 	    Parameters = A.Parameters;
-	    Attributes = A.Attributes;
-    }
-
-    template<typename T> member_function_info& operator=(const member_function_info<T>& A)
-    {
-	    Name = A.Name;
-	    Declaration = A.Declaration;
-	    ReturnType = A.ReturnType;
- 	    Parameters = A.Parameters;
-	    Attributes = A.Attributes;
-
-        return *this;
-    }
 };
 
 template<typename T = void> struct pycppgen { static constexpr bool is_valid() { return false; } };
@@ -1147,7 +1121,7 @@ template<> struct pycppgen<void>
 {
     pycppgen(std::string_view name);
     pycppgen(const std::type_info& info) : HashCode(info.hash_code()) {}
-    std::map<std::string, std::string> get_var_attributes(std::string_view name) const;
+    std::unordered_map<std::string, std::string> get_var_attributes(std::string_view name) const;
     void for_each_var(auto fn, uint32_t maxDepth = UINT_MAX) const;
     template<typename T> static void for_each_var(const T* obj, auto fn, uint32_t maxDepth = UINT_MAX);
     template<typename T> static void for_each_var(T* obj, auto fn, uint32_t maxDepth = UINT_MAX);   
@@ -1310,7 +1284,7 @@ def CodeGenGlobal(path : str) :
             code += f"\t\tHashCode = typeid({node[ENodeFullName]}).hash_code();\n"
     code += "}\n\n"
     
-    code += "inline std::map<std::string, std::string> pycppgen<void>::get_var_attributes(std::string_view name) const\n"
+    code += "inline std::unordered_map<std::string, std::string> pycppgen<void>::get_var_attributes(std::string_view name) const\n"
     code += "{\n"
     code += "\tif (false) {}\n"
     for _, node in TLS().NodeList.items() :
