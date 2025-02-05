@@ -20,6 +20,13 @@ This project was created as:
 - **Reflection Support**: Includes both language reflection and user-provided attributes to enhance metadata management.
 - **Fast change detection**: Caches as much data as possible to allow fast iteration
 
+## Similar projects and why I didn't use them
+
+https://github.com/Manu343726/siplasplas: A library for C++ reflection and introspection -> doesn't support custom attributes
+https://github.com/jsoysouvanh/Refureku/tree/master: Refureku is a powerful C++17 runtime reflection dynamic library -> instrusive
+https://github.com/rttrorg/rttr: RTTR stands for Run Time Type Reflection -> macro based manual registration
+https://github.com/Neargye/magic_enum: Header-only C++17 library provides static reflection for enums, work with any enum type without any macro or boilerplate code -> I might end up using this one
+
 ## The test
 - Iterate over all enums and values, convert enum to string and string to enum (TODO: bit flags)
 ![image](https://github.com/user-attachments/assets/da24781d-aed4-466d-af34-9cfffd8a2ea0)
