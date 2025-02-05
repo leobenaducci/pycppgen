@@ -24,6 +24,7 @@ file(GLOB PROJ_SOURCES "app/*.cpp")
 file(GLOB PROJ_HEADERS "app/*.h")
 
 add_executable(app ${PROJ_SOURCES} ${PROJ_HEADERS})
+target_compile_options(app PRIVATE "/bigobj")
 target_include_directories(app PUBLIC lib)
 
 target_include_directories(app PUBLIC chaiscript/include)

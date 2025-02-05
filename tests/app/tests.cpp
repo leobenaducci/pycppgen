@@ -66,17 +66,39 @@ struct serializer_t
     std::map<std::string, serializer_value_t> data;
 };
 
-void RegisterChaiScriptTypes()
+static void RegisterChaiScriptTypes(chaiscript::ChaiScript& chai)
 {
-    pycppgen_globals::for_each_type_call([](auto param)
+    pycppgen_globals::for_each_type_call([&](auto param)
         {
             using T = decltype(param)::type;
-        });
 
+            chai.add(chaiscript::user_type<T>(), pycppgen<T>::name());
+            chai.add(chaiscript::constructor<T()>(), pycppgen<T>::name());
+
+            pycppgen<T>::for_each_parent([&](auto parent)
+                {
+                    using parent_t = decltype(param)::type;
+                    chai.add(chaiscript::base_class<parent_t, T>());
+                });
+
+            pycppgen<T>::for_each_var([&](auto var)
+                {
+                    chai.add(chaiscript::fun(var.MemberVar), var.Name);
+                }, 0);
+        });
 }
 
 int main()
 {
+    chaiscript::ChaiScript chai;
+    RegisterChaiScriptTypes(chai);
+
+    chai.eval(R"_(
+		var o = CObject();
+		print(o.PublicShort);
+        o.PublicShort = 1;
+	)_");
+
     printf("-> pycppgen_globals::for_each_enum_call([](auto&& e)\n");
     pycppgen_globals::for_each_enum_call([](auto e)
         {
@@ -94,8 +116,8 @@ int main()
         {
             printf("\t*%s\n", typeid(decltype(param)::type).name());
             
-            pycppgen<decltype(param)::type>::for_each_var_typed(
-                [&](const member_variable_info& v, auto t)
+            pycppgen<decltype(param)::type>::for_each_var(
+                [&](const auto& v)
                 {
                     printf("\t\t%s %s -> Offset: %llu Size: %llu", v.Type.data(), v.FullName.data(), v.Offset, v.TotalSize);
                     if (v.ArrayRank > 0)
@@ -113,7 +135,7 @@ int main()
 	CObject* o = new CChild();
 
     printf("-> CObject* o = new CChild(); pycppgen<>::for_each_var(o, [](const member_variable_info& v, auto&& t)\n");
-    pycppgen<>::for_each_var(o, [o](const member_variable_info& v, auto&& t)
+    pycppgen<>::for_each_var(o, [o](const auto& v, auto&& t)
         {
             auto attribs = pycppgen_of(o).get_var_attributes(v.Name);
             printf("\t%s = %s\n", v.FullName.data(), std::to_string(t).c_str());
@@ -136,7 +158,7 @@ int main()
     printf("---\n");
 
     printf("-> pycppgen<>(\"SStructTest\").for_each_var([](const member_variable_info& v)\n");
-    pycppgen<>("SStructTest").for_each_var([](const member_variable_info& v)
+    pycppgen<>("SStructTest").for_each_var([](const auto& v)
         {
             printf("\t%s\n", v.FullName.data());
         });
