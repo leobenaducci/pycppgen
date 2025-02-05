@@ -93,11 +93,21 @@ int main()
     chaiscript::ChaiScript chai;
     RegisterChaiScriptTypes(chai);
 
-    chai.eval(R"_(
-		var o = CObject();
-		print(o.PublicShort);
-        o.PublicShort = 1;
+    SStructTest testStruct;
+    testStruct.x = 0;
+    testStruct.y = 0;
+    testStruct.z = 100;
+
+    chai.add(chaiscript::var(testStruct), "testStruct");
+    auto o2 = chai.eval<CObject>(R"_(
+		print("testStruct.z = " + to_string(testStruct.z));
+		var o2 = CObject();
+		print("o2.PublicShort = " + to_string(o2.PublicShort));
+        o2.PublicShort = 1;
+        return o2;
 	)_");
+
+    printf("o2.PublicShort = %d\n", o2.PublicShort);
 
     printf("-> pycppgen_globals::for_each_enum_call([](auto&& e)\n");
     pycppgen_globals::for_each_enum_call([](auto e)
