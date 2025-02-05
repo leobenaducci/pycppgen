@@ -66,7 +66,7 @@ public:
     virtual ~CChild() {}
 
     //$[[pycppgen]]
-    virtual void DoSomething();
+    virtual void DoSomething() {}
 
     //$[[pycppgen serialize]]
     std::array<float, 16> Matrix;
