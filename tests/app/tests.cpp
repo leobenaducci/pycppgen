@@ -33,7 +33,7 @@ static void RegisterChaiScriptTypes(chaiscript::ChaiScript& chai)
 
             pycppgen<T>::for_each_static_var([&](auto var)
                 {
-                    //chai.add(chaiscript::fun(var.StaticMemberVar), var.FullName);
+                    chai.add(chaiscript::exception::global_non_const(var.StaticMemberVar), var.FullName);
                 });
         });
 
