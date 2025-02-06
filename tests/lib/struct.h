@@ -6,7 +6,7 @@
 struct SStructBase
 {
     //$[[pycppgen visible]]
-    static const char size = 12;
+    static const char size = 'A';
 
     //$[[pycppgen visible]]
     int components = 3;
