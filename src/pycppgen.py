@@ -1475,6 +1475,7 @@ def main(args : list) :
                 if not pathlib.Path(i).is_absolute() :
                     i = ResolvePath(os.path.join(ProjectPath, i))
                 Dependencies.append(i)
+                args.append(f"-I{i}")
 
     OutdatedFiles = set()
     FilesToCodeGen = set()
