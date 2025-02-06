@@ -33,7 +33,9 @@ static void RegisterChaiScriptTypes(chaiscript::ChaiScript& chai)
 
             pycppgen<T>::for_each_static_var([&](auto var)
                 {
-                    chai.add(chaiscript::exception::global_non_const(var.StaticMemberVar), var.FullName);
+                    std::string name = var.FullName;
+                    std::ranges::replace(name, ':', '_');
+                    chai.add_global(chaiscript::var(var.StaticMemberVar), name);
                 });
         });
 
@@ -51,14 +53,8 @@ static void RegisterChaiScriptTypes(chaiscript::ChaiScript& chai)
 
 int main()
 {
-    //member_function_info<decltype(&pycppgen<SStructTest>::access_helper::size)> info;
-    //info.Function;
-
-    decltype(&SStructTest::size) A;
-
     chaiscript::ChaiScript chai;
     RegisterChaiScriptTypes(chai);
-
     
     SStructTest testStruct;
     testStruct.x = 0;
@@ -69,7 +65,7 @@ int main()
     {
         chai.add(chaiscript::var(testStruct), "testStruct");
         auto o2 = chai.eval<CObject>(R"_(
-		    print("testStruct::size = " + to_string(testStruct::size));
+		    print("SStructBase__size = " + to_string(SStructBase__size));
 		    print("testStruct.z = " + to_string(testStruct.z));
 		    print("testStruct.components = " + to_string(testStruct.components));
 		    var o2 = CObject();
