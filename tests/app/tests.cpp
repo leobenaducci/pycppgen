@@ -33,14 +33,14 @@ static void RegisterScriptingBindings(chaiscript::ChaiScript& chai, auto pyModul
 
             pycppgen<T>::for_each_var([&](auto var)
                 {
-                    chai.add(chaiscript::fun(var.MemberVar), var.Name);
+                    chai.add(chaiscript::fun(var.VariablePtr), var.name());
                 }, 0);
 
             pycppgen<T>::for_each_static_var([&](auto var)
                 {
-                    std::string name = var.FullName;
+                    std::string name = var.full_name();
                     std::ranges::replace(name, ':', '_');
-                    chai.add_global(chaiscript::var(var.StaticMemberVar), name);
+                    chai.add_global(chaiscript::var(var.VariablePtr), name);
                 });
         });
 
@@ -80,9 +80,9 @@ PYBIND11_EMBEDDED_MODULE(tests, m)
 					pycppgen<T>::for_each_var([&](auto var)
 						{
 							if (var.is_const())
-								pyClass.def_readonly(var.Name.data(), var.MemberVar);
+								pyClass.def_readonly(var.name(), var.VariablePtr);
 							else
-								pyClass.def_readwrite(var.Name.data(), var.MemberVar);
+								pyClass.def_readwrite(var.name(), var.VariablePtr);
 						}, 0);
 
 					pycppgen<T>::for_each_function([&](auto fn)
@@ -99,9 +99,9 @@ PYBIND11_EMBEDDED_MODULE(tests, m)
 				pycppgen<T>::for_each_var([&](auto var)
 					{
 						if (var.is_const())
-							pyClass.def_readonly(var.Name.data(), var.MemberVar);
+							pyClass.def_readonly(var.name(), var.VariablePtr);
 						else
-							pyClass.def_readwrite(var.Name.data(), var.MemberVar);
+							pyClass.def_readwrite(var.name(), var.VariablePtr);
 					}, 0);
 
 				pycppgen<T>::for_each_function([&](auto fn)
@@ -124,27 +124,27 @@ int main()
 
     RegisterScriptingBindings(chai, py::module_::__main__());
 
-    {
-        printf("------------ PYTHON ---------------------\n");
-        auto globals = py::dict();
+	{
+		printf("------------ PYTHON ---------------------\n");
+		auto globals = py::dict();
 
-        auto tests = py::module::import("tests");
-        globals["testStruct"] = py::cast(&testStruct);
-        py::exec(
+		auto tests = py::module::import("tests");
+		globals["testStruct"] = py::cast(&testStruct);
+		py::exec(
 			"import tests\n"
 			"testStruct.z = 23\n"
-            "print('testStruct.z = ' + str(testStruct.z))\n"
+			"print('testStruct.z = ' + str(testStruct.z))\n"
 			"o2 = tests.CObject()\n"
-            "print('o2.PublicShort = ' + str(o2.PublicShort))\n"
-            "print('set o2.PublicShort to 2')\n"
-            "o2.PublicShort = 2\n"
-            , globals);
+			"print('o2.PublicShort = ' + str(o2.PublicShort))\n"
+			"print('set o2.PublicShort to 2')\n"
+			"o2.PublicShort = 2\n"
+			, globals);
 
-        auto o2 = py::eval("o2", globals).cast<CObject>();
-        printf("o2.PublicShort = %d\n", o2.PublicShort);
+		auto o2 = py::eval("o2", globals).cast<CObject>();
+		printf("o2.PublicShort = %d\n", o2.PublicShort);
 
-        printf("---------------------------------\n");
-    }
+		printf("---------------------------------\n");
+	}
 
     try
     {
