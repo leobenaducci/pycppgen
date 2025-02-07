@@ -1144,6 +1144,7 @@ struct static_member_variable_info {
 template<typename C, typename T>
 struct member_variable_info : member_variable_info_base {
     using type_t = T;
+    constexpr bool is_const() { return std::is_const_v<T>; }
     member_variable_info(T C::* memberVar) : MemberVar(memberVar) {}
     size_t Offset = 0;
     T C::* MemberVar = nullptr;
