@@ -4,7 +4,6 @@
 
 #include "chaiscript/chaiscript.hpp"
 #include "pybind11/pybind11.h"
-#include "pocketpy.h"
 
 #include "class.gen.h"
 #include "enum.gen.h"
@@ -46,16 +45,19 @@ static void RegisterScriptingBindings(chaiscript::ChaiScript& chai, auto pyModul
         });
 
     pycppgen_globals::for_each_type([&](auto param)
-    {
-        using T = decltype(param)::type;
+        {
+            using T = decltype(param)::type;
 
-        pycppgen<T>::for_each_parent([&](auto parent)
-            {
-                using parent_t = decltype(parent)::type;
-                chai.add(chaiscript::base_class<parent_t, T>());
-            });
-    });
+            pycppgen<T>::for_each_parent([&](auto parent)
+                {
+                    using parent_t = decltype(parent)::type;
+                    chai.add(chaiscript::base_class<parent_t, T>());
+                });
+        });
+}
 
+PYBIND11_EMBEDDED_MODULE(tests, m)
+{
     //pocketpy
 	pycppgen_globals::for_each_type([&](auto param)
 		{
@@ -71,12 +73,13 @@ static void RegisterScriptingBindings(chaiscript::ChaiScript& chai, auto pyModul
 
 					using parent_t = decltype(parent)::type;
 
-					auto& pyClass = py::class_<T, parent_t>(pyModule, pycppgen<T>::name())
-						.def(py::init<>());
+					auto& pyClass = py::class_<T, parent_t>(m, pycppgen<T>::name())
+						.def(py::init<>())
+                        .def(py::init<const T&>());
 
 					pycppgen<T>::for_each_var([&](auto var)
 						{
-							if (var.is_const)
+							if (var.is_const())
 								pyClass.def_readonly(var.Name.data(), var.MemberVar);
 							else
 								pyClass.def_readwrite(var.Name.data(), var.MemberVar);
@@ -90,12 +93,12 @@ static void RegisterScriptingBindings(chaiscript::ChaiScript& chai, auto pyModul
 
 			if (!parentRegistered)
 			{
-				auto& pyClass = py::class_<T>(pyModule, pycppgen<T>::name())
+				auto& pyClass = py::class_<T>(m, pycppgen<T>::name())
 					.def(py::init<>());
 
 				pycppgen<T>::for_each_var([&](auto var)
 					{
-						if (var.is_const)
+						if (var.is_const())
 							pyClass.def_readonly(var.Name.data(), var.MemberVar);
 						else
 							pyClass.def_readwrite(var.Name.data(), var.MemberVar);
@@ -122,19 +125,22 @@ int main()
     RegisterScriptingBindings(chai, py::module_::__main__());
 
     {
-        CObject o2;
-
         printf("------------ PYTHON ---------------------\n");
         auto globals = py::dict();
-        globals["testStruct"] = py::cast(testStruct);
-        globals["o2"] = py::cast(o2);
+
+        auto tests = py::module::import("tests");
+        globals["testStruct"] = py::cast(&testStruct);
         py::exec(
+			"import tests\n"
+			"testStruct.z = 23\n"
             "print('testStruct.z = ' + str(testStruct.z))\n"
+			"o2 = tests.CObject()\n"
             "print('o2.PublicShort = ' + str(o2.PublicShort))\n"
-            "o2.PublicShort = 1\n"
+            "print('set o2.PublicShort to 2')\n"
+            "o2.PublicShort = 2\n"
             , globals);
 
-        o2 = globals["o2"].cast<CObject>();
+        auto o2 = py::eval("o2", globals).cast<CObject>();
         printf("o2.PublicShort = %d\n", o2.PublicShort);
 
         printf("---------------------------------\n");
@@ -151,6 +157,7 @@ int main()
 		    print("testStruct.components = " + to_string(testStruct.components));
 		    var o2 = CObject();
 		    print("o2.PublicShort = " + to_string(o2.PublicShort));
+		    print("set o2.PublicShort to 1");
             o2.PublicShort = 1;
             return o2;
 	    )_");

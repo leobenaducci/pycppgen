@@ -4,6 +4,8 @@ include(FetchContent)
 
 project(pycppgen_test VERSION 1.0 LANGUAGES CXX)
 
+set(CMAKE_TLS_VERIFY FALSE)
+
 FetchContent_Declare(
     chaiscript
     URL https://github.com/ChaiScript/ChaiScript/archive/refs/heads/develop.zip
@@ -12,7 +14,7 @@ FetchContent_Declare(
     )
 FetchContent_GetProperties(chaiscript)
 if (NOT chaiscript_POPULATED)
-    FetchContent_Populate(chaiscript)
+    FetchContent_MakeAvailable(chaiscript)
 endif()
     
 FetchContent_Declare(
@@ -21,7 +23,10 @@ FetchContent_Declare(
     URL_HASH SHA256=B7B3AA7C063C99A73513F41A31E37C371AFA28CCF941BA3AF3B23A550749D668
     SOURCE_DIR ../3rdparty/pocketpy
     )
-FetchContent_MakeAvailable(pocketpy)
+FetchContent_GetProperties(pocketpy)
+if (NOT pocketpy_POPULATED)
+    FetchContent_MakeAvailable(pocketpy)
+endif()
 
 add_custom_command(
     OUTPUT ${pocketpy_SOURCE_DIR}/amalgamated/pocketpy.c ${pocketpy_SOURCE_DIR}/amalgamated/pocketpy.h
