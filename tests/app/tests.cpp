@@ -28,7 +28,7 @@ static void RegisterScriptingBindings(chaiscript::ChaiScript& chai, auto pyModul
 
             pycppgen<T>::for_each_function([&](auto fn)
                 {
-                    chai.add(chaiscript::fun(fn.Function), fn.Name);
+                    chai.add(chaiscript::fun(fn.FunctionPtr), fn.name());
                 }, 0);
 
             pycppgen<T>::for_each_var([&](auto var)
@@ -87,7 +87,7 @@ PYBIND11_EMBEDDED_MODULE(tests, m)
 
 					pycppgen<T>::for_each_function([&](auto fn)
 						{
-							pyClass.def((const char*)fn.Name.data(), fn.Function);
+							pyClass.def(fn.name(), fn.FunctionPtr);
 						}, 0);
 				}, 1);
 
@@ -106,7 +106,7 @@ PYBIND11_EMBEDDED_MODULE(tests, m)
 
 				pycppgen<T>::for_each_function([&](auto fn)
 					{
-						pyClass.def((const char*)fn.Name.data(), fn.Function);
+						pyClass.def(fn.name(), fn.FunctionPtr);
 					}, 0);
 			}
 		});
@@ -170,6 +170,21 @@ int main()
     }
 
     printf("---------------------------------\n");
+
+    pycppgen_globals::for_each_type([&](auto param)
+        {
+            using T = decltype(param)::type;
+
+            pycppgen<T>::for_each_var([&](auto var)
+                {
+                    printf("%s\n", decltype(var)::name());
+                }, 0);
+
+            pycppgen<T>::for_each_function([&](auto fun)
+                {
+                    printf("%s\n", decltype(fun)::declaration());
+                }, 0);
+        });
 
     return 0;
 }
