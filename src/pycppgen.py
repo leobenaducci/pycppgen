@@ -1253,7 +1253,9 @@ def CodeGenGlobal(path : str) :
     code += "#include \"pycppgen.h\"\n"
     for k in PerFileData :
         if not k.endswith(".gen.h") :
-            code += f"#include \"{str(pathlib.Path(GetOutputFilePath(k)).relative_to(ProjectPath, walk_up=True)).replace("\\", "/")}\"\n"
+            relPath = pathlib.Path(GetOutputFilePath(k)).relative_to(ProjectPath, walk_up=True)
+            relPath = str(relPath).replace('\\', '/')
+            code += f"#include \"{relPath}\"\n"
 
     code += "\nnamespace pycppgen_globals\n{\n"
 
@@ -1459,6 +1461,11 @@ def main(args : list) :
             args.remove(arg)
             arg = arg[3:]
             for i in arg.split(";") :
+                args.append(f"-D{i}")
+        if arg.startswith("--P") :
+            args.remove(arg)
+            arg = arg[3:]
+            for i in arg.split(";") :
                 Dependencies.append(i)
 
     OutdatedFiles = set()
@@ -1551,7 +1558,7 @@ def main(args : list) :
     #clear data
     TLS().NodeList = {}
 
-    for _, v in PerFileData.items() : 
+    for n, v in sorted(PerFileData.items()) : 
         if "NodeList" in v :
             TLS().NodeList.update(v["NodeList"])
 
