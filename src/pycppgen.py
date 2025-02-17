@@ -694,6 +694,7 @@ def GenerateMemberVariableStructDefinition(node : dict, var : dict, infoName : s
     tabs -= 1
     result += "\t" * tabs + "};\n"
     result += "\t" * tabs + f"using type_t = decltype({infoName}::{varName});\n"
+    result += "\t" * tabs + f"using owner_t = {node[ENodeName]};\n"
     if isStatic :
         result += "\t" * tabs + f"type_t* VariablePtr = &{infoName}::{varName};\n"
     else :
@@ -1160,9 +1161,7 @@ def CodeGen(filePath : str) :
 #codegen: emit for each type call
 def CodeGenGlobalAddForEachTypeCall(code, node) :
     if node[ENodeKind] == EKindClass or node[ENodeKind] == EKindStruct : #or node[ENodeKind] == EKindClassTemplate:
-        typeName = "type_" + node[ENodeFullName].replace("::", "_")
-        code += "\t\tstruct " + typeName + " { using type = " + node[ENodeFullName] + "; const type* obj = nullptr; };\n"
-        code += f"\t\tvisitor({typeName}());\n"
+        code += f"\t\tvisitor.template operator()<{node[ENodeFullName]}>();\n"
     return code
 
 #codegen: output global file
