@@ -678,7 +678,7 @@ def GenerateMemberVariableStructDefinition(node : dict, var : dict, infoName : s
     varName = var[ENodeName]
     fullVarName = var[ENodeFullName]
 
-    result += "\t" * tabs + "struct " + infoName + " : member_variable_info_base, protected " + node[ENodeName] + " {\n"
+    result += "\t" * tabs + "struct " + infoName + " : protected " + node[ENodeName] + ", public member_variable_info_base {\n"
     tabs += 1 
     result += "\t" * (tabs - 1) + "protected:\n"
     result += "\t" * tabs + f"using {node[ENodeName]}::{var[ENodeName]};\n"
