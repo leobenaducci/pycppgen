@@ -11,7 +11,7 @@ from concurrent.futures import ThreadPoolExecutor
 from clang.cindex import CursorKind
 from clang.cindex import AccessSpecifier
 
-DebugMode = True
+DebugMode = False
 
 ENodeName = "name"
 ENodeFullName = "full_name"
@@ -785,7 +785,7 @@ def CodeGenOutputNode(node) :
         hppCode += "\n"
 
         #declare the attribute map
-        hppCode += "\tconst attribute_map_t attributes() {\n"
+        hppCode += "\tstatic attribute_map_t attributes() {\n"
         hppCode += "\t\treturn {" + CodeGenOutputAttributes(node, 2) + "};\n" 
         hppCode += "\t};\n\n"
         
