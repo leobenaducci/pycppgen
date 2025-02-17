@@ -583,7 +583,7 @@ def CodeGenOutputMetaFooter(code, node) :
 
 #codegen: emit attributes as array of pairs
 def CodeGenOutputAttributes(node, depth = 0) :
-    if not ENodeAttributes in node or len(node[ENodeAttributes]) == 0 :
+    if ENodeAttributes in node and len(node[ENodeAttributes]) > 0 :
         attribs = node[ENodeAttributes]
 
         depth += 1
@@ -729,7 +729,7 @@ def GenerateMemberFunctionInfo(node, func, infoName) :
     funcName = func[ENodeName]
     paramsString = func[ENodeType][len(func[ENodeReturnType]) + 1:]
 
-    result += f"\t\tstruct {infoName} : member_function_info_base, protected {node[ENodeName]} " + "{\n"
+    result += f"\t\tstruct {infoName} : member_function_info_base, protected {node[ENodeFullName]} " + "{\n"
     result += f"\t\t\t{infoName}() " + "{\n"
     result += f"\t\t\t\tName = name();\n"
     result += f"\t\t\t\tDeclaration = declaration();\n"
@@ -738,16 +738,17 @@ def GenerateMemberFunctionInfo(node, func, infoName) :
     result += "\t\t\t}\n"
     result += "\n"
 
-    result += f"\t\t\tusing type_t = decltype({func[ENodeFullName]});\n"
+    result += f"\t\t\tusing {node[ENodeName]}::{func[ENodeName]};\n"
+    result += f"\t\t\tusing type_t = decltype(&{infoName}::{func[ENodeName]});\n"
     result += f"\t\t\tusing return_type_t = {func[ENodeReturnType]};\n"
-    result += f"\t\t\t{func[ENodeReturnType]} ({node[ENodeName]}::*FunctionPtr){paramsString} = &{func[ENodeFullName]};\n"
+    result += f"\t\t\t{func[ENodeReturnType]} ({node[ENodeName]}::*FunctionPtr){paramsString} = function_ptr();\n"
     result += "\n"
 
     result += "\t\t\tstatic constexpr const char* name() { return \"" + funcName + "\"; }\n"
     result += "\t\t\tstatic constexpr const char* declaration() { return \"" + func[ENodeType] + "\"; }\n"
     result += "\t\t\tstatic constexpr const char* return_type_name() { return \"" + func[ENodeReturnType] + "\"; }\n"
     result += "\t\t\tstatic constexpr const char* parameters_string() { return \"" + paramsString + "\"; }\n"
-    result += "\t\t\tstatic auto function_ptr() { return &pycppgen_t::" + func[ENodeName] + "; }\n"
+    result += "\t\t\tstatic type_t function_ptr() { return &" + infoName + "::" + func[ENodeName] + "; }\n"
     result += "\t\t\tstatic constexpr attribute_map_t attributes() { return " + CodeGenOutputAttributes(func, 4) + "; }\n"
     result += "\t\t\tstatic std::vector<function_parameter_info> parameters() {\n"
     result += "\t\t\t\tstd::vector<function_parameter_info> result;\n"
