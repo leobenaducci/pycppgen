@@ -1487,6 +1487,8 @@ def main(args : list) :
         atomic_print("usage py main.py <directory> <options>")
         exit(-1)
 
+    ProjectPath = str(pathlib.Path(args[0]).resolve())
+
     Dependencies = []
     for arg in list(args[1:]) :
         if arg.startswith("--I") :
@@ -1512,7 +1514,6 @@ def main(args : list) :
 
     OutdatedFiles = set()
     FilesToCodeGen = set()
-    ProjectPath = str(pathlib.Path(args[0]).resolve())
     CacheFile = os.path.join(ProjectPath, "pycppgen.cache")
 
     atomic_print("parsing path: " + ProjectPath)
