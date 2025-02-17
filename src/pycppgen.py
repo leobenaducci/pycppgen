@@ -1059,11 +1059,30 @@ def CodeGenOutputNode(node) :
             hppCode += "\t\treturn \"\";\n"
             hppCode += "\t}\n"
 
+            hppCode += "\tstatic std::string bitfield_to_string(" + node[ENodeFullName] + " value) {\n"
+            hppCode += f"\t\tusing type = std::underlying_type_t<{node[ENodeFullName]}>;\n"
+            hppCode += f"\t\tstd::string result;\n"
+            for k, v in node[ENodeEnumValues].items() :
+                hppCode += f"\t\tif ((type)value & (type){node[ENodeFullName]}::{k}) result += \"|{k}\";\n"
+            hppCode += "\t\treturn result.empty() ? result : std::string{result.begin() + 1, result.end()};\n"
+            hppCode += "\t}\n"
+
             #string to enum
             hppCode += "\tstatic constexpr " + node[ENodeFullName] + " string_to_enum(std::string_view value) {\n"
             for k, v in node[ENodeEnumValues].items() :
                 hppCode += "\t\tif (value == \"" + k + "\") return " + node[ENodeFullName] + "::" + k + ";\n"
             hppCode += "\t\treturn static_cast<" + node[ENodeFullName] + ">(-1);\n"
+            hppCode += "\t}\n"
+
+            hppCode += "\tstatic " + node[ENodeFullName] + " string_to_bitfield(std::string_view value) {\n"
+            hppCode += f"\t\tusing type = std::underlying_type_t<{node[ENodeFullName]}>;\n"
+            hppCode += f"\t\tstd::string str(value);\n"
+            hppCode += f"\t\tstr.erase(std::remove(str.begin(), str.end(), ' '));\n"
+            hppCode += f"\t\tconst std::vector<std::string> tokens = pycppgen_detail::split_string(str, '|');\n"
+            hppCode += f"\t\ttype result = 0;\n"
+            for k, v in node[ENodeEnumValues].items() :
+                hppCode += f"\t\tif (std::ranges::find(tokens, \"{k}\") != tokens.end()) result |= (type){node[ENodeFullName]}::{k};\n"
+            hppCode += f"\t\treturn ({node[ENodeFullName]}) result;\n"
             hppCode += "\t}\n"
 
             #enum value attributes
@@ -1162,6 +1181,8 @@ def CodeGenGlobalHeader(path : str) :
 #include <unordered_map>
 #include <functional>
 #include <type_traits>
+#include <algorithm>
+#include <sstream>
 #include <any>
 
 using attribute_map_t = std::unordered_map<std::string_view, std::string_view>;
@@ -1239,6 +1260,16 @@ namespace pycppgen_detail
 	    (extents.push_back(dims), ...);
 	    return extents;
 	}
+
+    inline std::vector<std::string> split_string(const std::string_view str, char delimiter) {
+        std::vector<std::string> tokens;
+        std::string token;
+        std::istringstream tokenStream(std::string{str});
+        while (std::getline(tokenStream, token, delimiter)) {
+            tokens.push_back(token);
+        }
+        return tokens;
+    }
 }
 
 #endif //_PYCPPGEN_HEADER_

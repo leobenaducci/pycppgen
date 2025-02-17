@@ -105,10 +105,14 @@ int main()
 
         printf("o2.PublicShort = %d\n", o2.PublicShort);
     }
-    catch (std::exception e)
+    catch (const std::exception& e)
     {
-        printf(e.what());
+        printf("%s\n", e.what());
     }
+
+    auto v = pycppgen<EEnum>::string_to_bitfield("Test| Value");
+    v = (EEnum) ((std::underlying_type_t<EEnum>)v | (std::underlying_type_t<EEnum>)EEnum::Something);
+    auto s = pycppgen<EEnum>::bitfield_to_string(v);
 
     printf("---------------------------------\n");
 
