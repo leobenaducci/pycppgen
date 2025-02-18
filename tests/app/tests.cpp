@@ -12,17 +12,14 @@
 static void RegisterScriptingBindings(chaiscript::ChaiScript& chai)
 {
     //chaiscript
-    pycppgen_globals::for_each_type([&](auto param)
+    pycppgen_globals::for_each_type([&]<typename T>()
         {
-            using T = decltype(param)::type;
-
             chai.add(chaiscript::user_type<T>(), pycppgen<T>::name());
             chai.add(chaiscript::constructor<T()>(), pycppgen<T>::name());
         });
 
-    pycppgen_globals::for_each_enum([&](auto param)
+    pycppgen_globals::for_each_enum([&]<typename T>()
         {
-            using T = decltype(param);
             const auto enumName = std::string(pycppgen<T>::name());
 
             auto m = std::make_shared<chaiscript::Module>();
@@ -41,36 +38,31 @@ static void RegisterScriptingBindings(chaiscript::ChaiScript& chai)
             chai.add(m);
         });
 
-    pycppgen_globals::for_each_type([&](auto param)
+    pycppgen_globals::for_each_type([&]<typename T>()
         {
-            using T = decltype(param)::type;
-
-            pycppgen<T>::for_each_function([&](auto fn)
+            pycppgen<T>::for_each_function([&]<typename R>()
                 {
-                    chai.add(chaiscript::fun(fn.FunctionPtr), fn.name());
+                    chai.add(chaiscript::fun(R::function_ptr()), R::name());
                 }, 0);
 
-            pycppgen<T>::for_each_var([&](auto var)
+            pycppgen<T>::for_each_var([&]<typename R>()
                 {
-                    chai.add(chaiscript::fun(var.VariablePtr), var.name());
+                    chai.add(chaiscript::fun(R::variable_ptr()), R::name());
                 }, 0);
 
-            pycppgen<T>::for_each_static_var([&](auto var)
+            pycppgen<T>::for_each_static_var([&]<typename R>()
                 {
-                    std::string name = var.full_name();
+                    std::string name = R::full_name();
                     std::ranges::replace(name, ':', '_');
-                    chai.add_global(chaiscript::var(var.VariablePtr), name);
+                    chai.add_global(chaiscript::var(R::variable_ptr()), name);
                 });
         });
 
-    pycppgen_globals::for_each_type([&](auto param)
+    pycppgen_globals::for_each_type([&]<typename T>()
         {
-            using T = decltype(param)::type;
-
-            pycppgen<T>::for_each_parent([&](auto parent)
+            pycppgen<T>::for_each_parent([&]<typename R>()
                 {
-                    using parent_t = decltype(parent)::type;
-                    chai.add(chaiscript::base_class<parent_t, T>());
+                    chai.add(chaiscript::base_class<R, T>());
                 });
         });
 }
@@ -116,18 +108,16 @@ int main()
 
     printf("---------------------------------\n");
 
-    pycppgen_globals::for_each_type([&](auto param)
+    pycppgen_globals::for_each_type([&]<typename T>()
         {
-            using T = decltype(param)::type;
-
-            pycppgen<T>::for_each_var([&](auto var)
+            pycppgen<T>::for_each_var([&]<typename R>()
                 {
-                    printf("%s\n", decltype(var)::name());
+                    printf("%s\n", R::name());
                 }, 0);
 
-            pycppgen<T>::for_each_function([&](auto fun)
+            pycppgen<T>::for_each_function([&]<typename R>()
                 {
-                    printf("%s\n", decltype(fun)::declaration());
+                    printf("%s\n", R::declaration());
                 }, 0);
         });
 
