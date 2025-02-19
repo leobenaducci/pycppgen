@@ -717,19 +717,10 @@ def GenerateMemberFunctionInfo(node, func, infoName) :
     funcName = func[ENodeName]
     paramsString = func[ENodeType][len(func[ENodeReturnType]) + 1:]
 
-    result += f"\t\tstruct {infoName} : member_function_info_base, protected {node[ENodeFullName]} " + "{\n"
-    result += f"\t\t\t{infoName}() " + "{\n"
-    result += f"\t\t\t\tName = name();\n"
-    result += f"\t\t\t\tDeclaration = declaration();\n"
-    result += f"\t\t\t\tReturnType = return_type_name();\n"
-    result += f"\t\t\t\tParameters = parameters();\n"
-    result += "\t\t\t}\n"
-    result += "\n"
-
+    result += f"\t\tstruct {infoName} : protected {node[ENodeFullName]} " + "{\n"
     result += f"\t\t\tusing {node[ENodeName]}::{func[ENodeName]};\n"
     result += f"\t\t\tusing type_t = decltype(&{infoName}::{func[ENodeName]});\n"
     result += f"\t\t\tusing return_type_t = {func[ENodeReturnType]};\n"
-    result += f"\t\t\t{func[ENodeReturnType]} ({node[ENodeName]}::*FunctionPtr){paramsString} = function_ptr();\n"
     result += "\n"
 
     result += "\t\t\tstatic constexpr const char* name() { return \"" + funcName + "\"; }\n"
@@ -1173,27 +1164,10 @@ def CodeGenGlobalHeader(path : str) :
 
 using attribute_map_t = std::unordered_map<std::string_view, std::string_view>;
 
-struct member_variable_info_base {
-	std::string_view Name;
-	std::string_view FullName;
-	std::string_view Type;
-	size_t ElementSize = 0;
-	size_t TotalSize = 0;
-	size_t ArrayRank = 0;
-	std::vector<size_t> ArrayExtents;
-};
-
 struct function_parameter_info {
 	std::string_view Name;
 	std::string_view Type;
 	std::string_view DefaultValue;
-};
-
-struct member_function_info_base {
-	std::string_view Name;
-	std::string_view Declaration;
-	std::string_view ReturnType;
-	std::vector<function_parameter_info> Parameters;
 };
 
 template<typename T = void> struct pycppgen { static constexpr bool is_valid() { return false; } };
