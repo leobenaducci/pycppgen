@@ -1427,7 +1427,7 @@ def ProcessFile(file : str, compilerOptions) :
         PerFileData[file]["IncludedFiles"] = list(set(includedFiles))
 
     for f in PerFileData[file]["IncludedFiles"] :
-        if os.path.getmtime(f) > fileTime :
+        if not f.endswith("pycppgen.h") and os.path.getmtime(f) > fileTime :
             needsCodeGen = True
             if not f in FilesToParse and FileContainsPyCppGenTag(f) :
                 FilesToParse.append(f)
