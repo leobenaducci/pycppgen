@@ -1248,7 +1248,7 @@ def CodeGenGlobal(path : str) :
     code += "#pragma once\n\n"
     code += "\n"
     code += "#include \"pycppgen.h\"\n"
-    for k in PerFileData :
+    for k in sorted(PerFileData) :
         if not k.endswith(".gen.h") :
             relPath = pathlib.Path(GetOutputFilePath(k)).relative_to(ProjectPath, walk_up=True)
             relPath = str(relPath).replace('\\', '/')
