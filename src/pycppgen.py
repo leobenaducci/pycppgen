@@ -1175,7 +1175,7 @@ template<> struct pycppgen<void>
 {
     pycppgen(std::string_view name);
     pycppgen(const std::type_info& info) : HashCode(info.hash_code()) {}
-    constexpr const char* name() const;
+    const char* name() const;
     attribute_map_t get_var_attributes(std::string_view name) const;
     void for_each_var(auto visitor, uint32_t maxDepth = UINT_MAX) const;
     template<typename T> static void for_each_var(const T* obj, auto visitor, uint32_t maxDepth = UINT_MAX);
@@ -1278,13 +1278,14 @@ def CodeGenGlobal(path : str) :
     code += "\t}\n"
     code += "}\n\n"
 
-    code += "constexpr const char* pycppgen<void>::name() const\n"
+    code += "const char* pycppgen<void>::name() const\n"
     code += "{\n"
     code += "\tif (false) {}\n"
     for _, node in TLS().NodeList.items() :
         if node[ENodeKind] == EKindClass or node[ENodeKind] == EKindStruct :
             code += f"\telse if (HashCode == typeid({node[ENodeFullName]}).hash_code())\n"
             code += f"\t\treturn pycppgen<{node[ENodeFullName]}>::name();\n"
+    code += "\treturn "";\n"
     code += "}\n\n"
 
     code += "template<typename T> void pycppgen<void>::for_each_var(const T* obj, auto visitor, uint32_t maxDepth)\n"
