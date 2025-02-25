@@ -1285,7 +1285,7 @@ def CodeGenGlobal(path : str) :
         if node[ENodeKind] == EKindClass or node[ENodeKind] == EKindStruct :
             code += f"\telse if (HashCode == typeid({node[ENodeFullName]}).hash_code())\n"
             code += f"\t\treturn pycppgen<{node[ENodeFullName]}>::name();\n"
-    code += "\treturn "";\n"
+    code += "\treturn \"\";\n"
     code += "}\n\n"
 
     code += "template<typename T> void pycppgen<void>::for_each_var(const T* obj, auto visitor, uint32_t maxDepth)\n"
