@@ -1173,11 +1173,11 @@ struct function_parameter_info {
 template<typename T = void> struct pycppgen { static constexpr bool is_valid() { return false; } };
 template<> struct pycppgen<void> 
 {
-    pycppgen(std::string_view name);
-    pycppgen(const std::type_info& info) : HashCode(info.hash_code()) {}
-    const char* name() const;
-    attribute_map_t get_var_attributes(std::string_view name) const;
-    void for_each_var(auto visitor, uint32_t maxDepth = UINT_MAX) const;
+    inline pycppgen(std::string_view name);
+    inline pycppgen(const std::type_info& info) : HashCode(info.hash_code()) {}
+    inline const char* name() const;
+    inline attribute_map_t get_var_attributes(std::string_view name) const;
+    inline void for_each_var(auto visitor, uint32_t maxDepth = UINT_MAX) const;
     template<typename T> static void for_each_var(const T* obj, auto visitor, uint32_t maxDepth = UINT_MAX);
     template<typename T> static void for_each_var(T* obj, auto visitor, uint32_t maxDepth = UINT_MAX);   
     template<typename T, typename R> static bool dump(T& result, const R* obj); 
