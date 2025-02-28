@@ -1092,7 +1092,7 @@ def CodeGen(filePath : str) :
 
     parentPath = pathlib.Path(filePath).parent
     if "IncludedFiles" in PerFileData[filePath] :
-        for f in PerFileData[filePath]["IncludedFiles"] :
+        for f in sorted(PerFileData[filePath]["IncludedFiles"]) :
             if f in PerFileData and "NodeList" in PerFileData[f] :
                 hppCode += f"#include \"{pathlib.Path(GetOutputFilePath(f)).relative_to(ProjectPath, walk_up=True)}\"\n"
 
