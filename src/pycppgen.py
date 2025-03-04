@@ -1397,7 +1397,7 @@ def IsFileDifferent(file, content) :
         return content != ""
 
     fileContent = ""
-    with open(file) as f :
+    with open(file, "rt") as f :
         fileContent = f.read()
     
     return fileContent != content
