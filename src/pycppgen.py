@@ -1500,7 +1500,7 @@ def main(args : list) :
             if file.endswith(".pycppgentmp") :
                 os.remove(root + "\\" + file)
                 continue
-            if re.match(r".*\.h", file) and not re.match(r".*\.gen.h$", file) :
+            if re.match(r".*\.h$", file) and not re.match(r".*\.gen.h$", file) :
                 filePath = os.path.join(root, file)
                 if FileContainsPyCppGenTag(filePath) :
                     FilesToParse.append(os.path.join(root, file))
