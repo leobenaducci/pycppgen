@@ -1580,7 +1580,7 @@ def main(args : list) :
         atomic_print("global code gen step")
         FilesToParse.append(os.path.join(ProjectPath, "\\pycppgen.h"))
         CodeGenGlobal(ProjectPath)
-        PerFileData["pycppgen.gen.h"] = TLS().NodeList
+    PerFileData["pycppgen.gen.h"] = TLS().NodeList
 
     #save cache
     with open(CacheFile, "wt") as file :
