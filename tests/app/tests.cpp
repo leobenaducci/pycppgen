@@ -1,158 +1,127 @@
 
 #include <cstdio>
-#include <string_view>
-#include <functional>
-#include <typeinfo>
-#include <map>
-#include <string>
+#include <utility>
+
+#include "chaiscript/chaiscript.hpp"
+#include "chaiscript/utility/utility.hpp"
 
 #include "class.gen.h"
 #include "enum.gen.h"
 #include "pycppgen.gen.h"
 
-void CChild::DoSomething() {}
-
-namespace std
+static void RegisterScriptingBindings(chaiscript::ChaiScript& chai)
 {
-    template<typename T, size_t N>
-    std::string to_string(const std::array<T, N>& arr)
-    {
-        std::string str;
-        str.reserve(N * 3 + 3);
+    //chaiscript
+    pycppgen_globals::for_each_type([&]<typename T>()
+        {
+            chai.add(chaiscript::user_type<T>(), pycppgen<T>::name());
+            chai.add(chaiscript::constructor<T()>(), pycppgen<T>::name());
+        });
 
-        str += '[';
-        
-        for (const auto& it : arr)
-            str += std::to_string(it) + ", ";
+    pycppgen_globals::for_each_enum([&]<typename T>()
+        {
+            const auto enumName = std::string(pycppgen<T>::name());
 
-        if (arr.size() > 0)
-            str.resize(str.length() - 2);
+            auto m = std::make_shared<chaiscript::Module>();
+    		chaiscript::utility::add_class(*m, enumName, std::vector<std::pair<T, std::string>>{});
 
-        str += ']';
+            pycppgen<T>::for_each_enum_value(
+                [&](auto v)
+                {
+                   m->add_global_const(chaiscript::const_var(T(v)), enumName + "__" + std::string(pycppgen<T>::enum_to_string(v)));
+                });
 
-        return str;
-    }
+            chai.add(chaiscript::type_conversion<T, std::underlying_type_t<T>>([](const T& v) { return static_cast<std::underlying_type_t<T>>(v); }));
+            chai.add(chaiscript::type_conversion<T, int>([](const T& v) { return static_cast<int>(v); }));
+            chai.add(chaiscript::type_conversion<T, std::string>([](const T& v) { return std::string(pycppgen<T>::enum_to_string(v)); }));
+
+            chai.add(m);
+        });
+
+    pycppgen_globals::for_each_type([&]<typename T>()
+        {
+            pycppgen<T>::for_each_function([&]<typename R>()
+                {
+                    chai.add(chaiscript::fun(R::function_ptr()), R::name());
+                }, 0);
+
+            pycppgen<T>::for_each_var([&]<typename R>()
+                {
+                    chai.add(chaiscript::fun(R::variable_ptr()), R::name());
+                }, 0);
+
+            pycppgen<T>::for_each_static_var([&]<typename R>()
+                {
+                    std::string name = R::full_name();
+                    std::ranges::replace(name, ':', '_');
+                    chai.add_global(chaiscript::var(R::variable_ptr()), name);
+                });
+        });
+
+    pycppgen_globals::for_each_type([&]<typename T>()
+        {
+            pycppgen<T>::for_each_parent([&]<typename R>()
+                {
+                    chai.add(chaiscript::base_class<R, T>());
+                });
+        });
 }
-
-//sample serializer
-struct serializer_value_t
-{
-    std::string value;
-
-    template<typename T>
-    serializer_value_t& operator=(const T& a) { value = std::to_string(a); return *this; }
-
-    template<std::integral T> operator T () const { return std::atoi(value.c_str()); }
-    template<std::floating_point T> operator T () const { return std::atof(value.c_str()); }
-    operator std::string () const { return value; }
-    template<typename T, size_t N> operator std::array<T, N> () const { return std::array<T, N>(); }
-};
-
-struct serializer_t
-{
-    serializer_value_t operator[](std::string key) const 
-    {
-        auto it = data.find(key); 
-        return it != data.end() ? it->second : serializer_value_t{}; 
-    }
-
-    serializer_value_t& operator[](std::string key)
-    {
-        return data[key];
-    }
-
-    std::map<std::string, serializer_value_t> data;
-};
 
 int main()
 {
-    printf("-> pycppgen_globals::for_each_enum_call([](auto&& e)\n");
-    pycppgen_globals::for_each_enum_call([](auto e)
-        {
-            printf("\t%s:\n", typeid(e).name());
-            pycppgen_of(e).for_each_enum_value([e](auto v)
-                {
-                    printf("\t\t*%s = %d\n", pycppgen_of(e).enum_to_string(v).data(), (uint32_t)v);
-                });
-        });
+    chaiscript::ChaiScript chai;
 
-    printf("---\n");
-    
-    printf("-> pycppgen_globals::for_each_type_call([](auto&& e)\n");
-    pycppgen_globals::for_each_type_call([](auto param)
-        {
-            printf("\t*%s\n", typeid(decltype(param)::type).name());
-            
-            pycppgen<decltype(param)::type>::for_each_var_typed(
-                [&](const member_variable_info& v, auto t)
-                {
-                    printf("\t\t%s %s -> Offset: %llu Size: %llu", v.Type.data(), v.FullName.data(), v.Offset, v.TotalSize);
-                    if (v.ArrayRank > 0)
-                    {
-                        printf(" Array decl: ");
-                        for (auto i : v.ArrayExtents)
-                        {
-                            printf("[%llu]", i);
-                        }
-                    }
-                    printf("\n");
-                });
-        });
-    
-	CObject* o = new CChild();
+    SStructTest testStruct;
+    testStruct.x = 75;
+    testStruct.y = 0;
+    testStruct.z = 100;
 
-    printf("-> CObject* o = new CChild(); pycppgen<>::for_each_var(o, [](const member_variable_info& v, auto&& t)\n");
-    pycppgen<>::for_each_var(o, [o](const member_variable_info& v, auto&& t)
-        {
-            auto attribs = pycppgen_of(o).get_var_attributes(v.Name);
-            printf("\t%s = %s\n", v.FullName.data(), std::to_string(t).c_str());
-        }
-    );
+    RegisterScriptingBindings(chai);
 
-    printf("---\n");
-
-    float rf;
-    printf("-> pycppgen<CObject>::call_function(\"Add\", o, rf, 1.f, 2.f)\n");
-    pycppgen<CObject>::call_function("Add", o, rf, 1.f, 2.f);
-    printf("\tAdd(1.f, 2.f) = %.2f\n", rf);
-
-    const CObject co;
-    short rs;
-    printf("-> const CObject co; pycppgen<CObject>::call_function(\"Get\", &co, rs)\n");
-    pycppgen<CObject>::call_function("Get", &co, rs);
-    printf("\tGet() = %d\n", rs);
-
-    printf("---\n");
-
-    printf("-> pycppgen<>(\"SStructTest\").for_each_var([](const member_variable_info& v)\n");
-    pycppgen<>("SStructTest").for_each_var([](const member_variable_info& v)
-        {
-            printf("\t%s\n", v.FullName.data());
-        });
-
-    printf("---\n");
-
-    //dump/parse
-    serializer_t data{};
-    pycppgen<>::dump(data, o);
-
+    try
     {
-        CChild dst;
-        dst.PublicShort = 0;
-        ((pycppgen<CObject>::access_helper*) & dst)->SetProtectedUint(0);
+        printf("------------ CHAISCRIPT ---------------------\n");
 
-        pycppgen<>::parse(data, &dst);
+        chai.add(chaiscript::var(testStruct), "testStruct");
+        auto o2 = chai.eval<CObject>(R"_chai_(
+		    print("SStructBase__size = " + to_string(SStructBase__size));
+		    print("testStruct.z = " + to_string(testStruct.z));
+		    print("testStruct.components = " + to_string(testStruct.components));
+		    var o2 = CObject();
+		    print("o2.PublicShort = " + to_string(o2.PublicShort));
+		    print("set o2.PublicShort to 1");
+            o2.PublicShort = 1;
+			print("EEnum__Test = " + to_string(EEnum__Test));
+            return o2;
+	    )_chai_");
+
+        printf("o2.PublicShort = %d\n", o2.PublicShort);
+    }
+    catch (const std::exception& e)
+    {
+        printf("%s\n", e.what());
     }
 
-    pycppgen<CObject>::find_function_by_name("Get", [](auto fn)
-        {
-            printf("CObject::Get -> %s\n", typeid(fn.Function).name());
-        });
+    auto v = pycppgen<EEnum>::string_to_bitfield("Test| Value");
+    v = (EEnum) ((std::underlying_type_t<EEnum>)v | (std::underlying_type_t<EEnum>)EEnum::Something);
+    auto s = pycppgen<EEnum>::bitfield_to_string(v);
 
-    pycppgen<CChild>::find_function_by_name("Add", [](auto fn)
+    printf("---------------------------------\n");
+
+    pycppgen_globals::for_each_type([&]<typename T>()
         {
-            printf("CChild::Add -> %s\n", typeid(fn.Function).name());
+            pycppgen<T>::for_each_var([&]<typename R>()
+                {
+                    printf("%s\n", R::name());
+                }, 0);
+
+            pycppgen<T>::for_each_function([&]<typename R>()
+                {
+                    printf("%s\n", R::declaration());
+                }, 0);
         });
 
     return 0;
 }
+
+

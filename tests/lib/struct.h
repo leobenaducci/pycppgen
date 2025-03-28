@@ -1,15 +1,25 @@
 #pragma once
 
-#include <array>
+#include <array> //included for performance profiling
 
-//$[[pycppgen visible]]
-struct SStructTest
+//$[[pycppgen]]
+struct SStructBase
 {
     //$[[pycppgen visible]]
-    static inline const int size = 3;
-    
+    static const char size = 'A';
+
+    //$[[pycppgen visible]]
+    int components = 3;
+
+    //$[[pycppgen]]
+    float x;
+};
+
+//$[[pycppgen visible]]
+struct SStructTest : SStructBase
+{
     //$[[pycppgen visible;serialize]]
-    float x,y,z;
+    float y,z;
 
     //$[[pycppgen pure]
     static void OnRegister() {}
