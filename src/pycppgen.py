@@ -1577,7 +1577,7 @@ def main(args : list) :
             TLS().NodeList.update(v["NodeList"])
 
     if len(OutdatedFiles) > 0 or not "pycppgen.gen.h" in CachedPerFileData or CachedPerFileData["pycppgen.gen.h"] != TLS().NodeList :
-        atomic_print("global code gen step")
+        atomic_print(f"global code gen step, outdated files -> {OutdatedFiles}")
         FilesToParse.append(os.path.join(ProjectPath, "\\pycppgen.h"))
         CodeGenGlobal(ProjectPath)
     PerFileData["pycppgen.gen.h"] = TLS().NodeList
