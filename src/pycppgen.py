@@ -124,6 +124,7 @@ def ParseComments(cursor, kind : str = EParseCommentsBeforeDecl) :
             while firstTokenIndex > 0 and tokens[firstTokenIndex - 1].kind == clang.cindex.TokenKind.COMMENT :
                 firstTokenIndex -= 1
         else :
+            lastTokenIndex = len(tokens)
             while firstTokenIndex < lastTokenIndex and tokens[firstTokenIndex].kind != clang.cindex.TokenKind.COMMENT :
                 firstTokenIndex += 1
             lastTokenIndex = firstTokenIndex
@@ -1593,6 +1594,7 @@ def main(args : list) :
 
 if __name__ == "__main__":
     if len(sys.argv) < 2 :
+        atomic_print("usage py main.py <directory> <options>")
         exit(-1)
 
     main(sys.argv[1:])
