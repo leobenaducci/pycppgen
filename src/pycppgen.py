@@ -1452,11 +1452,20 @@ def ProcessFile(file : str, compilerOptions) :
     if needsParseTU or needsCodeGen :
         FilesToCodeGen.add(file)
 
+def show_usage() :
+        print("usage pycppgen.py <project-path> <options>")
+        print("options:")
+        print("    -I<include_dir>")
+        print("    -D<definition>")
+        print("    --I<include_dirs_separated_by_semicolons>")
+        print("    --D<definitions_separated_by_semicolons>")
+        print("    --P<dependency_dirs_separated_by_semicolons>")
+
 def main(args : list) :
     global FilesToParse, PerFileData, ProjectPath, CacheFile, OutdatedFiles, CachedPerFileData, FilesToCodeGen
 
     if len(args) < 1 :
-        atomic_print("usage py main.py <directory> <options>")
+        show_usage()
         exit(-1)
 
     ProjectPath = str(pathlib.Path(args[0]).resolve())
@@ -1466,6 +1475,10 @@ def main(args : list) :
         if arg.startswith("--I") :
             args.remove(arg)
             arg = arg[3:]
+            if not arg:
+                print("error: no includes after --I. Did you add a space?")
+                print("Expected format: --I<include_dirs_separated_by_semicolons>")
+                exit(-1)
             for i in arg.split(";") :
                 if not pathlib.Path(i).is_absolute() :
                     i = ResolvePath(os.path.join(ProjectPath, i))
@@ -1473,11 +1486,19 @@ def main(args : list) :
         if arg.startswith("--D") :
             args.remove(arg)
             arg = arg[3:]
+            if not arg:
+                print("error: no defines after --D. Did you add a space?")
+                print("Expected format: --D<definitions_separated_by_semicolons>")
+                exit(-1)
             for i in arg.split(";") :
                 args.append(f"-D{i}")
         if arg.startswith("--P") :
             args.remove(arg)
             arg = arg[3:]
+            if not arg:
+                print("error: no dependencies after --P. Did you add a space?")
+                print("Expected format: --P<dependency_dirs_separated_by_semicolons>")
+                exit(-1)
             for i in arg.split(";") :
                 if not pathlib.Path(i).is_absolute() :
                     i = ResolvePath(os.path.join(ProjectPath, i))
@@ -1593,9 +1614,5 @@ def main(args : list) :
             os.remove(file)
 
 if __name__ == "__main__":
-    if len(sys.argv) < 2 :
-        atomic_print("usage py main.py <directory> <options>")
-        exit(-1)
-
     main(sys.argv[1:])
 
