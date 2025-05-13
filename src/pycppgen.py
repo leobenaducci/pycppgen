@@ -949,7 +949,8 @@ def CodeGenOutputNode(node) :
         if ENodeVariables in node and len(node[ENodeVariables]) > 0 :
             for _, var in node[ENodeVariables].items() :
                 if "serialize" in var[ENodeAttributes] and (var[ENodeAccess] == str(AccessSpecifier.PUBLIC) or var[ENodeAccess] == str(AccessSpecifier.PROTECTED)) :
-                    hppCode += "\t\tstatic_cast<pycppgen_t*>(obj)->set_" + var[ENodeName] + "(data[\"" + var[ENodeName]+ "\"]);\n"
+                    hppCode += "\t\tif (data.contains(\"" + var[ENodeName]+ "\"))\n"
+                    hppCode += "\t\t\tstatic_cast<pycppgen_t*>(obj)->set_" + var[ENodeName] + "(data[\"" + var[ENodeName]+ "\"]);\n"
         hppCode += "\t\treturn true;\n"
         hppCode += "\t}\n\n"
 
