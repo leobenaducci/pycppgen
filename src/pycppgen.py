@@ -157,7 +157,7 @@ def ParseComments(cursor, kind : str = EParseCommentsBeforeDecl) :
 
         if len(comments) == 0 : continue
 
-        comments = comments.replace(" ", "").split(";")
+        comments = comments.split(";")
         for g in comments :
             if len(g) == 0 : continue
 
@@ -166,8 +166,8 @@ def ParseComments(cursor, kind : str = EParseCommentsBeforeDecl) :
 
             kv = g.split("=")
             if len(kv) == 0 : continue
-            if len(kv) > 0 : key = kv[0]
-            if len(kv) > 1 : value = kv[1]
+            if len(kv) > 0 : key = kv[0].strip()
+            if len(kv) > 1 : value = kv[1].strip()
 
             if key.lower() == "exclude" : result["include"] = str(bool(value != None and value == True))
             else : result[key] = value
