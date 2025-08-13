@@ -7,12 +7,12 @@ import inspect
 import itertools
 import threading
 import json
+import contextvars
+from typing import Final, Any
 from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass
 from clang.cindex import CursorKind
 from clang.cindex import AccessSpecifier
-from dataclasses import dataclass
-from typing import Final, Any
-import contextvars
 
 DebugMode = False
 
@@ -104,6 +104,7 @@ class TLS_Data:
         self.NodeList: dict[str, Any] = {}
         self.NodeTree: dict[str, Any] = {}
         self.NodeStack: list[dict[str, Any]] = [self.NodeTree]
+        self.pycppdefine: str = ""
 
 _ctx: contextvars.ContextVar[TLS_Data] = contextvars.ContextVar("tls")
 def TLS() -> TLS_Data:
@@ -531,36 +532,66 @@ def ParseTranslationUnit(tu, file) :
 
 #parse a header file
 def ParseFile(filePath : str, options : list) :
-    with open(filePath) as file:
-        for line in file.readlines() :
-            m = re.match(r"\s*\/\/\s*\$\[\[pycppgen-include\s+((?>\w|\W)*)\]\]", line, flags=re.MULTILINE|re.IGNORECASE)
-            if not m : continue
-            for g in m.groups() :
-                TLS().NodesToInclude += g.replace(" ", ";").replace(",", ";").split(";")
 
-    args = ['-x', 'c++', '-std=c++20', "-DPYCPPGEN"] + options
-    idx = clang.cindex.Index.create()
-    tu = idx.parse(filePath, args = args, options = clang.cindex.TranslationUnit.PARSE_INCOMPLETE | clang.cindex.TranslationUnit.PARSE_SKIP_FUNCTION_BODIES)
+    # Make destFilePath equal to filepath but append "__pycppgen_tmp" before the extension
+    extStart = filePath.rfind(".")
+    tmpPath = filePath[:extStart] + "__pycppgen_tmp" + filePath[extStart:]
 
-    if DebugMode :
-        # Print diagnostics
-        for diag in tu.diagnostics:
-            atomic_print(str(diag))
+    tu = None
 
-    return tu
+    try:
+        contents = ""
+        for t in ["float", "int", "uint", "bool"] :
+            for m in range(2, 5) :
+                for n in range(2, 5) :
+                    contents += f"using {t}{m}x{n} = float;\n"
+                contents += f"using {t}{m} = float;\n"
+        contents += "\n"
+
+        with open(filePath) as file:
+            for line in file.readlines() :
+                contents += line
+                m = re.match(r"\s*\/\/\s*\$\[\[pycppgen-include\s+((?>\w|\W)*)\]\]", line, flags=re.MULTILINE|re.IGNORECASE)
+                if not m : continue
+                for g in m.groups() :
+                    TLS().NodesToInclude += g.replace(" ", ";").replace(",", ";").split(";")
+
+        with open(tmpPath, "wt") as tmpFile:
+            tmpFile.write(contents)
+
+        args = ['-x', 'c++', '-std=c++20', "-DPYCPPGEN", "-D__clang_major__=19", "-Wnomacro-redefined"] + options
+        idx = clang.cindex.Index.create()
+        tu = idx.parse(tmpPath, args = args, options = clang.cindex.TranslationUnit.PARSE_INCOMPLETE | clang.cindex.TranslationUnit.PARSE_SKIP_FUNCTION_BODIES)
+
+        if DebugMode :
+            # Print diagnostics
+            for diag in tu.diagnostics:
+                atomic_print(str(diag))
+    except:
+        atomic_print(f"error parsing {filePath}")
+    finally:
+        if os.path.exists(tmpPath):
+            os.remove(tmpPath)
+
+    return tu, tmpPath
 
 #codegen: common type header 
-def CodeGenOutputMetaHeader(code, node) :
-    global pycppdefine
-
+def CodeGenOutputHeaderDefines(code, node) :
+    
     #make a unique name
-    pycppdefine = "_pycppgen_" + node[ENode.FullName].replace("::", "_").replace("<","_").replace(">","_")
+    pycppdefine = TLS_Data().pycppdefine = "_pycppgen_" + node[ENode.FullName].replace("::", "_").replace("<","_").replace(">","_")
 
     lines = [
         f"//<autogen_{pycppdefine}>\n",
         f"#ifndef {pycppdefine}\n",
         f"#define {pycppdefine}\n\n"
     ]
+
+    return code + "".join(lines)
+
+#codegen: common type header 
+def CodeGenOutputMetaHeader(code, node) :
+    lines = []
 
     #create the specialized pycppgen struct
     #code 'template<> struct pycppgen<type_name> {
@@ -587,10 +618,9 @@ def CodeGenOutputMetaHeader(code, node) :
 
 #codegen: common type footer
 def CodeGenOutputMetaFooter(code, node) :
-    global pycppdefine
+    pycppdefine = TLS_Data().pycppdefine
 
     code += "};\n\n"
-
     code += f"#endif //{pycppdefine}\n"
 
     #tag the end of autogen code
@@ -765,14 +795,35 @@ def GenerateMemberFunctionInfo(node, func, infoName) :
 
     return result
 
-#codegen: emit a node5
+#codegen: emit a hlsl node
+def CodeGenHlslNode(hppCode, node) :
+    
+    result = ""
+    result += f"struct {node[ENode.FullName].replace("_pyhlslgen", "")}\n"
+    result += "{\n"
+
+    if ENode.Variables in node :
+        for _, var in node[ENode.Variables].items() :
+            result += f"\t{var[ENode.Type]} {var[ENode.Name]};\n"
+    result += "};\n"
+    result += "\n"
+
+    return hppCode + result
+
+#codegen: emit a node
 def CodeGenOutputNode(node) :
    
     hppCode = cppCode = ""
 
+    if node[ENode.Kind] == EKind.Class or node[ENode.Kind] == EKind.ClassTemplate or node[ENode.Kind] == EKind.Struct :
+        hppCode = CodeGenOutputHeaderDefines(hppCode, node)
+
+    if node[ENode.Kind] == EKind.Struct and node[ENode.Name].endswith("_pyhlslgen") :
+        hppCode = CodeGenHlslNode(hppCode, node)
+
     #class or structs
     if node[ENode.Kind] == EKind.Class or node[ENode.Kind] == EKind.ClassTemplate or node[ENode.Kind] == EKind.Struct :
-        hppCode += CodeGenOutputMetaHeader(hppCode, node)
+        hppCode = CodeGenOutputMetaHeader(hppCode, node)
 
         if ENode.Variables in node :
             for _, var in node[ENode.Variables].items() :
@@ -1408,7 +1459,8 @@ def FileContainsPyCppGenTag(file : str) :
 
     if os.path.exists(file) :
         with open(file) as f :
-            if f.read().find("$[[pycppgen") != -1 :
+            data = f.read()
+            if data.find("$[[pycppgen") != -1 or data.find("pyhlslgen") != -1:
                 FilesWithPyCppGenTag[file] = True
                 return True
 
@@ -1452,8 +1504,10 @@ def ProcessFile(file : str, compilerOptions) :
         if not isOutdated :
             atomic_print(f"outdated cache entry for {file}") 
 
+    tu = None
+    tmpFilePath = None
     if needsParseTU :
-        tu = ParseFile(file, compilerOptions)
+        tu, tmpFilePath = ParseFile(file, compilerOptions)
 
         includedFiles = []
         for f in tu.get_includes() :
@@ -1469,7 +1523,7 @@ def ProcessFile(file : str, compilerOptions) :
                 atomic_print(f"outdated include {f} in {file}")
 
     if needsParseTU : 
-        PerFileData[file]["NodeList"] = ParseTranslationUnit(tu, file)
+        PerFileData[file]["NodeList"] = ParseTranslationUnit(tu, tmpFilePath)
 
     if needsParseTU or needsCodeGen :
         FilesToCodeGen.add(file)
