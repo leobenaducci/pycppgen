@@ -158,8 +158,9 @@ def ParseComments(cursor, kind : str = EParseComments.BeforeDecl):
     result = {}
     oneMatch = False
 
+    COMMENT_REGEX = re.compile(r".*\$\[\[pycppgen(?>(?>\s+((?>\s|\w|\W)*)\]\])|(?>\]\]))", flags=re.IGNORECASE | re.MULTILINE)    
     for line in attribs.splitlines() :
-        m = re.match(r".*\$\[\[pycppgen(?>(?>\s+((?>\s|\w|\W)*)\]\])|(?>\]\]))", line, flags=re.IGNORECASE|re.MULTILINE)
+        m = COMMENT_REGEX.match(line)
         if m == None : continue
         oneMatch = True
 
@@ -439,7 +440,7 @@ def ParseTypeAlias(cursor) :
     AppendToStackTop(node, ENode.Variables, True)
 
 #generic parse call
-def ParseCursor(cursor, forceInclude = False) :
+def ParseCursor(cursor, forceInclude : bool = False)  -> None:
     #TODO
     if cursor.kind == CursorKind.UNION_DECL : return
     if cursor.kind == CursorKind.TYPEDEF_DECL : return
@@ -544,7 +545,7 @@ def ParseFile(filePath : str, options : list) :
     if DebugMode :
         # Print diagnostics
         for diag in tu.diagnostics:
-            atomic_print(diag)
+            atomic_print(str(diag))
 
     return tu
 
@@ -600,7 +601,7 @@ def CodeGenOutputMetaFooter(code, node) :
     return code
 
 #codegen: emit attributes as array of pairs
-def CodeGenOutputAttributes(node, depth = 0) :
+def CodeGenOutputAttributes(node, depth : int = 0) -> str:
     if ENode.Attributes in node and len(node[ENode.Attributes]) > 0 :
         attribs = node[ENode.Attributes]
 
@@ -1075,7 +1076,7 @@ def CodeGenOutputNode(node) :
             hppCode += "\tstatic " + node[ENode.FullName] + " string_to_bitfield(std::string_view value) {\n"
             hppCode += f"\t\tusing type = std::underlying_type_t<{node[ENode.FullName]}>;\n"
             hppCode += f"\t\tstd::string str(value);\n"
-            hppCode += f"\t\tstr.erase(std::remove(str.begin(), str.end(), ' '), std.end());\n"
+            hppCode += f"\t\tstr.erase(std::remove(str.begin(), str.end(), ' '), str.end());\n"
             hppCode += f"\t\tconst std::vector<std::string> tokens = pycppgen_detail::split_string(str, '|');\n"
             hppCode += f"\t\ttype result = 0;\n"
             for k, v in node[ENode.EnumValues].items() :
@@ -1382,12 +1383,15 @@ def CodeGenGlobal(path : str) :
         with open(path + "\\pycppgen.gen.h", mode="wt") as file :
             file.write(code)
 
-def IsFileUpToDate(src : str, dst : str) :
-    if not os.path.exists(dst) or not os.path.exists(src) :
+def IsFileUpToDate(src : str | None, dst : str | None) :
+    if src == None : return False
+    if dst == None : return True
+
+    if not os.path.exists(str(dst)) or not os.path.exists(str(src)) :
         return False
 
-    srcTime = os.path.getmtime(src)
-    dstTime = os.path.getmtime(dst)
+    srcTime = os.path.getmtime(str(src))
+    dstTime = os.path.getmtime(str(dst))
 
     return srcTime < dstTime  
 
