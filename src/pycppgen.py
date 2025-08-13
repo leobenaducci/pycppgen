@@ -69,7 +69,11 @@ class _ParseCommentsType:
     BeforeDecl: Final[str] = "comments_before_decl"
     AfterDecl: Final[str] = "comments_after_decl"
 
-EInvalid: Final[str] = "invalid"
+# Add to global constants
+kInvalid: Final[str] = "invalid"
+kInclude: Final[str] = "include"
+kSerialize: Final[str] = "serialize"
+kExclude: Final[str] = "exclude"
 
 EKind = _Kinds()          # use K.Unknown, K.Class … everywhere
 ENode = _NodeType()
@@ -119,30 +123,30 @@ def atomic_print(text : str) :
         print(f"pycppgen: {text}")
 
 #try to parse the comments before or after the cursor (hacky but, cursor.raw_comments isn't working as expected)
-def ParseComments(cursor, kind : str = EParseComments.BeforeDecl) :
-   
-    try :
+def ParseComments(cursor, kind : str = EParseComments.BeforeDecl):
+    try:
         preDeclComments = not kind in ParseCommentsMode or ParseCommentsMode[kind] == EParseComments.BeforeDecl
         parent = cursor.semantic_parent
 
         tokens = list(parent.get_tokens())
         firstToken = list(cursor.get_tokens())[0]
-
         firstTokenIndex = tokens.index(next(x for x in tokens if x.location.line == firstToken.location.line))
 
-        if preDeclComments :
+        if preDeclComments:
             lastTokenIndex = firstTokenIndex
-            while firstTokenIndex > 0 and tokens[firstTokenIndex - 1].kind == clang.cindex.TokenKind.COMMENT :
+            while firstTokenIndex > 0 and tokens[firstTokenIndex - 1].kind == clang.cindex.TokenKind.COMMENT:
                 firstTokenIndex -= 1
-        else :
+        else:
             lastTokenIndex = len(tokens)
-            while firstTokenIndex < lastTokenIndex and tokens[firstTokenIndex].kind != clang.cindex.TokenKind.COMMENT :
+            while firstTokenIndex < lastTokenIndex and tokens[firstTokenIndex].kind != clang.cindex.TokenKind.COMMENT:
                 firstTokenIndex += 1
             lastTokenIndex = firstTokenIndex
-            while lastTokenIndex < len(tokens) and tokens[lastTokenIndex].kind == clang.cindex.TokenKind.COMMENT :
+            while lastTokenIndex < len(tokens) and tokens[lastTokenIndex].kind == clang.cindex.TokenKind.COMMENT:
                 lastTokenIndex += 1
 
-    except :
+    except (StopIteration, clang.cindex.LibclangError) as e:
+        if DebugMode:
+            atomic_print(f"ParseComments error: {str(e)}")
         return {}
     
     attribs = ""
@@ -180,11 +184,11 @@ def ParseComments(cursor, kind : str = EParseComments.BeforeDecl) :
             if len(kv) > 0 : key = kv[0].strip()
             if len(kv) > 1 : value = kv[1].strip()
 
-            if key.lower() == "exclude" : result["include"] = str(bool(value != None and value == True))
+            if key.lower() == kExclude : result[kInclude] = str(bool(value != None and value == True))
             else : result[key] = value
 
-    if oneMatch and not "include".casefold() in result :
-        result["include"] = True
+    if oneMatch and not kInclude.casefold() in result :
+        result[kInclude] = True
 
     return result
     
@@ -213,7 +217,7 @@ def AppendToStackTop(node, node_type : str, appendToList : bool = False) :
         TLS().NodeList[node[ENode.FullName]] = node
 
 #common node push code
-def PushNode(cursor, kind : str = EInvalid) :
+def PushNode(cursor, kind : str = kInvalid) :
     node = dict()
     node[ENode.Name] = str(cursor.spelling)
     node[ENode.FullName] = GetFullName(cursor)
@@ -299,7 +303,7 @@ def ParseVar(cursor, isFreeVariable : bool = False) :
 
 #parse struct/class
 def ParseStruct(cursor) :
-    kind = EInvalid
+    kind = kInvalid
     if cursor.kind == CursorKind.CLASS_TEMPLATE :
         kind = EKind.ClassTemplate
     elif cursor.kind == CursorKind.CLASS_DECL :
@@ -319,8 +323,8 @@ def ParseStruct(cursor) :
             if child.referenced :
                 childFullName = GetFullName(child.referenced)
                 flags = ParseComments(child.referenced, EKind.Unknown)
-                if "include" in flags : 
-                    if str(flags["include"]) == "False" :
+                if kInclude in flags : 
+                    if str(flags[kInclude]) == "False" :
                         continue
                 elif not childFullName in TLS().NodesToInclude :
                     continue
@@ -330,7 +334,7 @@ def ParseStruct(cursor) :
         #template parameters
         if child.kind == CursorKind.TEMPLATE_TYPE_PARAMETER or child.kind == CursorKind.TEMPLATE_NON_TYPE_PARAMETER or child.kind == CursorKind.TEMPLATE_TEMPLATE_PARAMETER:
             
-            kind = EInvalid
+            kind = kInvalid
             if child.kind == CursorKind.TEMPLATE_TYPE_PARAMETER :
                 kind = EKind.TemplateTypeParameter
             elif child.kind == CursorKind.TEMPLATE_NON_TYPE_PARAMETER :
@@ -353,7 +357,7 @@ def ParseStruct(cursor) :
             continue
 
         flags = ParseComments(child, EKind.Unknown)
-        if not "include" in flags or flags["include"] == False :
+        if not kInclude in flags or flags[kInclude] == False :
             continue
 
         #class functions
@@ -457,8 +461,8 @@ def ParseCursor(cursor, forceInclude = False) :
     #check if it should be parsed
     if not forceInclude :
         flags = ParseComments(cursor, EKind.Unknown)
-        if "include" in flags : 
-            if str(flags["include"]) == "False" :
+        if kInclude in flags : 
+            if str(flags[kInclude]) == "False" :
                 return
         elif not fullName in TLS().NodesToInclude :
             return
@@ -551,30 +555,30 @@ def CodeGenOutputMetaHeader(code, node) :
     #make a unique name
     pycppdefine = "_pycppgen_" + node[ENode.FullName].replace("::", "_").replace("<","_").replace(">","_")
 
-    #tag the begining of autogen code
-    code += f"//<autogen_{pycppdefine}>\n\n"
-
-    #ifndef pycppgen_<nodefullname>
-    code += f"#ifndef {pycppdefine}\n"
-    #define pycppgen_<nodefullname>
-    code += f"#define {pycppdefine}\n\n"
+    lines = [
+        f"//<autogen_{pycppdefine}>\n",
+        f"#ifndef {pycppdefine}\n",
+        f"#define {pycppdefine}\n\n"
+    ]
 
     #create the specialized pycppgen struct
     #code 'template<> struct pycppgen<type_name> {
-    code += "template<"
+    lines.append("template<")
     if ENode.MetaTemplateDecl in node :
-        code += node[ENode.MetaTemplateDecl]
-    code += ">\nstruct pycppgen<" + node[ENode.FullName] + ">"
+        lines.append(node[ENode.MetaTemplateDecl])
+    lines.append(f">\nstruct pycppgen<{node[ENode.FullName]}>")
     
     if node[ENode.Kind] == EKind.Class or node[ENode.Kind] == EKind.ClassTemplate or node[ENode.Kind] == EKind.Struct :
-        code += " : " + node[ENode.FullName]
+        lines.append(f" : {node[ENode.FullName]}")
         if ENode.Parents in node :
             for p in node[ENode.Parents] :
-                    code += f", virtual pycppgen<{p}>"
-    code += "{\n"
-    code += "\tusing pycppgen_t = pycppgen<" + node[ENode.FullName] + ">;\n"
-    code += "\tstatic constexpr bool is_valid() { return true; }\n"
-    code += "\tstatic constexpr const char* name() { return \"" + node[ENode.Name] + "\"; }\n"
+                    lines.append(f", virtual pycppgen<{p}>")
+    lines.extend([
+        "{\n",
+        f"\tusing pycppgen_t = pycppgen<{node[ENode.FullName]}>;\n"
+        "\tstatic constexpr bool is_valid() { return true; \\n"
+        "\tstatic constexpr const char* name() { return \"" + node[ENode.Name] + "\"; }\n"
+    ])
 
     return code
 
@@ -602,7 +606,7 @@ def CodeGenOutputAttributes(node, depth = 0) :
         result = "{\n"
 
         for k, v in attribs.items() :
-            if k == "include" : continue
+            if k == kInclude : continue
             result += "\t" * depth
             result += "{ \"" + k + "\", "
             if len(str(v)) > 0 :
@@ -948,7 +952,7 @@ def CodeGenOutputNode(node) :
         if ENode.Variables in node and len(node[ENode.Variables]) > 0 :
             #serialize the values
             for _, var in node[ENode.Variables].items() :
-                if "serialize" in var[ENode.Attributes] and (var[ENode.Access] == str(AccessSpecifier.PUBLIC) or var[ENode.Access] == str(AccessSpecifier.PROTECTED)) :
+                if kSerialize in var[ENode.Attributes] and (var[ENode.Access] == str(AccessSpecifier.PUBLIC) or var[ENode.Access] == str(AccessSpecifier.PROTECTED)) :
                     hppCode += f"\t\tresult[\"{var[ENode.Name]}\"] = static_cast<const pycppgen_t*>(obj)->get_{var[ENode.Name]}();\n"
         hppCode += "\t\treturn true;\n"
         hppCode += "\t}\n\n"
@@ -959,7 +963,7 @@ def CodeGenOutputNode(node) :
                 hppCode += f"\t\tpycppgen<{parent}>::parse(data, obj);\n"
         if ENode.Variables in node and len(node[ENode.Variables]) > 0 :
             for _, var in node[ENode.Variables].items() :
-                if "serialize" in var[ENode.Attributes] and (var[ENode.Access] == str(AccessSpecifier.PUBLIC) or var[ENode.Access] == str(AccessSpecifier.PROTECTED)) :
+                if kSerialize in var[ENode.Attributes] and (var[ENode.Access] == str(AccessSpecifier.PUBLIC) or var[ENode.Access] == str(AccessSpecifier.PROTECTED)) :
                     hppCode += "\t\tif (data.contains(\"" + var[ENode.Name]+ "\"))\n"
                     hppCode += "\t\t\tstatic_cast<pycppgen_t*>(obj)->set_" + var[ENode.Name] + "(data[\"" + var[ENode.Name]+ "\"]);\n"
         hppCode += "\t\treturn true;\n"
@@ -1326,7 +1330,7 @@ def CodeGenGlobal(path : str) :
     code += f"\tconst auto hashCode = obj ? typeid(*obj).hash_code() : 0;\n"
     code += "\tif (false) {}\n"
     for _, node in TLS().NodeList.items() :
-        if (node[ENode.Kind] == EKind.Class or node[ENode.Kind] == EKind.Struct) and "serialize" in node[ENode.Attributes] :
+        if (node[ENode.Kind] == EKind.Class or node[ENode.Kind] == EKind.Struct) and kSerialize in node[ENode.Attributes] :
             code += f"\telse if (hashCode == typeid({node[ENode.FullName]}).hash_code())\n"
             code += f"\t\treturn pycppgen<{node[ENode.FullName]}>::dump(result, (const {node[ENode.FullName]}*)obj);\n"
     code += "\treturn false;\n"
@@ -1337,7 +1341,7 @@ def CodeGenGlobal(path : str) :
     code += f"\tconst auto hashCode = obj ? typeid(*obj).hash_code() : 0;\n"
     code += "\tif (false) {}\n"
     for _, node in TLS().NodeList.items() :
-        if (node[ENode.Kind] == EKind.Class or node[ENode.Kind] == EKind.Struct) and "serialize" in node[ENode.Attributes] :
+        if (node[ENode.Kind] == EKind.Class or node[ENode.Kind] == EKind.Struct) and kSerialize in node[ENode.Attributes] :
             code += f"\telse if (hashCode == typeid({node[ENode.FullName]}).hash_code())\n"
             code += f"\t\treturn pycppgen<{node[ENode.FullName]}>::parse(data, (const {node[ENode.FullName]}*)obj);\n"
     code += "\treturn false;\n"
