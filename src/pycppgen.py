@@ -10,97 +10,108 @@ import json
 from concurrent.futures import ThreadPoolExecutor
 from clang.cindex import CursorKind
 from clang.cindex import AccessSpecifier
+from dataclasses import dataclass
+from typing import Final, Any
+import contextvars
 
 DebugMode = False
 
-ENodeName = "name"
-ENodeFullName = "full_name"
-ENodeKind = "kind"
-ENodeType = "type"
-ENodeUnderlyingType = "underlying_type"
-ENodeAccess = "access"
-ENodeScope = "scope"
-ENodeVariables = "variables"
-ENodeStaticVariables = "static_variables"
-ENodeFunctions = "functions"
-ENodeStaticFunctions = "static_functions"
-ENodeFreeVariables = "free_variables"
-ENodeFreeFunctions = "free_functions"
-ENodeParents = "parents"
-ENodeEnums = "enums"
-ENodeStructs = "structs"
-ENodeNamespaces = "namespaces"
-ENodeNamespace = "namespace"
-ENodeParameters = "parameters"
-ENodeEnumValues = "enum_values"
-ENodeMetaTemplateDecl = "meta_template_decl"
-ENodeReturnType = "return_type"
-ENodeAttributes = "attributes"
-ENodeDefaultValue = "default_value"
-ENodeMemberAttributesOverride = "member_attribs_override"
-ENodeConst = "is_const"
+@dataclass(frozen=True, slots=True)
+class _Kinds:
+    Unknown: Final[str] = "kind_unknown"
+    Namespace: Final[str] = "kind_namespace"
+    Alias: Final[str] = "kind_alias"
+    Enum: Final[str] = "kind_enum"
+    EnumValue: Final[str] = "kind_enum_value"
+    ClassTemplate: Final[str] = "kind_class_template"
+    Class: Final[str] = "kind_class"
+    Struct: Final[str] = "kind_struct"
+    Function: Final[str] = "kind_function"
+    Parameter: Final[str] = "kind_parameter"
+    Variable: Final[str] = "kind_variable"
+    FreeFunction: Final[str] = "kind_free_function"
+    FreeVariable: Final[str] = "kind_free_variable"
+    TemplateTypeParameter: Final[str] = "kind_template_type_parameter"
+    TemplateNonTypeParameter: Final[str] = "kind_template_non_type_parameter"
+    TemplateTemplateParameter: Final[str] = "kind_template_template_parameter"
 
-EKindUnknown = "kind_unknown"
-EKindNamespace = "kind_namespace"
-EKindAlias = "kind_alias"
-EKindEnum = "kind_enum"
-EKindEnumValue = "kind_enum_value"
-EKindClassTemplate = "kind_class_template"
-EKindClass = "kind_class"
-EKindStruct = "kind_struct"
-EKindFunction = "kind_function"
-EKindParameter = "kind_parameter"
-EKindVariable = "kind_variable"
-EKindFreeFunction = "kind_free_function"
-EKindFreeVariable = "kind_free_variable"
-EKindTemplateTypeParameter = "kind_template_type_parameter"
-EKindTemplateNonTypeParameter = "kind_template_non_type_parameter"
-EKindTemplateTemplateParameter = "kind_template_template_parameter"
+@dataclass(frozen=True, slots=True)
+class _NodeType:
+    Name: Final[str] = "name"
+    FullName: Final[str] = "full_name"
+    Kind: Final[str] = "kind"
+    Type: Final[str] = "type"
+    UnderlyingType: Final[str] = "underlying_type"
+    Access: Final[str] = "access"
+    Scope: Final[str] = "scope"
+    Variables: Final[str] = "variables"
+    StaticVariables: Final[str] = "static_variables"
+    Functions: Final[str] = "functions"
+    StaticFunctions: Final[str] = "static_functions"
+    FreeVariables: Final[str] = "free_variables"
+    FreeFunctions: Final[str] = "free_functions"
+    Parents: Final[str] = "parents"
+    Enums: Final[str] = "enums"
+    Structs: Final[str] = "structs"
+    Namespaces: Final[str] = "namespaces"
+    Namespace: Final[str] = "namespace"
+    Parameters: Final[str] = "parameters"
+    EnumValues: Final[str] = "enum_values"
+    MetaTemplateDecl: Final[str] = "meta_template_decl"
+    ReturnType: Final[str] = "return_type"
+    Attributes: Final[str] = "attributes"
+    DefaultValue: Final[str] = "default_value"
+    MemberAttributesOverride: Final[str] = "member_attribs_override"
+    Const: Final[str] = "is_const"
 
-EParseCommentsBeforeDecl = "comments_before_decl"
-EParseCommentsAfterDecl = "comments_after_decl"
+@dataclass(frozen=True, slots=True)
+class _ParseCommentsType:
+    BeforeDecl: Final[str] = "comments_before_decl"
+    AfterDecl: Final[str] = "comments_after_decl"
 
-EInvalid = "invalid"
+EInvalid: Final[str] = "invalid"
+
+EKind = _Kinds()          # use K.Unknown, K.Class … everywhere
+ENode = _NodeType()
+EParseComments = _ParseCommentsType()
 
 ParseCommentsMode = {
-    EKindUnknown : EParseCommentsBeforeDecl,
-    EKindNamespace : EParseCommentsBeforeDecl,
-    EKindAlias : EParseCommentsBeforeDecl,
-    EKindEnum : EParseCommentsBeforeDecl,
-    EKindEnumValue : EParseCommentsAfterDecl,
-    EKindClassTemplate : EParseCommentsBeforeDecl,
-    EKindClass : EParseCommentsBeforeDecl,
-    EKindStruct : EParseCommentsBeforeDecl,
-    EKindFunction : EParseCommentsBeforeDecl,
-    EKindParameter : EParseCommentsAfterDecl,
-    EKindVariable : EParseCommentsBeforeDecl,
-    EKindFreeFunction : EParseCommentsBeforeDecl,
-    EKindFreeVariable : EParseCommentsBeforeDecl,
-    EKindTemplateTypeParameter : EParseCommentsBeforeDecl,
-    EKindTemplateNonTypeParameter : EParseCommentsBeforeDecl,
-    EKindTemplateTemplateParameter : EParseCommentsBeforeDecl,
+    EKind.Unknown : EParseComments.BeforeDecl,
+    EKind.Namespace : EParseComments.BeforeDecl,
+    EKind.Alias : EParseComments.BeforeDecl,
+    EKind.Enum : EParseComments.BeforeDecl,
+    EKind.EnumValue : EParseComments.AfterDecl,
+    EKind.ClassTemplate : EParseComments.BeforeDecl,
+    EKind.Class : EParseComments.BeforeDecl,
+    EKind.Struct : EParseComments.BeforeDecl,
+    EKind.Function : EParseComments.BeforeDecl,
+    EKind.Parameter : EParseComments.AfterDecl,
+    EKind.Variable : EParseComments.BeforeDecl,
+    EKind.FreeFunction : EParseComments.BeforeDecl,
+    EKind.FreeVariable : EParseComments.BeforeDecl,
+    EKind.TemplateTypeParameter : EParseComments.BeforeDecl,
+    EKind.TemplateNonTypeParameter : EParseComments.BeforeDecl,
+    EKind.TemplateTemplateParameter : EParseComments.BeforeDecl,
 }
-
-FilesWithPyCppGenTag = dict()
-
-TLS_Dict = {}
 
 class TLS_Data:
     def __init__(self):
-        self.NodesToInclude = []
-        self.NodeList = {}
-        self.NodeTree = {}
-        self.NodeStack = [self.NodeTree] 
+        self.NodesToInclude: list[str] = []
+        self.NodeList: dict[str, Any] = {}
+        self.NodeTree: dict[str, Any] = {}
+        self.NodeStack: list[dict[str, Any]] = [self.NodeTree]
 
-def TLS() :
-    global TLS_Dict
-
-    ident = threading.current_thread().ident
-    if not ident in TLS_Dict :
-        TLS_Dict[ident] = TLS_Data()
-
-    return TLS_Dict[ident]
-
+_ctx: contextvars.ContextVar[TLS_Data] = contextvars.ContextVar("tls")
+def TLS() -> TLS_Data:
+    try:
+        return _ctx.get()
+    except LookupError:
+        data = TLS_Data()
+        _ctx.set(data)
+        return data
+    
+FilesWithPyCppGenTag = dict()
+TLS_Dict = {}
 PrintLock = threading.Lock()
 
 def atomic_print(text : str) :
@@ -108,10 +119,10 @@ def atomic_print(text : str) :
         print(f"pycppgen: {text}")
 
 #try to parse the comments before or after the cursor (hacky but, cursor.raw_comments isn't working as expected)
-def ParseComments(cursor, kind : str = EParseCommentsBeforeDecl) :
+def ParseComments(cursor, kind : str = EParseComments.BeforeDecl) :
    
     try :
-        preDeclComments = not kind in ParseCommentsMode or ParseCommentsMode[kind] == EParseCommentsBeforeDecl
+        preDeclComments = not kind in ParseCommentsMode or ParseCommentsMode[kind] == EParseComments.BeforeDecl
         parent = cursor.semantic_parent
 
         tokens = list(parent.get_tokens())
@@ -196,34 +207,34 @@ def AppendToStackTop(node, node_type : str, appendToList : bool = False) :
     if not node_type in TLS().NodeStack[-1]:
         TLS().NodeStack[-1][node_type] = dict()
 
-    TLS().NodeStack[-1][node_type][node[ENodeFullName]] = node
+    TLS().NodeStack[-1][node_type][node[ENode.FullName]] = node
 
     if appendToList :
-        TLS().NodeList[node[ENodeFullName]] = node
+        TLS().NodeList[node[ENode.FullName]] = node
 
 #common node push code
 def PushNode(cursor, kind : str = EInvalid) :
     node = dict()
-    node[ENodeName] = str(cursor.spelling)
-    node[ENodeFullName] = GetFullName(cursor)
-    node[ENodeKind] = kind
-    if kind == EKindClassTemplate :
-        node[ENodeType] = node[ENodeFullName]
+    node[ENode.Name] = str(cursor.spelling)
+    node[ENode.FullName] = GetFullName(cursor)
+    node[ENode.Kind] = kind
+    if kind == EKind.ClassTemplate :
+        node[ENode.Type] = node[ENode.FullName]
     else :
-        node[ENodeType] = str(cursor.type.spelling)
-    node[ENodeAccess] = str(cursor.access_specifier)
-    node[ENodeScope] = GetScope(cursor)
-    node[ENodeAttributes] = ParseComments(cursor, kind)
-    node[ENodeNamespace] = ""
-    node[ENodeConst] = cursor.type != None and cursor.type.is_const_qualified() or cursor.is_const_method()
+        node[ENode.Type] = str(cursor.type.spelling)
+    node[ENode.Access] = str(cursor.access_specifier)
+    node[ENode.Scope] = GetScope(cursor)
+    node[ENode.Attributes] = ParseComments(cursor, kind)
+    node[ENode.Namespace] = ""
+    node[ENode.Const] = cursor.type != None and cursor.type.is_const_qualified() or cursor.is_const_method()
 
     ns_parent = cursor.semantic_parent
     while ns_parent and ns_parent.kind == CursorKind.NAMESPACE :
-        node[ENodeNamespace] = ns_parent.spelling + "::" + node[ENodeNamespace]
+        node[ENode.Namespace] = ns_parent.spelling + "::" + node[ENode.Namespace]
         ns_parent = ns_parent.semantic_parent
 
-    if node[ENodeNamespace].endswith("::") :
-        node[ENodeNamespace] = node[ENodeNamespace][:-2]
+    if node[ENode.Namespace].endswith("::") :
+        node[ENode.Namespace] = node[ENode.Namespace][:-2]
     
     TLS().NodeStack.append(node)
     return TLS().NodeStack[-1]
@@ -240,49 +251,49 @@ def ParseFunction(cursor, isFreeFunction : bool = False) :
         return
 
     #push this function to it's parent
-    node = PushNode(cursor, EKindFunction)
-    node[ENodeFullName] = node[ENodeFullName][:node[ENodeFullName].find("(")]
+    node = PushNode(cursor, EKind.Function)
+    node[ENode.FullName] = node[ENode.FullName][:node[ENode.FullName].find("(")]
 
     #get the return type
-    node[ENodeReturnType] = cursor.result_type.spelling
+    node[ENode.ReturnType] = cursor.result_type.spelling
 
     #and parameters
-    node[ENodeParameters] = dict()
+    node[ENode.Parameters] = dict()
     for child in cursor.get_children() :
         if child.kind == CursorKind.PARM_DECL:
-            param = PushNode(child, EKindParameter)
-            param[ENodeDefaultValue] = ""
+            param = PushNode(child, EKind.Parameter)
+            param[ENode.DefaultValue] = ""
             PopNode()
 
             #append parameter to parent (function)
-            AppendToStackTop(param, ENodeParameters)
+            AppendToStackTop(param, ENode.Parameters)
 
     PopNode()
 
     #append function to parent (struct/class/namespace/translation_unit)
     if isFreeFunction : 
-        node[ENodeKind] = EKindFreeFunction
-        AppendToStackTop(node, ENodeFreeFunctions, True)
+        node[ENode.Kind] = EKind.FreeFunction
+        AppendToStackTop(node, ENode.FreeFunctions, True)
     elif cursor.storage_class == clang.cindex.StorageClass.STATIC :
-        AppendToStackTop(node, ENodeStaticFunctions)
+        AppendToStackTop(node, ENode.StaticFunctions)
     else :
-        AppendToStackTop(node, ENodeFunctions)
+        AppendToStackTop(node, ENode.Functions)
 
     return node
 
 #parse variable or class/struct field
 def ParseVar(cursor, isFreeVariable : bool = False) :
 
-    node = PushNode(cursor, EKindVariable)
+    node = PushNode(cursor, EKind.Variable)
     PopNode()
 
     if isFreeVariable : 
-        node[ENodeKind] = EKindFreeVariable
-        AppendToStackTop(node, ENodeFreeVariables, True)
+        node[ENode.Kind] = EKind.FreeVariable
+        AppendToStackTop(node, ENode.FreeVariables, True)
     elif cursor.storage_class == clang.cindex.StorageClass.STATIC :
-        AppendToStackTop(node, ENodeStaticVariables)
+        AppendToStackTop(node, ENode.StaticVariables)
     else :
-        AppendToStackTop(node, ENodeVariables)
+        AppendToStackTop(node, ENode.Variables)
     
     return node
 
@@ -290,16 +301,16 @@ def ParseVar(cursor, isFreeVariable : bool = False) :
 def ParseStruct(cursor) :
     kind = EInvalid
     if cursor.kind == CursorKind.CLASS_TEMPLATE :
-        kind = EKindClassTemplate
+        kind = EKind.ClassTemplate
     elif cursor.kind == CursorKind.CLASS_DECL :
-        kind = EKindClass
+        kind = EKind.Class
     else :
-        kind = EKindStruct
+        kind = EKind.Struct
 
     node = PushNode(cursor, kind)
-    node[ENodeMetaTemplateDecl] = ""
-    node[ENodeFunctions] = {}
-    node[ENodeMemberAttributesOverride] = {}
+    node[ENode.MetaTemplateDecl] = ""
+    node[ENode.Functions] = {}
+    node[ENode.MemberAttributesOverride] = {}
 
     for child in cursor.get_children() :
         
@@ -307,13 +318,13 @@ def ParseStruct(cursor) :
         if child.kind == CursorKind.CXX_BASE_SPECIFIER :
             if child.referenced :
                 childFullName = GetFullName(child.referenced)
-                flags = ParseComments(child.referenced, EKindUnknown)
+                flags = ParseComments(child.referenced, EKind.Unknown)
                 if "include" in flags : 
                     if str(flags["include"]) == "False" :
                         continue
                 elif not childFullName in TLS().NodesToInclude :
                     continue
-                AppendToStackTop({ENodeFullName: childFullName}, ENodeParents)
+                AppendToStackTop({ENode.FullName: childFullName}, ENode.Parents)
             continue
 
         #template parameters
@@ -321,27 +332,27 @@ def ParseStruct(cursor) :
             
             kind = EInvalid
             if child.kind == CursorKind.TEMPLATE_TYPE_PARAMETER :
-                kind = EKindTemplateTypeParameter
+                kind = EKind.TemplateTypeParameter
             elif child.kind == CursorKind.TEMPLATE_NON_TYPE_PARAMETER :
-                kind = EKindTemplateNonTypeParameter
+                kind = EKind.TemplateNonTypeParameter
             elif child.kind == CursorKind.TEMPLATE_TEMPLATE_PARAMETER :
-                kind = EKindTemplateTemplateParameter
+                kind = EKind.TemplateTemplateParameter
 
             param = PushNode(child, kind)
             PopNode()
 
             if child.kind == CursorKind.TEMPLATE_TYPE_PARAMETER :
-                node[ENodeMetaTemplateDecl] += "typename " + param[ENodeName] + ", "
+                node[ENode.MetaTemplateDecl] += "typename " + param[ENode.Name] + ", "
             elif child.kind == CursorKind.TEMPLATE_NON_TYPE_PARAMETER :
-                node[ENodeMetaTemplateDecl] += param[ENodeType] + " " + param[ENodeName] + ", "
+                node[ENode.MetaTemplateDecl] += param[ENode.Type] + " " + param[ENode.Name] + ", "
             elif child.kind == CursorKind.TEMPLATE_TEMPLATE_PARAMETER :
-                node[ENodeMetaTemplateDecl] += "template " + param[ENodeName] + ", "
+                node[ENode.MetaTemplateDecl] += "template " + param[ENode.Name] + ", "
 
-            AppendToStackTop(param, ENodeParameters)
+            AppendToStackTop(param, ENode.Parameters)
 
             continue
 
-        flags = ParseComments(child, EKindUnknown)
+        flags = ParseComments(child, EKind.Unknown)
         if not "include" in flags or flags["include"] == False :
             continue
 
@@ -369,18 +380,18 @@ def ParseStruct(cursor) :
         if child.kind == CursorKind.USING_DECLARATION :
             name = str(child.spelling)
             attribs = ParseComments(child)
-            if name in node[ENodeMemberAttributesOverride] :
-                node[ENodeMemberAttributesOverride][name].update(attribs)
+            if name in node[ENode.MemberAttributesOverride] :
+                node[ENode.MemberAttributesOverride][name].update(attribs)
             else :
-                node[ENodeMemberAttributesOverride][name] = attribs
+                node[ENode.MemberAttributesOverride][name] = attribs
             continue
 
         ParseCursor(child)
 
     #fixup template declaration string
-    if ENodeMetaTemplateDecl in node :
-        if node[ENodeMetaTemplateDecl].endswith(", ") :
-            node[ENodeMetaTemplateDecl] = node[ENodeMetaTemplateDecl][:-2]
+    if ENode.MetaTemplateDecl in node :
+        if node[ENode.MetaTemplateDecl].endswith(", ") :
+            node[ENode.MetaTemplateDecl] = node[ENode.MetaTemplateDecl][:-2]
 
     PopNode()
 
@@ -389,39 +400,39 @@ def ParseStruct(cursor) :
 #Parse enum definitions
 def ParseEnum(cursor, isGlobal : bool = False) :
 
-    node = PushNode(cursor, EKindEnum)
+    node = PushNode(cursor, EKind.Enum)
 
     #underlying type
-    node[ENodeUnderlyingType] = str(cursor.enum_type.spelling)
+    node[ENode.UnderlyingType] = str(cursor.enum_type.spelling)
 
     #values
-    node[ENodeEnumValues] = dict()
+    node[ENode.EnumValues] = dict()
     for child in cursor.get_children() :
         if child.kind == CursorKind.ENUM_CONSTANT_DECL :
-            node[ENodeEnumValues][child.spelling] = dict()
-            node[ENodeEnumValues][child.spelling]["value"] = str(child.enum_value)
-            node[ENodeEnumValues][child.spelling][ENodeAttributes] = ParseComments(child, EKindEnumValue)
+            node[ENode.EnumValues][child.spelling] = dict()
+            node[ENode.EnumValues][child.spelling]["value"] = str(child.enum_value)
+            node[ENode.EnumValues][child.spelling][ENode.Attributes] = ParseComments(child, EKind.EnumValue)
 
     PopNode()
 
-    AppendToStackTop(node, ENodeEnums, isGlobal)
+    AppendToStackTop(node, ENode.Enums, isGlobal)
 
 #append to list and recurse
 def ParseNamespace(cursor) :
-    node = PushNode(cursor, EKindNamespace)
+    node = PushNode(cursor, EKind.Namespace)
     for child in cursor.get_children() :
         ParseCursor(child)
     PopNode()
 
-    AppendToStackTop(node, ENodeNamespaces, True)
+    AppendToStackTop(node, ENode.Namespaces, True)
 
 #using/typedef
 def ParseTypeAlias(cursor) :
-    node = PushNode(cursor, EKindAlias)
-    node[ENodeUnderlyingType] = str(cursor.underlying_typedef_type.spelling)
+    node = PushNode(cursor, EKind.Alias)
+    node[ENode.UnderlyingType] = str(cursor.underlying_typedef_type.spelling)
     PopNode()
 
-    AppendToStackTop(node, ENodeVariables, True)
+    AppendToStackTop(node, ENode.Variables, True)
 
 #generic parse call
 def ParseCursor(cursor, forceInclude = False) :
@@ -445,7 +456,7 @@ def ParseCursor(cursor, forceInclude = False) :
 
     #check if it should be parsed
     if not forceInclude :
-        flags = ParseComments(cursor, EKindUnknown)
+        flags = ParseComments(cursor, EKind.Unknown)
         if "include" in flags : 
             if str(flags["include"]) == "False" :
                 return
@@ -461,8 +472,8 @@ def ParseCursor(cursor, forceInclude = False) :
     if isStruct :
         if cursor.is_definition() :
             node = ParseStruct(cursor)   
-            AppendToStackTop(node, ENodeStructs)
-            TLS().NodeList[node[ENodeFullName]] = node
+            AppendToStackTop(node, ENode.Structs)
+            TLS().NodeList[node[ENode.FullName]] = node
         return
 
     if cursor.kind == CursorKind.ENUM_DECL :
@@ -538,7 +549,7 @@ def CodeGenOutputMetaHeader(code, node) :
     global pycppdefine
 
     #make a unique name
-    pycppdefine = "_pycppgen_" + node[ENodeFullName].replace("::", "_").replace("<","_").replace(">","_")
+    pycppdefine = "_pycppgen_" + node[ENode.FullName].replace("::", "_").replace("<","_").replace(">","_")
 
     #tag the begining of autogen code
     code += f"//<autogen_{pycppdefine}>\n\n"
@@ -551,19 +562,19 @@ def CodeGenOutputMetaHeader(code, node) :
     #create the specialized pycppgen struct
     #code 'template<> struct pycppgen<type_name> {
     code += "template<"
-    if ENodeMetaTemplateDecl in node :
-        code += node[ENodeMetaTemplateDecl]
-    code += ">\nstruct pycppgen<" + node[ENodeFullName] + ">"
+    if ENode.MetaTemplateDecl in node :
+        code += node[ENode.MetaTemplateDecl]
+    code += ">\nstruct pycppgen<" + node[ENode.FullName] + ">"
     
-    if node[ENodeKind] == EKindClass or node[ENodeKind] == EKindClassTemplate or node[ENodeKind] == EKindStruct :
-        code += " : " + node[ENodeFullName]
-        if ENodeParents in node :
-            for p in node[ENodeParents] :
+    if node[ENode.Kind] == EKind.Class or node[ENode.Kind] == EKind.ClassTemplate or node[ENode.Kind] == EKind.Struct :
+        code += " : " + node[ENode.FullName]
+        if ENode.Parents in node :
+            for p in node[ENode.Parents] :
                     code += f", virtual pycppgen<{p}>"
     code += "{\n"
-    code += "\tusing pycppgen_t = pycppgen<" + node[ENodeFullName] + ">;\n"
+    code += "\tusing pycppgen_t = pycppgen<" + node[ENode.FullName] + ">;\n"
     code += "\tstatic constexpr bool is_valid() { return true; }\n"
-    code += "\tstatic constexpr const char* name() { return \"" + node[ENodeName] + "\"; }\n"
+    code += "\tstatic constexpr const char* name() { return \"" + node[ENode.Name] + "\"; }\n"
 
     return code
 
@@ -584,8 +595,8 @@ def CodeGenOutputMetaFooter(code, node) :
 
 #codegen: emit attributes as array of pairs
 def CodeGenOutputAttributes(node, depth = 0) :
-    if ENodeAttributes in node and len(node[ENodeAttributes]) > 0 :
-        attribs = node[ENodeAttributes]
+    if ENode.Attributes in node and len(node[ENode.Attributes]) > 0 :
+        attribs = node[ENode.Attributes]
 
         depth += 1
         result = "{\n"
@@ -611,8 +622,8 @@ def CodeGenOutputAttributes(node, depth = 0) :
 
 #codegen: emit call_function definitions
 def CodeGenOutputAddFunctionDeclaration(declarations, node, funcNode, isStatic : bool) :
-    decl = f"static_{isStatic}_{funcNode[ENodeType]}"
-    numParams = len(funcNode[ENodeParameters])
+    decl = f"static_{isStatic}_{funcNode[ENode.Type]}"
+    numParams = len(funcNode[ENode.Parameters])
     isConst = decl.endswith("const")
       
     #if call_function with the current return value and parameters doesn't exists, create it
@@ -624,16 +635,16 @@ def CodeGenOutputAddFunctionDeclaration(declarations, node, funcNode, isStatic :
                 #code 'const '
                 declarations[decl] += "const " 
             #code '<type>* obj, '
-            declarations[decl] += node[ENodeType] + "* obj, "
+            declarations[decl] += node[ENode.Type] + "* obj, "
 
-        if funcNode[ENodeReturnType] != "void" :
+        if funcNode[ENode.ReturnType] != "void" :
             #code '<return_type>& result, '
-            declarations[decl] += f"std::remove_cv_t<{funcNode[ENodeReturnType]}>& result, "
+            declarations[decl] += f"std::remove_cv_t<{funcNode[ENode.ReturnType]}>& result, "
 
         paramNum = 1
-        for _, pv in funcNode[ENodeParameters].items() :
+        for _, pv in funcNode[ENode.Parameters].items() :
             #code '_<param_num, '
-            declarations[decl] += f"{pv[ENodeType]} _{str(paramNum)}, "
+            declarations[decl] += f"{pv[ENode.Type]} _{str(paramNum)}, "
             paramNum += 1
 
         #remove last ', ' and close parenthesis 
@@ -641,28 +652,28 @@ def CodeGenOutputAddFunctionDeclaration(declarations, node, funcNode, isStatic :
     
     #append name comparison + call code
     #code '     if (name == "<function_name>") {
-    declarations[decl] += "\t\tif (name == \"" + funcNode[ENodeName] + "\") {\n"
+    declarations[decl] += "\t\tif (name == \"" + funcNode[ENode.Name] + "\") {\n"
     declarations[decl] += "\t\t\t"
 
-    if funcNode[ENodeReturnType] != "void" :
+    if funcNode[ENode.ReturnType] != "void" :
         #code 'result = '
         declarations[decl] += "result = "
 
     if isStatic :   
         #code '<class_name>::<function_name>('
-        declarations[decl] += f"{node[ENodeType]}::{funcNode[ENodeName]}("
+        declarations[decl] += f"{node[ENode.Type]}::{funcNode[ENode.Name]}("
     else :          
         #code 'obj-><function_name>('
         declarations[decl] += f"static_cast<"
         if isConst :
             #code 'const '
             declarations[decl] += "const " 
-        declarations[decl] += f"pycppgen_t*>(obj)->{funcNode[ENodeName]}("
+        declarations[decl] += f"pycppgen_t*>(obj)->{funcNode[ENode.Name]}("
 
     #code '[_1, _2...]'
     if numParams > 0 :
         paramNum = 1
-        for _, pv in funcNode[ENodeParameters].items() :
+        for _, pv in funcNode[ENode.Parameters].items() :
             declarations[decl] += " _" + str(paramNum) + ", "
             paramNum += 1
         declarations[decl] = declarations[decl][:-2] + ");\n"
@@ -676,24 +687,24 @@ def CodeGenOutputAddFunctionDeclaration(declarations, node, funcNode, isStatic :
 def GenerateMemberVariableStructDefinition(node : dict, var : dict, infoName : str, isStatic : bool = False, tabs : int = 0) :
     result = ""
     
-    varName = var[ENodeName]
-    fullVarName = var[ENodeFullName]
+    varName = var[ENode.Name]
+    fullVarName = var[ENode.FullName]
 
-    result += "\t" * tabs + f"struct {infoName} : protected {node[ENodeName]} " + "{\n"
+    result += "\t" * tabs + f"struct {infoName} : protected {node[ENode.Name]} " + "{\n"
     tabs += 1 
-    result += "\t" * tabs + f"using {node[ENodeName]}::{var[ENodeName]};\n"
+    result += "\t" * tabs + f"using {node[ENode.Name]}::{var[ENode.Name]};\n"
     result += "\t" * tabs + f"using type_t = decltype({infoName}::{varName});\n"
-    result += "\t" * tabs + f"using owner_t = {node[ENodeName]};\n"
+    result += "\t" * tabs + f"using owner_t = {node[ENode.Name]};\n"
     result += "\n"
-    result += "\t" * tabs + "static constexpr const char* name() { return \"" + var[ENodeName] + "\"; }\n"
+    result += "\t" * tabs + "static constexpr const char* name() { return \"" + var[ENode.Name] + "\"; }\n"
     result += "\t" * tabs + "static constexpr const char* full_name() { return \"" + fullVarName + "\"; }\n"
-    result += "\t" * tabs + "static constexpr const char* type_name() { return \"" + var[ENodeType] + "\"; }\n"
+    result += "\t" * tabs + "static constexpr const char* type_name() { return \"" + var[ENode.Type] + "\"; }\n"
     result += "\t" * tabs + "static const type_info& type_id() { return typeid(type_t); }\n"
     if isStatic :
         result += "\t" * tabs + f"static type_t* variable_ptr() " + "{ return " + f"&{infoName}::{varName}; " + "}\n"
         result += "\t" * tabs + "static constexpr size_t offset() { return 0; }\n"
     else :
-        result += "\t" * tabs + f"static type_t {node[ENodeName]}::* variable_ptr() " + "{ return " + f"&{infoName}::{varName}; " + "}\n"
+        result += "\t" * tabs + f"static type_t {node[ENode.Name]}::* variable_ptr() " + "{ return " + f"&{infoName}::{varName}; " + "}\n"
         result += "\t" * tabs + "static constexpr size_t offset() { " + f"return std::integral_constant<size_t, (size_t)(&(static_cast<{infoName}*>(nullptr)->{varName}))>::value; " + "}\n"
     result += "\t" * tabs + "static constexpr size_t element_size() { return sizeof(std::remove_all_extents_t<type_t>); }\n"
     result += "\t" * tabs + "static constexpr size_t total_size() { return sizeof(type_t); }\n"
@@ -715,29 +726,29 @@ def GenerateMemberVariableStructDefinition(node : dict, var : dict, infoName : s
 def GenerateMemberFunctionInfo(node, func, infoName) :
     result = ""
 
-    funcName = func[ENodeName]
-    paramsString = func[ENodeType][len(func[ENodeReturnType]) + 1:]
+    funcName = func[ENode.Name]
+    paramsString = func[ENode.Type][len(func[ENode.ReturnType]) + 1:]
 
-    result += f"\t\tstruct {infoName} : protected {node[ENodeFullName]} " + "{\n"
-    result += f"\t\t\tusing {node[ENodeName]}::{func[ENodeName]};\n"
-    result += f"\t\t\tusing type_t = decltype(&{infoName}::{func[ENodeName]});\n"
-    result += f"\t\t\tusing return_type_t = {func[ENodeReturnType]};\n"
+    result += f"\t\tstruct {infoName} : protected {node[ENode.FullName]} " + "{\n"
+    result += f"\t\t\tusing {node[ENode.Name]}::{func[ENode.Name]};\n"
+    result += f"\t\t\tusing type_t = decltype(&{infoName}::{func[ENode.Name]});\n"
+    result += f"\t\t\tusing return_type_t = {func[ENode.ReturnType]};\n"
     result += "\n"
 
     result += "\t\t\tstatic constexpr const char* name() { return \"" + funcName + "\"; }\n"
-    result += "\t\t\tstatic constexpr const char* declaration() { return \"" + func[ENodeType] + "\"; }\n"
-    result += "\t\t\tstatic constexpr const char* return_type_name() { return \"" + func[ENodeReturnType] + "\"; }\n"
+    result += "\t\t\tstatic constexpr const char* declaration() { return \"" + func[ENode.Type] + "\"; }\n"
+    result += "\t\t\tstatic constexpr const char* return_type_name() { return \"" + func[ENode.ReturnType] + "\"; }\n"
     result += "\t\t\tstatic constexpr const char* parameters_string() { return \"" + paramsString + "\"; }\n"
-    result += "\t\t\tstatic type_t function_ptr() { return &" + infoName + "::" + func[ENodeName] + "; }\n"
+    result += "\t\t\tstatic type_t function_ptr() { return &" + infoName + "::" + func[ENode.Name] + "; }\n"
     result += "\t\t\tstatic constexpr attribute_map_t attributes() { return " + CodeGenOutputAttributes(func, 4) + "; }\n"
     result += "\t\t\tstatic std::vector<function_parameter_info> parameters() {\n"
     result += "\t\t\t\tstd::vector<function_parameter_info> result;\n"
-    for _, pv in func[ENodeParameters].items() :
-        paramInfoName = f"{pv[ENodeName]}_info" + str(result.count('\n'))
+    for _, pv in func[ENode.Parameters].items() :
+        paramInfoName = f"{pv[ENode.Name]}_info" + str(result.count('\n'))
         result += f"\t\t\t\tfunction_parameter_info {paramInfoName};\n"
-        result += f"\t\t\t\t{paramInfoName}.Name = \"{pv[ENodeName]}\";\n"
-        result += f"\t\t\t\t{paramInfoName}.Type = \"{pv[ENodeType]}\";\n"
-        result += f"\t\t\t\t{paramInfoName}.DefaultValue = \"{pv[ENodeDefaultValue]}\";\n"
+        result += f"\t\t\t\t{paramInfoName}.Name = \"{pv[ENode.Name]}\";\n"
+        result += f"\t\t\t\t{paramInfoName}.Type = \"{pv[ENode.Type]}\";\n"
+        result += f"\t\t\t\t{paramInfoName}.DefaultValue = \"{pv[ENode.DefaultValue]}\";\n"
         result += f"\t\t\t\tresult.push_back({paramInfoName});\n"
     result += "\t\t\t\treturn result;\n"
     result += "\t\t\t}\n"
@@ -753,16 +764,16 @@ def CodeGenOutputNode(node) :
     hppCode = cppCode = ""
 
     #class or structs
-    if node[ENodeKind] == EKindClass or node[ENodeKind] == EKindClassTemplate or node[ENodeKind] == EKindStruct :
+    if node[ENode.Kind] == EKind.Class or node[ENode.Kind] == EKind.ClassTemplate or node[ENode.Kind] == EKind.Struct :
         hppCode += CodeGenOutputMetaHeader(hppCode, node)
 
-        if ENodeVariables in node :
-            for _, var in node[ENodeVariables].items() :
-                hppCode += f"\tusing {node[ENodeFullName]}::{var[ENodeName]};\n"
+        if ENode.Variables in node :
+            for _, var in node[ENode.Variables].items() :
+                hppCode += f"\tusing {node[ENode.FullName]}::{var[ENode.Name]};\n"
         
-        if ENodeFunctions in node :
-            for _, fn in node[ENodeFunctions].items() :
-                hppCode += f"\tusing {node[ENodeName]}::{fn[ENodeName]};\n"
+        if ENode.Functions in node :
+            for _, fn in node[ENode.Functions].items() :
+                hppCode += f"\tusing {node[ENode.Name]}::{fn[ENode.Name]};\n"
         hppCode += "\n"
 
         #declare the attribute map
@@ -771,45 +782,45 @@ def CodeGenOutputNode(node) :
         hppCode += "\t};\n\n"
         
         #variables
-        if ENodeVariables in node :
-            for _, var in node[ENodeVariables].items() :
-                if var[ENodeAccess] == str(AccessSpecifier.PROTECTED) or var[ENodeAccess] == str(AccessSpecifier.PUBLIC) :
-                    varName = f"{node[ENodeFullName]}::{var[ENodeName]}"
+        if ENode.Variables in node :
+            for _, var in node[ENode.Variables].items() :
+                if var[ENode.Access] == str(AccessSpecifier.PROTECTED) or var[ENode.Access] == str(AccessSpecifier.PUBLIC) :
+                    varName = f"{node[ENode.FullName]}::{var[ENode.Name]}"
 
-                    hppCode += f"\t//{var[ENodeType]} {var[ENodeName]}\n"
-                    hppCode += f"\tusing {var[ENodeName]}_type = decltype({varName});\n"
-                    if not var[ENodeConst] :
-                        hppCode += "\tvoid set_" + var[ENodeName] + "(const " + var[ENodeName] + "_type& value) { " + varName + " = value; }\n"
-                    hppCode += "\tconst auto& get_" + var[ENodeName] + "() const { return " + varName + "; }\n"
-                    hppCode += "\tauto& get_" + var[ENodeName] + "_ref() { return " + varName + "; }\n"
-                    hppCode += "\tstatic auto get_" + var[ENodeName] + "_member_variable_info() {\n"
-                    hppCode += GenerateMemberVariableStructDefinition(node, var, f"{var[ENodeName]}_info", False, 2)           
-                    hppCode += f"\t\treturn {var[ENodeName]}_info();\n"
+                    hppCode += f"\t//{var[ENode.Type]} {var[ENode.Name]}\n"
+                    hppCode += f"\tusing {var[ENode.Name]}_type = decltype({varName});\n"
+                    if not var[ENode.Const] :
+                        hppCode += "\tvoid set_" + var[ENode.Name] + "(const " + var[ENode.Name] + "_type& value) { " + varName + " = value; }\n"
+                    hppCode += "\tconst auto& get_" + var[ENode.Name] + "() const { return " + varName + "; }\n"
+                    hppCode += "\tauto& get_" + var[ENode.Name] + "_ref() { return " + varName + "; }\n"
+                    hppCode += "\tstatic auto get_" + var[ENode.Name] + "_member_variable_info() {\n"
+                    hppCode += GenerateMemberVariableStructDefinition(node, var, f"{var[ENode.Name]}_info", False, 2)           
+                    hppCode += f"\t\treturn {var[ENode.Name]}_info();\n"
                     hppCode += "\t}\n\n"
         hppCode += "\n"
 
         #static variables
-        if ENodeStaticVariables in node :
-            for _, var in node[ENodeStaticVariables].items() :
-                if var[ENodeAccess] == str(AccessSpecifier.PROTECTED) or var[ENodeAccess] == str(AccessSpecifier.PUBLIC) :
-                    varName = f"{node[ENodeFullName]}::{var[ENodeName]}"
-                    hppCode += f"\t//static {var[ENodeType]} {var[ENodeName]}\n"
-                    hppCode += f"\tusing {var[ENodeName]}_type = decltype({varName});\n"
-                    if not var[ENodeConst] :
-                        hppCode += "\tconst void set_" + var[ENodeName] + "(const " + var[ENodeName] + "_type& value) { " + varName + " = value; }\n"
-                    hppCode += "\tconst auto& get_" + var[ENodeName] + "() const { return " + varName + "; }\n"
-                    hppCode += "\tdecltype(auto) get_" + var[ENodeName] + "_ref() { return " + varName + "; }\n"
-                    hppCode += "\tstatic auto get_" + var[ENodeName] + "_member_variable_info() {\n"
-                    hppCode += GenerateMemberVariableStructDefinition(node, var, f"{var[ENodeName]}_info", True, 2)           
-                    hppCode += f"\t\treturn {var[ENodeName]}_info();\n"
+        if ENode.StaticVariables in node :
+            for _, var in node[ENode.StaticVariables].items() :
+                if var[ENode.Access] == str(AccessSpecifier.PROTECTED) or var[ENode.Access] == str(AccessSpecifier.PUBLIC) :
+                    varName = f"{node[ENode.FullName]}::{var[ENode.Name]}"
+                    hppCode += f"\t//static {var[ENode.Type]} {var[ENode.Name]}\n"
+                    hppCode += f"\tusing {var[ENode.Name]}_type = decltype({varName});\n"
+                    if not var[ENode.Const] :
+                        hppCode += "\tconst void set_" + var[ENode.Name] + "(const " + var[ENode.Name] + "_type& value) { " + varName + " = value; }\n"
+                    hppCode += "\tconst auto& get_" + var[ENode.Name] + "() const { return " + varName + "; }\n"
+                    hppCode += "\tdecltype(auto) get_" + var[ENode.Name] + "_ref() { return " + varName + "; }\n"
+                    hppCode += "\tstatic auto get_" + var[ENode.Name] + "_member_variable_info() {\n"
+                    hppCode += GenerateMemberVariableStructDefinition(node, var, f"{var[ENode.Name]}_info", True, 2)           
+                    hppCode += f"\t\treturn {var[ENode.Name]}_info();\n"
                     hppCode += "\t}\n\n"
         hppCode += "\n"
 
         #parent classes 
         hppCode += "\tstatic void for_each_parent(auto visitor, uint32_t maxDepth = UINT_MAX) {\n"
-        if ENodeParents in node :
+        if ENode.Parents in node :
             hppCode += "\t\tif(maxDepth > 0) {\n"
-            for p in node[ENodeParents] :
+            for p in node[ENode.Parents] :
                 typeName = "type_" + p.replace("::", "_")
                 hppCode += "\t\t\tpycppgen<" + p + ">::for_each_parent(visitor, maxDepth - 1);\n"
                 hppCode += f"\t\t\tvisitor.template operator()<{p}>();\n"
@@ -818,106 +829,106 @@ def CodeGenOutputNode(node) :
         
         #variable's reflection
         hppCode += "\tstatic void for_each_var(auto visitor, uint32_t maxDepth = UINT_MAX) {\n"
-        if ENodeNamespace in node and node[ENodeNamespace] != "" :
-            hppCode += f"\t\tusing namespace {node[ENodeNamespace]};\n"
+        if ENode.Namespace in node and node[ENode.Namespace] != "" :
+            hppCode += f"\t\tusing namespace {node[ENode.Namespace]};\n"
         
         #parent variables
-        if ENodeParents in node :
+        if ENode.Parents in node :
             hppCode += "\t\tif(maxDepth > 0) {\n"
-            for p in node[ENodeParents] :
+            for p in node[ENode.Parents] :
                 hppCode += f"\t\t\tpycppgen<{p}>::for_each_var(visitor, maxDepth - 1);\n"
             hppCode += "\t\t}\n"
             hppCode += "\n"
 
-        if ENodeVariables in node and len(node[ENodeVariables]) > 0 :
-            for _, var in node[ENodeVariables].items() :
+        if ENode.Variables in node and len(node[ENode.Variables]) > 0 :
+            for _, var in node[ENode.Variables].items() :
                 #skip private variables
-                if var[ENodeAccess] == str(AccessSpecifier.PRIVATE) :
+                if var[ENode.Access] == str(AccessSpecifier.PRIVATE) :
                     continue
                 
                 #call visitor
-                hppCode += f"\t\tvisitor.template operator()<decltype(get_{var[ENodeName]}_member_variable_info())>();\n"
+                hppCode += f"\t\tvisitor.template operator()<decltype(get_{var[ENode.Name]}_member_variable_info())>();\n"
 
         hppCode += "\t}\n\n"
 
-        hppCode += "\tstatic void for_each_var(" + node[ENodeType] + "* obj, auto visitor, uint32_t maxDepth = UINT_MAX) {\n"
-        if ENodeNamespace in node and node[ENodeNamespace] != "" :
-            hppCode += f"\t\tusing namespace {node[ENodeNamespace]};\n"
+        hppCode += "\tstatic void for_each_var(" + node[ENode.Type] + "* obj, auto visitor, uint32_t maxDepth = UINT_MAX) {\n"
+        if ENode.Namespace in node and node[ENode.Namespace] != "" :
+            hppCode += f"\t\tusing namespace {node[ENode.Namespace]};\n"
         #parent classes
-        if ENodeParents in node :
+        if ENode.Parents in node :
             hppCode += "\t\tif(maxDepth > 0) {\n"
-            for p in node[ENodeParents] :
+            for p in node[ENode.Parents] :
                 hppCode += f"\t\t\tpycppgen<{p}>::for_each_var(obj, visitor, maxDepth - 1);\n"
             hppCode += "\t\t}\n"
 
-        if ENodeVariables in node and len(node[ENodeVariables]) > 0 :
-            for _, var in node[ENodeVariables].items() :
+        if ENode.Variables in node and len(node[ENode.Variables]) > 0 :
+            for _, var in node[ENode.Variables].items() :
                 #skip private variables
-                if var[ENodeAccess] == str(AccessSpecifier.PRIVATE) :
+                if var[ENode.Access] == str(AccessSpecifier.PRIVATE) :
                     continue
                
-                hppCode += f"\t\tvisitor.template operator()<decltype(get_{var[ENodeName]}_member_variable_info())>(static_cast<pycppgen_t*>(obj)->get_{var[ENodeName]}_ref());\n"
+                hppCode += f"\t\tvisitor.template operator()<decltype(get_{var[ENode.Name]}_member_variable_info())>(static_cast<pycppgen_t*>(obj)->get_{var[ENode.Name]}_ref());\n"
         hppCode += "\t}\n\n"
 
-        hppCode += "\tstatic void for_each_var(const " + node[ENodeType] + "* obj, auto visitor, uint32_t maxDepth = UINT_MAX) {\n"
-        if ENodeNamespace in node and node[ENodeNamespace] != "" :
-            hppCode += f"\t\tusing namespace {node[ENodeNamespace]};\n"
+        hppCode += "\tstatic void for_each_var(const " + node[ENode.Type] + "* obj, auto visitor, uint32_t maxDepth = UINT_MAX) {\n"
+        if ENode.Namespace in node and node[ENode.Namespace] != "" :
+            hppCode += f"\t\tusing namespace {node[ENode.Namespace]};\n"
         #parent classes
-        if ENodeParents in node :
+        if ENode.Parents in node :
             hppCode += "\t\tif(maxDepth > 0) {\n"
-            for p in node[ENodeParents] :
+            for p in node[ENode.Parents] :
                 hppCode += f"\t\t\tpycppgen<{p}>::for_each_var(obj, visitor, maxDepth - 1);\n"
             hppCode += "\t\t}\n"
 
-        if ENodeVariables in node and len(node[ENodeVariables]) > 0 :
-            for _, var in node[ENodeVariables].items() :
+        if ENode.Variables in node and len(node[ENode.Variables]) > 0 :
+            for _, var in node[ENode.Variables].items() :
                 #skip private variables
-                if var[ENodeAccess] == str(AccessSpecifier.PRIVATE) :
+                if var[ENode.Access] == str(AccessSpecifier.PRIVATE) :
                     continue
 
                 #call visitor
-                hppCode += f"\t\tvisitor.template operator()<decltype(get_{var[ENodeName]}_member_variable_info())>(static_cast<const pycppgen_t*>(obj)->get_{var[ENodeName]}());\n"
+                hppCode += f"\t\tvisitor.template operator()<decltype(get_{var[ENode.Name]}_member_variable_info())>(static_cast<const pycppgen_t*>(obj)->get_{var[ENode.Name]}());\n"
         hppCode += "\t}\n\n"
 
         #do the same for static variables
         hppCode += "\tstatic void for_each_static_var(auto visitor) {\n"
-        if ENodeStaticVariables in node and len(node[ENodeStaticVariables]) > 0 :
-            for _, var in node[ENodeStaticVariables].items() :
+        if ENode.StaticVariables in node and len(node[ENode.StaticVariables]) > 0 :
+            for _, var in node[ENode.StaticVariables].items() :
                 #skip private variables
-                if var[ENodeAccess] == str(AccessSpecifier.PRIVATE) :
+                if var[ENode.Access] == str(AccessSpecifier.PRIVATE) :
                     continue
                
                 #call visitor
-                hppCode += f"\t\tvisitor.template operator()<decltype(get_{var[ENodeName]}_member_variable_info())>();\n"
+                hppCode += f"\t\tvisitor.template operator()<decltype(get_{var[ENode.Name]}_member_variable_info())>();\n"
         hppCode += "\t}\n\n"
         
         #get_var_attributes
         hppCode += "\tstatic attribute_map_t get_var_attributes(std::string_view name) {\n"
-        if ENodeNamespace in node and node[ENodeNamespace] != "" :
-            hppCode += f"\t\tusing namespace {node[ENodeNamespace]};\n"
+        if ENode.Namespace in node and node[ENode.Namespace] != "" :
+            hppCode += f"\t\tusing namespace {node[ENode.Namespace]};\n"
         
         hppCode += f"\t\tattribute_map_t result;\n"
 
-        if ENodeVariables in node and len(node[ENodeVariables]) > 0 :
-            for _, var in node[ENodeVariables].items() :
+        if ENode.Variables in node and len(node[ENode.Variables]) > 0 :
+            for _, var in node[ENode.Variables].items() :
                 #skip private variables
-                if var[ENodeAccess] == str(AccessSpecifier.PRIVATE) :
+                if var[ENode.Access] == str(AccessSpecifier.PRIVATE) :
                     continue
                 
-                hppCode += f"\t\tif (name == \"{var[ENodeName]}\")\n"
+                hppCode += f"\t\tif (name == \"{var[ENode.Name]}\")\n"
                 hppCode += f"\t\t\t result = {CodeGenOutputAttributes(var, 3)};\n"
             
         #parent classes
-        if ENodeParents in node :
+        if ENode.Parents in node :
             hppCode += "\n"
-            for p in node[ENodeParents] :
+            for p in node[ENode.Parents] :
                 hppCode += "\t\tif (result.empty())\n"
                 hppCode += f"\t\t\tresult = pycppgen<{p}>::get_var_attributes(name);\n"
             hppCode += "\n"
 
-        if ENodeMemberAttributesOverride in node and len(node[ENodeMemberAttributesOverride]) > 0:
+        if ENode.MemberAttributesOverride in node and len(node[ENode.MemberAttributesOverride]) > 0:
             hppCode += f"\t\t//overrides\n"
-            overrides = node[ENodeMemberAttributesOverride]
+            overrides = node[ENode.MemberAttributesOverride]
             for o in overrides :
                 hppCode += f"\t\tif (name == \"{o}\")\n"
                 hppCode += "\t\t{\n"
@@ -929,46 +940,46 @@ def CodeGenOutputNode(node) :
         hppCode += "\t}\n\n"
 
         #serialization creates a dump (output) and parse (input) functions
-        hppCode += "\ttemplate<typename T> static bool dump(T& result, const " + node[ENodeType] + "* obj) {\n"
-        if ENodeParents in node :
-            for parent in node[ENodeParents] :
+        hppCode += "\ttemplate<typename T> static bool dump(T& result, const " + node[ENode.Type] + "* obj) {\n"
+        if ENode.Parents in node :
+            for parent in node[ENode.Parents] :
                 hppCode += f"\t\tpycppgen<{parent}>::dump(result, obj);\n"
 
-        if ENodeVariables in node and len(node[ENodeVariables]) > 0 :
+        if ENode.Variables in node and len(node[ENode.Variables]) > 0 :
             #serialize the values
-            for _, var in node[ENodeVariables].items() :
-                if "serialize" in var[ENodeAttributes] and (var[ENodeAccess] == str(AccessSpecifier.PUBLIC) or var[ENodeAccess] == str(AccessSpecifier.PROTECTED)) :
-                    hppCode += f"\t\tresult[\"{var[ENodeName]}\"] = static_cast<const pycppgen_t*>(obj)->get_{var[ENodeName]}();\n"
+            for _, var in node[ENode.Variables].items() :
+                if "serialize" in var[ENode.Attributes] and (var[ENode.Access] == str(AccessSpecifier.PUBLIC) or var[ENode.Access] == str(AccessSpecifier.PROTECTED)) :
+                    hppCode += f"\t\tresult[\"{var[ENode.Name]}\"] = static_cast<const pycppgen_t*>(obj)->get_{var[ENode.Name]}();\n"
         hppCode += "\t\treturn true;\n"
         hppCode += "\t}\n\n"
 
         hppCode += "\ttemplate<typename T, typename R> static bool parse(const T& data, R* obj) {\n"
-        if ENodeParents in node :
-            for parent in node[ENodeParents] :
+        if ENode.Parents in node :
+            for parent in node[ENode.Parents] :
                 hppCode += f"\t\tpycppgen<{parent}>::parse(data, obj);\n"
-        if ENodeVariables in node and len(node[ENodeVariables]) > 0 :
-            for _, var in node[ENodeVariables].items() :
-                if "serialize" in var[ENodeAttributes] and (var[ENodeAccess] == str(AccessSpecifier.PUBLIC) or var[ENodeAccess] == str(AccessSpecifier.PROTECTED)) :
-                    hppCode += "\t\tif (data.contains(\"" + var[ENodeName]+ "\"))\n"
-                    hppCode += "\t\t\tstatic_cast<pycppgen_t*>(obj)->set_" + var[ENodeName] + "(data[\"" + var[ENodeName]+ "\"]);\n"
+        if ENode.Variables in node and len(node[ENode.Variables]) > 0 :
+            for _, var in node[ENode.Variables].items() :
+                if "serialize" in var[ENode.Attributes] and (var[ENode.Access] == str(AccessSpecifier.PUBLIC) or var[ENode.Access] == str(AccessSpecifier.PROTECTED)) :
+                    hppCode += "\t\tif (data.contains(\"" + var[ENode.Name]+ "\"))\n"
+                    hppCode += "\t\t\tstatic_cast<pycppgen_t*>(obj)->set_" + var[ENode.Name] + "(data[\"" + var[ENode.Name]+ "\"]);\n"
         hppCode += "\t\treturn true;\n"
         hppCode += "\t}\n\n"
 
         #functions
         hppCode += "\tstatic void for_each_function(auto visitor, uint32_t maxDepth = UINT_MAX) {\n"
-        if ENodeNamespace in node and node[ENodeNamespace] != "" :
-            hppCode += f"\t\tusing namespace {node[ENodeNamespace]};\n"
+        if ENode.Namespace in node and node[ENode.Namespace] != "" :
+            hppCode += f"\t\tusing namespace {node[ENode.Namespace]};\n"
 
-        if ENodeParents in node :
+        if ENode.Parents in node :
             hppCode += "\t\tif(maxDepth > 0) {\n"
-            for p in node[ENodeParents] :
+            for p in node[ENode.Parents] :
                 hppCode += f"\t\t\tpycppgen<{p}>::for_each_function(visitor, maxDepth - 1);\n"
             hppCode += "\t\t}\n"
 
-        if ENodeFunctions in node and len(node[ENodeFunctions]) > 0 :
-            for _, func in node[ENodeFunctions].items() :
-                if func[ENodeAccess] == str(AccessSpecifier.PUBLIC) or func[ENodeAccess] == str(AccessSpecifier.PROTECTED) :
-                    funcName = func[ENodeName]
+        if ENode.Functions in node and len(node[ENode.Functions]) > 0 :
+            for _, func in node[ENode.Functions].items() :
+                if func[ENode.Access] == str(AccessSpecifier.PUBLIC) or func[ENode.Access] == str(AccessSpecifier.PROTECTED) :
+                    funcName = func[ENode.Name]
                     infoName = f"{funcName}_info_" + str(hppCode.count('\n'))
 
                     hppCode += GenerateMemberFunctionInfo(node, func, infoName)
@@ -985,18 +996,18 @@ def CodeGenOutputNode(node) :
         
         #has_function by name declaration
         hppCode += "\tstatic constexpr bool has_function(std::string_view name, uint32_t maxDepth = UINT_MAX) {\n"
-        if ENodeNamespace in node and node[ENodeNamespace] != "" :
-            hppCode += f"\t\tusing namespace {node[ENodeNamespace]};\n"
+        if ENode.Namespace in node and node[ENode.Namespace] != "" :
+            hppCode += f"\t\tusing namespace {node[ENode.Namespace]};\n"
 
-        if ENodeFunctions in node :
-            for _, v in node[ENodeFunctions].items() :
-                hppCode += f"\t\tif (name == std::string_view(\"{v[ENodeName]}\")) return true; \n"
-        if ENodeStaticFunctions in node :
-            for _, v in node[ENodeStaticFunctions].items() :
-                hppCode += f"\t\tif (name == std::string_view(\"{v[ENodeName]}\")) return true; \n"
-        if ENodeParents in node :
+        if ENode.Functions in node :
+            for _, v in node[ENode.Functions].items() :
+                hppCode += f"\t\tif (name == std::string_view(\"{v[ENode.Name]}\")) return true; \n"
+        if ENode.StaticFunctions in node :
+            for _, v in node[ENode.StaticFunctions].items() :
+                hppCode += f"\t\tif (name == std::string_view(\"{v[ENode.Name]}\")) return true; \n"
+        if ENode.Parents in node :
             hppCode += "\t\tif(maxDepth > 0) {\n"
-            for p in node[ENodeParents] :
+            for p in node[ENode.Parents] :
                 hppCode += f"\t\t\tif (pycppgen<{p}>::has_function(name, maxDepth)) return true;\n"
             hppCode += "\t\t}\n"
         hppCode += "\t\treturn false;\n\t}\n\n"
@@ -1004,13 +1015,13 @@ def CodeGenOutputNode(node) :
         declarations = dict()
 
         #append functions
-        if ENodeFunctions in node :
-            for _, v in node[ENodeFunctions].items() :
+        if ENode.Functions in node :
+            for _, v in node[ENode.Functions].items() :
                 CodeGenOutputAddFunctionDeclaration(declarations, node, v, False)
 
         #append static functions
-        if ENodeStaticFunctions in node and len(node[ENodeStaticFunctions]) > 0 :
-            for _, v in node[ENodeStaticFunctions].items() :
+        if ENode.StaticFunctions in node and len(node[ENode.StaticFunctions]) > 0 :
+            for _, v in node[ENode.StaticFunctions].items() :
                 CodeGenOutputAddFunctionDeclaration(declarations, node, v, True)
 
         for _, v in declarations.items() :
@@ -1018,7 +1029,7 @@ def CodeGenOutputNode(node) :
 
         hppCode = CodeGenOutputMetaFooter(hppCode, node)
 
-    elif node[ENodeKind] == EKindEnum :
+    elif node[ENode.Kind] == EKind.Enum :
         hppCode += CodeGenOutputMetaHeader(hppCode, node)
 
         #append enum attributes
@@ -1026,50 +1037,50 @@ def CodeGenOutputNode(node) :
         hppCode += "\t\treturn {" + CodeGenOutputAttributes(node, 2) + "};\n" 
         hppCode += "};\n\n"
 
-        if ENodeEnumValues in node :
+        if ENode.EnumValues in node :
             #for each enum
             hppCode += "\ttemplate<typename FN> static void for_each_enum_value(FN&& visitor) {\n"
-            for k, v in node[ENodeEnumValues].items() :
-                hppCode += "\t\tvisitor( " + node[ENodeFullName] + "::" + k + " );\n"
+            for k, v in node[ENode.EnumValues].items() :
+                hppCode += "\t\tvisitor( " + node[ENode.FullName] + "::" + k + " );\n"
             hppCode += "\t}\n"
 
             #enum to string
-            hppCode += "\tstatic constexpr std::string_view enum_to_string(" + node[ENodeFullName] + " value) {\n"
-            for k, v in node[ENodeEnumValues].items() :
-                hppCode += "\t\tif (value == " + node[ENodeFullName] + "::" + k + " ) return \"" + k + "\";\n"
+            hppCode += "\tstatic constexpr std::string_view enum_to_string(" + node[ENode.FullName] + " value) {\n"
+            for k, v in node[ENode.EnumValues].items() :
+                hppCode += "\t\tif (value == " + node[ENode.FullName] + "::" + k + " ) return \"" + k + "\";\n"
             hppCode += "\t\treturn \"\";\n"
             hppCode += "\t}\n"
 
-            hppCode += "\tstatic std::string bitfield_to_string(" + node[ENodeFullName] + " value) {\n"
-            hppCode += f"\t\tusing type = std::underlying_type_t<{node[ENodeFullName]}>;\n"
+            hppCode += "\tstatic std::string bitfield_to_string(" + node[ENode.FullName] + " value) {\n"
+            hppCode += f"\t\tusing type = std::underlying_type_t<{node[ENode.FullName]}>;\n"
             hppCode += f"\t\tstd::string result;\n"
-            for k, v in node[ENodeEnumValues].items() :
-                hppCode += f"\t\tif ((type)value & (type){node[ENodeFullName]}::{k}) result += \"|{k}\";\n"
+            for k, v in node[ENode.EnumValues].items() :
+                hppCode += f"\t\tif ((type)value & (type){node[ENode.FullName]}::{k}) result += \"|{k}\";\n"
             hppCode += "\t\treturn result.empty() ? result : std::string{result.begin() + 1, result.end()};\n"
             hppCode += "\t}\n"
 
             #string to enum
-            hppCode += "\tstatic constexpr " + node[ENodeFullName] + " string_to_enum(std::string_view value) {\n"
-            for k, v in node[ENodeEnumValues].items() :
-                hppCode += "\t\tif (value == \"" + k + "\") return " + node[ENodeFullName] + "::" + k + ";\n"
-            hppCode += "\t\treturn static_cast<" + node[ENodeFullName] + ">(-1);\n"
+            hppCode += "\tstatic constexpr " + node[ENode.FullName] + " string_to_enum(std::string_view value) {\n"
+            for k, v in node[ENode.EnumValues].items() :
+                hppCode += "\t\tif (value == \"" + k + "\") return " + node[ENode.FullName] + "::" + k + ";\n"
+            hppCode += "\t\treturn static_cast<" + node[ENode.FullName] + ">(-1);\n"
             hppCode += "\t}\n"
 
-            hppCode += "\tstatic " + node[ENodeFullName] + " string_to_bitfield(std::string_view value) {\n"
-            hppCode += f"\t\tusing type = std::underlying_type_t<{node[ENodeFullName]}>;\n"
+            hppCode += "\tstatic " + node[ENode.FullName] + " string_to_bitfield(std::string_view value) {\n"
+            hppCode += f"\t\tusing type = std::underlying_type_t<{node[ENode.FullName]}>;\n"
             hppCode += f"\t\tstd::string str(value);\n"
             hppCode += f"\t\tstr.erase(std::remove(str.begin(), str.end(), ' '));\n"
             hppCode += f"\t\tconst std::vector<std::string> tokens = pycppgen_detail::split_string(str, '|');\n"
             hppCode += f"\t\ttype result = 0;\n"
-            for k, v in node[ENodeEnumValues].items() :
-                hppCode += f"\t\tif (std::ranges::find(tokens, \"{k}\") != tokens.end()) result |= (type){node[ENodeFullName]}::{k};\n"
-            hppCode += f"\t\treturn ({node[ENodeFullName]}) result;\n"
+            for k, v in node[ENode.EnumValues].items() :
+                hppCode += f"\t\tif (std::ranges::find(tokens, \"{k}\") != tokens.end()) result |= (type){node[ENode.FullName]}::{k};\n"
+            hppCode += f"\t\treturn ({node[ENode.FullName]}) result;\n"
             hppCode += "\t}\n"
 
             #enum value attributes
-            hppCode += "\tstatic attribute_map_t enum_value_attributes(" + node[ENodeFullName] + " value) {\n"
-            for k, v in node[ENodeEnumValues].items() :
-                hppCode += "\t\tif (value == " + node[ENodeFullName] + "::" + k + ") {\n\t\t\treturn " + CodeGenOutputAttributes(v, 3) + ";\n\t\t}\n"
+            hppCode += "\tstatic attribute_map_t enum_value_attributes(" + node[ENode.FullName] + " value) {\n"
+            for k, v in node[ENode.EnumValues].items() :
+                hppCode += "\t\tif (value == " + node[ENode.FullName] + "::" + k + ") {\n\t\t\treturn " + CodeGenOutputAttributes(v, 3) + ";\n\t\t}\n"
             hppCode += "\t\treturn {};\n"
             hppCode += "\t}\n"
 
@@ -1108,12 +1119,12 @@ def CodeGen(filePath : str) :
     hppCode += "namespace pycppgen_globals {\n"
     
     for _, func in TLS().NodeList.items() :
-        if func[ENodeKind] == EKindFreeFunction :
-            hppCode += "//" + func[ENodeFullName] + "\n"
+        if func[ENode.Kind] == EKind.FreeFunction :
+            hppCode += "//" + func[ENode.FullName] + "\n"
 
     for _, var in TLS().NodeList.items() :
-        if var[ENodeKind] == EKindFreeVariable :
-            hppCode += "//" + var[ENodeType] + " " + var[ENodeFullName] + "\n"
+        if var[ENode.Kind] == EKind.FreeVariable :
+            hppCode += "//" + var[ENode.Type] + " " + var[ENode.FullName] + "\n"
 
     hppCode += "}\n"
 
@@ -1139,8 +1150,8 @@ def CodeGen(filePath : str) :
 
 #codegen: emit for each type call
 def CodeGenGlobalAddForEachTypeCall(code, node) :
-    if node[ENodeKind] == EKindClass or node[ENodeKind] == EKindStruct : #or node[ENodeKind] == EKindClassTemplate:
-        code += f"\t\tvisitor.template operator()<{node[ENodeFullName]}>();\n"
+    if node[ENode.Kind] == EKind.Class or node[ENode.Kind] == EKind.Struct : #or node[ENode.Kind] == EKind.ClassTemplate:
+        code += f"\t\tvisitor.template operator()<{node[ENode.FullName]}>();\n"
     return code
 
 #codegen: output global file
@@ -1267,16 +1278,16 @@ def CodeGenGlobal(path : str) :
     code += "\tstatic void for_each_enum(auto visitor)\n"
     code += "\t{\n"
     for _, node in TLS().NodeList.items() :
-        if node[ENodeKind] == EKindEnum :
-            code += f"\t\tvisitor.template operator()<{node[ENodeFullName]}>();\n"
+        if node[ENode.Kind] == EKind.Enum :
+            code += f"\t\tvisitor.template operator()<{node[ENode.FullName]}>();\n"
     code += "\t}\n\n"
 
     code += "\tstatic void for_each_type_call_static_by_name(std::string_view funcName) {\n"
     for _, node in TLS().NodeList.items() :
-        if (node[ENodeKind] == EKindClass or node[ENodeKind] == EKindStruct) and ENodeStaticFunctions in node:
-            for _, func in node[ENodeStaticFunctions].items() :
-                if (not ENodeParameters in func or len(func[ENodeParameters]) == 0) and (not ENodeReturnType in func or func[ENodeReturnType] == "void"):
-                    code += f"\t\tpycppgen<{node[ENodeFullName]}>::call_function(funcName);\n"
+        if (node[ENode.Kind] == EKind.Class or node[ENode.Kind] == EKind.Struct) and ENode.StaticFunctions in node:
+            for _, func in node[ENode.StaticFunctions].items() :
+                if (not ENode.Parameters in func or len(func[ENode.Parameters]) == 0) and (not ENode.ReturnType in func or func[ENode.ReturnType] == "void"):
+                    code += f"\t\tpycppgen<{node[ENode.FullName]}>::call_function(funcName);\n"
     code += "\t}\n"
     code += "}\n\n"
 
@@ -1284,9 +1295,9 @@ def CodeGenGlobal(path : str) :
     code += "{\n"
     code += "\tif (false) {}\n"
     for _, node in TLS().NodeList.items() :
-        if node[ENodeKind] == EKindClass or node[ENodeKind] == EKindStruct :
-            code += f"\telse if (HashCode == typeid({node[ENodeFullName]}).hash_code())\n"
-            code += f"\t\treturn pycppgen<{node[ENodeFullName]}>::name();\n"
+        if node[ENode.Kind] == EKind.Class or node[ENode.Kind] == EKind.Struct :
+            code += f"\telse if (HashCode == typeid({node[ENode.FullName]}).hash_code())\n"
+            code += f"\t\treturn pycppgen<{node[ENode.FullName]}>::name();\n"
     code += "\treturn \"\";\n"
     code += "}\n\n"
 
@@ -1295,9 +1306,9 @@ def CodeGenGlobal(path : str) :
     code += f"\tconst auto hashCode = obj ? typeid(*obj).hash_code() : 0;\n"
     code += "\tif (false) {}\n"
     for _, node in TLS().NodeList.items() :
-        if node[ENodeKind] == EKindClass or node[ENodeKind] == EKindStruct :
-            code += f"\telse if (hashCode == typeid({node[ENodeFullName]}).hash_code())\n"
-            code += f"\t\tpycppgen<{node[ENodeFullName]}>::for_each_var((const {node[ENodeFullName]}*)obj, visitor, maxDepth - 1);\n"
+        if node[ENode.Kind] == EKind.Class or node[ENode.Kind] == EKind.Struct :
+            code += f"\telse if (hashCode == typeid({node[ENode.FullName]}).hash_code())\n"
+            code += f"\t\tpycppgen<{node[ENode.FullName]}>::for_each_var((const {node[ENode.FullName]}*)obj, visitor, maxDepth - 1);\n"
     code += "}\n\n"
 
     code += "template<typename T> void pycppgen<void>::for_each_var(T* obj, auto visitor, uint32_t maxDepth)\n"
@@ -1305,9 +1316,9 @@ def CodeGenGlobal(path : str) :
     code += f"\tconst auto hashCode = obj ? typeid(*obj).hash_code() : 0;\n"
     code += "\tif (false) {}\n"
     for _, node in TLS().NodeList.items() :
-        if node[ENodeKind] == EKindClass or node[ENodeKind] == EKindStruct :
-            code += f"\telse if (hashCode == typeid({node[ENodeFullName]}).hash_code())\n"
-            code += f"\t\tpycppgen<{node[ENodeFullName]}>::for_each_var(({node[ENodeFullName]}*)obj, visitor, maxDepth - 1);\n"
+        if node[ENode.Kind] == EKind.Class or node[ENode.Kind] == EKind.Struct :
+            code += f"\telse if (hashCode == typeid({node[ENode.FullName]}).hash_code())\n"
+            code += f"\t\tpycppgen<{node[ENode.FullName]}>::for_each_var(({node[ENode.FullName]}*)obj, visitor, maxDepth - 1);\n"
     code += "}\n\n"
 
     code += "template<typename T, typename R> bool pycppgen<void>::dump(T& result, const R* obj)\n"
@@ -1315,9 +1326,9 @@ def CodeGenGlobal(path : str) :
     code += f"\tconst auto hashCode = obj ? typeid(*obj).hash_code() : 0;\n"
     code += "\tif (false) {}\n"
     for _, node in TLS().NodeList.items() :
-        if (node[ENodeKind] == EKindClass or node[ENodeKind] == EKindStruct) and "serialize" in node[ENodeAttributes] :
-            code += f"\telse if (hashCode == typeid({node[ENodeFullName]}).hash_code())\n"
-            code += f"\t\treturn pycppgen<{node[ENodeFullName]}>::dump(result, (const {node[ENodeFullName]}*)obj);\n"
+        if (node[ENode.Kind] == EKind.Class or node[ENode.Kind] == EKind.Struct) and "serialize" in node[ENode.Attributes] :
+            code += f"\telse if (hashCode == typeid({node[ENode.FullName]}).hash_code())\n"
+            code += f"\t\treturn pycppgen<{node[ENode.FullName]}>::dump(result, (const {node[ENode.FullName]}*)obj);\n"
     code += "\treturn false;\n"
     code += "}\n\n"
 
@@ -1326,9 +1337,9 @@ def CodeGenGlobal(path : str) :
     code += f"\tconst auto hashCode = obj ? typeid(*obj).hash_code() : 0;\n"
     code += "\tif (false) {}\n"
     for _, node in TLS().NodeList.items() :
-        if (node[ENodeKind] == EKindClass or node[ENodeKind] == EKindStruct) and "serialize" in node[ENodeAttributes] :
-            code += f"\telse if (hashCode == typeid({node[ENodeFullName]}).hash_code())\n"
-            code += f"\t\treturn pycppgen<{node[ENodeFullName]}>::parse(data, (const {node[ENodeFullName]}*)obj);\n"
+        if (node[ENode.Kind] == EKind.Class or node[ENode.Kind] == EKind.Struct) and "serialize" in node[ENode.Attributes] :
+            code += f"\telse if (hashCode == typeid({node[ENode.FullName]}).hash_code())\n"
+            code += f"\t\treturn pycppgen<{node[ENode.FullName]}>::parse(data, (const {node[ENode.FullName]}*)obj);\n"
     code += "\treturn false;\n"
     code += "}\n\n"
 
@@ -1336,29 +1347,29 @@ def CodeGenGlobal(path : str) :
     code += "inline pycppgen<void>::pycppgen(std::string_view name)\n"
     code += "{\n"
     for _, node in TLS().NodeList.items() :
-        if node[ENodeKind] == EKindClass or node[ENodeKind] == EKindStruct :
+        if node[ENode.Kind] == EKind.Class or node[ENode.Kind] == EKind.Struct :
             if code.endswith("{\n") : code += "\t"
             else : code += f"\telse "
-            code += f"if (name == \"{node[ENodeFullName]}\" || name == \"{node[ENodeName]}\")\n"
-            code += f"\t\tHashCode = typeid({node[ENodeFullName]}).hash_code();\n"
+            code += f"if (name == \"{node[ENode.FullName]}\" || name == \"{node[ENode.Name]}\")\n"
+            code += f"\t\tHashCode = typeid({node[ENode.FullName]}).hash_code();\n"
     code += "}\n\n"
     
     code += "inline attribute_map_t pycppgen<void>::get_var_attributes(std::string_view name) const\n"
     code += "{\n"
     code += "\tif (false) {}\n"
     for _, node in TLS().NodeList.items() :
-        if node[ENodeKind] == EKindClass or node[ENodeKind] == EKindStruct :
-            code += f"\telse if (HashCode == typeid({node[ENodeFullName]}).hash_code())\n"
-            code += f"\t\treturn pycppgen<{node[ENodeFullName]}>::get_var_attributes(name);\n"
+        if node[ENode.Kind] == EKind.Class or node[ENode.Kind] == EKind.Struct :
+            code += f"\telse if (HashCode == typeid({node[ENode.FullName]}).hash_code())\n"
+            code += f"\t\treturn pycppgen<{node[ENode.FullName]}>::get_var_attributes(name);\n"
     code += "\treturn {};\n"
     code += "}\n\n"
 
     code += "inline void pycppgen<void>::for_each_var(auto visitor, uint32_t maxDepth) const\n"
     code += "{\n"
     for _, node in TLS().NodeList.items() :
-        if node[ENodeKind] == EKindClass or node[ENodeKind] == EKindStruct :
-            code += f"\tif (HashCode == typeid({node[ENodeFullName]}).hash_code())\n"
-            code += f"\t\tpycppgen<{node[ENodeFullName]}>::for_each_var(visitor, maxDepth - 1);\n"
+        if node[ENode.Kind] == EKind.Class or node[ENode.Kind] == EKind.Struct :
+            code += f"\tif (HashCode == typeid({node[ENode.FullName]}).hash_code())\n"
+            code += f"\t\tpycppgen<{node[ENode.FullName]}>::for_each_var(visitor, maxDepth - 1);\n"
     code += "}\n\n"
 
     if IsFileDifferent(path + "\\pycppgen.gen.h", code) :
