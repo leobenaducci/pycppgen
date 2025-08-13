@@ -575,10 +575,12 @@ def CodeGenOutputMetaHeader(code, node) :
                     lines.append(f", virtual pycppgen<{p}>")
     lines.extend([
         "{\n",
-        f"\tusing pycppgen_t = pycppgen<{node[ENode.FullName]}>;\n"
-        "\tstatic constexpr bool is_valid() { return true; \\n"
-        "\tstatic constexpr const char* name() { return \"" + node[ENode.Name] + "\"; }\n"
+        f"\tusing pycppgen_t = pycppgen<{node[ENode.FullName]}>;\n",
+        "\tstatic constexpr bool is_valid() { return true; }\n",
+        "\tstatic constexpr const char* name() { return \"" + node[ENode.Name] + "\"; }\n",
     ])
+
+    code += "".join(lines)
 
     return code
 
@@ -1073,7 +1075,7 @@ def CodeGenOutputNode(node) :
             hppCode += "\tstatic " + node[ENode.FullName] + " string_to_bitfield(std::string_view value) {\n"
             hppCode += f"\t\tusing type = std::underlying_type_t<{node[ENode.FullName]}>;\n"
             hppCode += f"\t\tstd::string str(value);\n"
-            hppCode += f"\t\tstr.erase(std::remove(str.begin(), str.end(), ' '));\n"
+            hppCode += f"\t\tstr.erase(std::remove(str.begin(), str.end(), ' '), std.end());\n"
             hppCode += f"\t\tconst std::vector<std::string> tokens = pycppgen_detail::split_string(str, '|');\n"
             hppCode += f"\t\ttype result = 0;\n"
             for k, v in node[ENode.EnumValues].items() :
