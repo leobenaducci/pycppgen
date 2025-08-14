@@ -1,5 +1,6 @@
 #pragma once
 
+// Size = 192
 struct STestShaderData
 {
 	float3		A;		// Offset: 0 - Size: 12
@@ -13,4 +14,4 @@ struct STestShaderData
 	float2		_pad2;	// Offset: 168 - Size: 8
 	float		H;		// Offset: 176 - Size: 4
 	float3		_pad3;	// Offset: 180 - Size: 12
-}; // Size = 192
+};

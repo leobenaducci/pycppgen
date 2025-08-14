@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from clang.cindex import CursorKind
 from clang.cindex import AccessSpecifier
 
-DebugMode = True
+DebugMode = False
 
 @dataclass(frozen=True, slots=True)
 class _Kinds:
@@ -920,7 +920,7 @@ def CodeGenHlslNode(hppCode, node) :
         offset = offset + int(padSize)
 
     result += "};"
-    result += f" // Size = {offset}\n"
+    result = f"// Size = {offset}\n" + result 
 
     return hppCode + result
 
