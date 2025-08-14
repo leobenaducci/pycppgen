@@ -2,23 +2,17 @@
 
 #include <array> //included for performance profiling
 
-//$[[pycppgen]]
 struct STestShaderData_pyhlslgen
 {
-    //$[[pycppgen visible]]
     float3 A;
-    //$[[pycppgen visible]]
     float B;
-    //$[[pycppgen visible]]
     float4 C;
-    //$[[pycppgen visible]]
     float2 D;
-    //$[[pycppgen visible]]
     float3x3 E;
-    //$[[pycppgen visible]]
     float2 F[4];
+    double G;
+    float H;
 };
-
 
 //$[[pycppgen]]
 struct SStructBase

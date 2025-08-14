@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from clang.cindex import CursorKind
 from clang.cindex import AccessSpecifier
 
-DebugMode = False
+DebugMode = True
 
 @dataclass(frozen=True, slots=True)
 class _Kinds:
@@ -97,6 +97,8 @@ ParseCommentsMode = {
     EKind.TemplateNonTypeParameter : EParseComments.BeforeDecl,
     EKind.TemplateTemplateParameter : EParseComments.BeforeDecl,
 }
+
+kHlslTypes = ["float", "int", "uint", "bool", "half", "double", "uint64"]
 
 class TLS_Data:
     def __init__(self):
@@ -189,7 +191,7 @@ def ParseComments(cursor, kind : str = EParseComments.BeforeDecl):
             if key.lower() == kExclude : result[kInclude] = str(bool(value != None and value == True))
             else : result[key] = value
 
-    if oneMatch and not kInclude.casefold() in result :
+    if oneMatch and not kExclude.casefold() in result :
         result[kInclude] = True
 
     return result
@@ -288,7 +290,7 @@ def ParseFunction(cursor, isFreeFunction : bool = False) :
     return node
 
 #parse variable or class/struct field
-def ParseVar(cursor, isFreeVariable : bool = False) :
+def ParseVar(cursor, isFreeVariable : bool = False):
 
     node = PushNode(cursor, EKind.Variable)
     PopNode()
@@ -325,7 +327,7 @@ def ParseStruct(cursor) :
             if child.referenced :
                 childFullName = GetFullName(child.referenced)
                 flags = ParseComments(child.referenced, EKind.Unknown)
-                if kInclude in flags : 
+                if kInclude in flags: 
                     if str(flags[kInclude]) == "False" :
                         continue
                 elif not childFullName in TLS().NodesToInclude :
@@ -359,7 +361,7 @@ def ParseStruct(cursor) :
             continue
 
         flags = ParseComments(child, EKind.Unknown)
-        if not kInclude in flags or flags[kInclude] == False :
+        if not kInclude in flags or flags[kInclude] == False:
             continue
 
         #class functions
@@ -398,6 +400,37 @@ def ParseStruct(cursor) :
     if ENode.MetaTemplateDecl in node :
         if node[ENode.MetaTemplateDecl].endswith(", ") :
             node[ENode.MetaTemplateDecl] = node[ENode.MetaTemplateDecl][:-2]
+
+    PopNode()
+
+    return node
+
+#parse struct/class
+def ParseHlslStruct(cursor) :
+    kind = kInvalid
+    if cursor.kind == CursorKind.CLASS_TEMPLATE or cursor.kind == CursorKind.CLASS_DECL :
+        return
+    kind = EKind.Struct
+
+    node = PushNode(cursor, kind)
+    node[ENode.MetaTemplateDecl] = ""
+    node[ENode.Functions] = {}
+    node[ENode.MemberAttributesOverride] = {}
+
+    for child in cursor.get_children() :
+        
+        #inheritance
+        if child.kind == CursorKind.CXX_BASE_SPECIFIER :
+            if child.referenced :
+                childFullName = GetFullName(child.referenced)
+                ParseComments(child.referenced, EKind.Unknown)
+                AppendToStackTop({ENode.FullName: childFullName}, ENode.Parents)
+            continue
+
+        #member variables (field)
+        if child.kind == CursorKind.FIELD_DECL :
+            ParseVar(child, False)
+            continue
 
     PopNode()
 
@@ -460,6 +493,11 @@ def ParseCursor(cursor, forceInclude : bool = False)  -> None:
         ParseNamespace(cursor)
         return
 
+    isHlslDecl = fullName.endswith("_pyhlslgen")
+
+    if isHlslDecl :
+        forceInclude = isHlslDecl
+
     #check if it should be parsed
     if not forceInclude :
         flags = ParseComments(cursor, EKind.Unknown)
@@ -476,6 +514,13 @@ def ParseCursor(cursor, forceInclude : bool = False)  -> None:
     isStruct = cursor.kind == CursorKind.STRUCT_DECL or cursor.kind == CursorKind.CLASS_DECL
     isStruct |= cursor.kind == CursorKind.CLASS_TEMPLATE or cursor.kind == CursorKind.CLASS_TEMPLATE_PARTIAL_SPECIALIZATION
     if isStruct :
+        if isHlslDecl :
+            node = ParseHlslStruct(cursor)
+            if node :
+                AppendToStackTop(node, ENode.Structs)
+                TLS().NodeList[node[ENode.FullName]] = node
+                return
+        
         if cursor.is_definition() :
             node = ParseStruct(cursor)   
             AppendToStackTop(node, ENode.Structs)
@@ -540,8 +585,8 @@ def ParseFile(filePath : str, options : list) :
     tu = None
 
     try:
-        contents = ""
-        for t in ["float", "int", "uint", "bool"] :
+        contents = "#define cbuffer struct\n"
+        for t in kHlslTypes :
             for m in range(2, 5) :
                 for n in range(2, 5) :
                     contents += f"using {t}{m}x{n} = float;\n"
@@ -559,7 +604,7 @@ def ParseFile(filePath : str, options : list) :
         with open(tmpPath, "wt") as tmpFile:
             tmpFile.write(contents)
 
-        args = ['-x', 'c++', '-std=c++20', "-DPYCPPGEN", "-D__clang_major__=19", "-Wnomacro-redefined"] + options
+        args = ['-x', 'c++', '-std=c++20', "-DPYCPPGEN", "-D__clang_major__=19", "-Wmacro-redefined"] + options
         idx = clang.cindex.Index.create()
         tu = idx.parse(tmpPath, args = args, options = clang.cindex.TranslationUnit.PARSE_INCOMPLETE | clang.cindex.TranslationUnit.PARSE_SKIP_FUNCTION_BODIES)
 
@@ -795,6 +840,29 @@ def GenerateMemberFunctionInfo(node, func, infoName) :
 
     return result
 
+def CalcHlslSize(varType : str) :
+
+    #match type<n>x<m>[s] patterns
+    match = re.fullmatch(rf'({"|".join(kHlslTypes)})(\d)?(?:x(\d))?(?:\[(\w+)\])?', varType)
+    if match:
+        baseType, rows, cols, arraySize = match.groups()
+        if rows and cols:
+            size = 4 * int(rows) * int(cols)
+        elif rows:
+            size = 4 * int(rows)
+        else:
+            size = 4
+        if baseType.startswith('uint64') | baseType.startswith('double'):
+            size *= 2
+        if baseType.startswith('half'):
+            size /= 2
+        if arraySize:
+            size *= int(arraySize)
+        return size, baseType, arraySize, rows, cols
+    
+    return None, None, None, None, None
+    
+
 #codegen: emit a hlsl node
 def CodeGenHlslNode(hppCode, node) :
     
@@ -802,24 +870,70 @@ def CodeGenHlslNode(hppCode, node) :
     result += f"struct {node[ENode.FullName].replace("_pyhlslgen", "")}\n"
     result += "{\n"
 
+    offset = 0
+    padNum = 0
     if ENode.Variables in node :
         for _, var in node[ENode.Variables].items() :
-            result += f"\t{var[ENode.Type]} {var[ENode.Name]};\n"
-    result += "};\n"
-    result += "\n"
+            size, baseType, arraySize, rows, cols = CalcHlslSize(var[ENode.Type])
+            
+            if size == None :
+                continue
+
+            if cols and int(cols) > 1:
+                rows = "4"
+                size = int(16 * int(cols))
+                
+            if arraySize and int(arraySize) > 1:
+                rows = "4"
+                size = int(16 * int(arraySize))
+                if cols and int(cols) > 1:
+                    size = int(size * int(cols))
+
+            if offset % 16 != 0 and offset + size > 16 :
+                padNum = padNum + 1
+                padSize = int((16 - offset % 16))
+                result += f"\tfloat{int(padSize / 4)}\t\t_pad{padNum};\t// Offset: {offset} - Size: {int(padSize)}\n"
+                offset = offset + int(padSize)
+
+            result += f"\t{baseType}"
+            
+            if rows and int(rows) > 1:
+                result += f"{rows}"
+            if cols and int(cols) > 1:
+                result += f"x{cols}"
+            else :
+                result += f"\t"
+
+            result += f"\t{var[ENode.Name]}"
+            if arraySize and int(arraySize) > 1:
+                result += f"[{arraySize}];"
+            else :
+                result += f";\t"
+            result += f"\t// Offset: {offset} - Size: {size}\n"
+
+            offset += size     
+
+    if offset % 16 != 0 :
+        padNum = padNum + 1
+        padSize = int((16 - offset % 16))
+        result += f"\tfloat{int(padSize / 4)}\t\t_pad{padNum};\t// Offset: {offset} - Size: {int(padSize)}\n"
+        offset = offset + int(padSize)
+
+    result += "};"
+    result += f" // Size = {offset}\n"
 
     return hppCode + result
 
 #codegen: emit a node
 def CodeGenOutputNode(node) :
    
-    hppCode = cppCode = ""
+    hppCode = cppCode = hlslCode = ""
 
     if node[ENode.Kind] == EKind.Class or node[ENode.Kind] == EKind.ClassTemplate or node[ENode.Kind] == EKind.Struct :
         hppCode = CodeGenOutputHeaderDefines(hppCode, node)
 
     if node[ENode.Kind] == EKind.Struct and node[ENode.Name].endswith("_pyhlslgen") :
-        hppCode = CodeGenHlslNode(hppCode, node)
+        hlslCode = CodeGenHlslNode(hlslCode, node)
 
     #class or structs
     if node[ENode.Kind] == EKind.Class or node[ENode.Kind] == EKind.ClassTemplate or node[ENode.Kind] == EKind.Struct :
@@ -1144,7 +1258,7 @@ def CodeGenOutputNode(node) :
 
         hppCode = CodeGenOutputMetaFooter(hppCode, node)
 
-    return hppCode, cppCode
+    return hppCode, cppCode, hlslCode
 
 #codegen: output file
 def CodeGen(filePath : str) :
@@ -1157,8 +1271,8 @@ def CodeGen(filePath : str) :
     TLS().NodeList = PerFileData[filePath]["NodeList"]
 
     cppCode = ""
-    hppCode = ""
-    hppCode += "#pragma once\n\n"
+    hlslCode = "#pragma once\n\n"
+    hppCode = "#pragma once\n\n"
     hppCode += "#include \"pycppgen.h\"\n"
 
     parentPath = pathlib.Path(filePath).parent
@@ -1170,9 +1284,10 @@ def CodeGen(filePath : str) :
     hppCode += "#include \"" + str(pathlib.Path(filePath).relative_to(ProjectPath, walk_up=True)) + "\"\n\n"
 
     for key in TLS().NodeList :
-        newHppCode, newCppCode = CodeGenOutputNode(TLS().NodeList[key])
+        newHppCode, newCppCode, newHlslCode = CodeGenOutputNode(TLS().NodeList[key])
         hppCode += newHppCode
         cppCode += newCppCode
+        hlslCode += newHlslCode
 
     hppCode += "namespace pycppgen_globals {\n"
     
@@ -1188,6 +1303,7 @@ def CodeGen(filePath : str) :
 
     hppFile = GetOutputFilePath(filePath, "h")
     cppFile = GetOutputFilePath(filePath, "cpp")
+    hlslFile = GetOutputFilePath(filePath, "hlsli")
     
     if hppCode == "" :
         if os.path.exists(hppFile) :
@@ -1205,6 +1321,14 @@ def CodeGen(filePath : str) :
         cppCode = f"#include \"{hppFile}\"\n\n" + cppCode
         with open(cppFile, mode="wt") as output :
             output.write(cppCode)
+
+    if hlslCode == "" :
+        if os.path.exists(hlslFile) :
+            os.remove(hlslFile)
+    else :
+        atomic_print("generating code for: " + hlslFile)
+        with open(hlslFile, mode="wt") as output :
+            output.write(hlslCode)            
 
 #codegen: emit for each type call
 def CodeGenGlobalAddForEachTypeCall(code, node) :
