@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from clang.cindex import CursorKind
 from clang.cindex import AccessSpecifier
 
-DebugMode = True
+DebugMode = False
 
 @dataclass(frozen=True, slots=True)
 class _Kinds:
@@ -98,7 +98,21 @@ ParseCommentsMode = {
     EKind.TemplateTemplateParameter : EParseComments.BeforeDecl,
 }
 
-kHlslTypes = ["float", "int", "uint", "bool", "half", "double", "uint64"]
+kHlslTypes: Final[list]= ["float", "int", "uint", "bool", "half", "double", "uint64"]
+
+def GenHlslDeclarations() :
+    result = "#define cbuffer struct\n"
+    for t in kHlslTypes :
+        for m in range(2, 5) :
+            for n in range(2, 5) :
+                result += f"using {t}{m}x{n} = float;\n"
+            result += f"using {t}{m} = float;\n"
+    result += "using uint = unsigned int;\n"
+    result += "\n"
+
+    return result
+
+kHlslDeclarations : Final[str] = GenHlslDeclarations()
 
 class TLS_Data:
     def __init__(self):
@@ -615,13 +629,7 @@ def ParseFile(filePath : str, options : list) :
     tu = None
 
     try:
-        contents = "#define cbuffer struct\n"
-        for t in kHlslTypes :
-            for m in range(2, 5) :
-                for n in range(2, 5) :
-                    contents += f"using {t}{m}x{n} = float;\n"
-                contents += f"using {t}{m} = float;\n"
-        contents += "\n"
+        contents = kHlslDeclarations
 
         with open(filePath) as file:
             for line in file.readlines() :
@@ -634,7 +642,7 @@ def ParseFile(filePath : str, options : list) :
         with open(tmpPath, "wt") as tmpFile:
             tmpFile.write(contents)
 
-        args = ['-x', 'c++', '-std=c++20', "-DPYCPPGEN", "-D__clang_major__=19", "-Wmacro-redefined"] + options
+        args = ['-x', 'c++', '-std=c++20', "-DPYCPPGEN", "-D__clang_major__=19", "-Wmacro-redefined", "-D_PYCPPGEN_=1"] + options
         idx = clang.cindex.Index.create()
         tu = idx.parse(tmpPath, args = args, options = clang.cindex.TranslationUnit.PARSE_INCOMPLETE | clang.cindex.TranslationUnit.PARSE_SKIP_FUNCTION_BODIES)
 
