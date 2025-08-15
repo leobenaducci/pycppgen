@@ -902,7 +902,7 @@ def CalcHlslSize(varType : str) :
     
 
 #codegen: emit a hlsl node
-def CodeGenHlslNode(hppCode, hlslCode, node) :
+def CodeGenHlslNode(hlslCode, node) :
     
     hppResult = ""
     hppResult += f"struct {node[ENode.FullName].replace("_pyhlslgen", "")}\n"
@@ -928,7 +928,7 @@ def CodeGenHlslNode(hppCode, hlslCode, node) :
                 rows = "4"
                 size = int(16 * int(cols))
                 
-            if arraySize and int(arraySize) > 1:
+            if arraySize and int(arraySize) > 1 and rows and int(rows) > 1:
                 rows = "4"
                 size = int(16 * int(arraySize))
                 if cols and int(cols) > 1:
@@ -979,21 +979,25 @@ def CodeGenHlslNode(hppCode, hlslCode, node) :
     hlslResult += "};"
     hlslResult = f"// Size = {offset}\n{hlslResult}\n"
 
-    return hppCode + hppResult, hlslCode + hlslResult
+    result = "#ifdef __hlsl_dx_compiler\n"
+    result += hlslResult
+    result = "#else\n"
+    result += hppResult
+    result = "#endif\n\n"
+
+    return hlslCode + result
 
 #codegen: emit a node
 def CodeGenOutputNode(node) :
    
     hppCode = cppCode = hlslCode = ""
 
-    if node[ENode.Kind] == EKind.Class or node[ENode.Kind] == EKind.ClassTemplate or node[ENode.Kind] == EKind.Struct :
-        hppCode = CodeGenOutputHeaderDefines(hppCode, node)
-
     if node[ENode.Kind] == EKind.Struct and node[ENode.Name].endswith("_pyhlslgen") :
-        hppCode, hlslCode = CodeGenHlslNode(hppCode, hlslCode, node)
+        hlslCode = CodeGenHlslNode(hlslCode, node)
 
     #class or structs
     if node[ENode.Kind] == EKind.Class or node[ENode.Kind] == EKind.ClassTemplate or node[ENode.Kind] == EKind.Struct :
+        hppCode = CodeGenOutputHeaderDefines(hppCode, node)
         hppCode = CodeGenOutputMetaHeader(hppCode, node)
 
         if ENode.Variables in node :
@@ -1259,7 +1263,8 @@ def CodeGenOutputNode(node) :
         hppCode = CodeGenOutputMetaFooter(hppCode, node)
 
     elif node[ENode.Kind] == EKind.Enum :
-        hppCode += CodeGenOutputMetaHeader(hppCode, node)
+        hppCode = CodeGenOutputHeaderDefines(hppCode, node)
+        hppCode = CodeGenOutputMetaHeader(hppCode, node)
 
         #append enum attributes
         hppCode += "\tattribute_map_t attributes() {\n"
