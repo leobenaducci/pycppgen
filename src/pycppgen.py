@@ -1551,7 +1551,7 @@ def CodeGenGlobal(path : str) :
     code += "{\n"
     code += "\tif (false) {}\n"
     for _, node in TLS().NodeList.items() :
-        if ENode.Cpp in node and node[ENode.Cpp] and node[ENode.Kind] == EKind.Class or node[ENode.Kind] == EKind.Struct :
+        if ENode.Cpp in node and node[ENode.Cpp] and (node[ENode.Kind] == EKind.Class or node[ENode.Kind] == EKind.Struct) :
             code += f"\telse if (HashCode == typeid({node[ENode.FullName]}).hash_code())\n"
             code += f"\t\treturn pycppgen<{node[ENode.FullName]}>::name();\n"
     code += "\treturn \"\";\n"
@@ -1562,7 +1562,7 @@ def CodeGenGlobal(path : str) :
     code += f"\tconst auto hashCode = obj ? typeid(*obj).hash_code() : 0;\n"
     code += "\tif (false) {}\n"
     for _, node in TLS().NodeList.items() :
-        if ENode.Cpp in node and node[ENode.Cpp] and node[ENode.Kind] == EKind.Class or node[ENode.Kind] == EKind.Struct :
+        if ENode.Cpp in node and node[ENode.Cpp] and (node[ENode.Kind] == EKind.Class or node[ENode.Kind] == EKind.Struct) :
             code += f"\telse if (hashCode == typeid({node[ENode.FullName]}).hash_code())\n"
             code += f"\t\tpycppgen<{node[ENode.FullName]}>::for_each_var((const {node[ENode.FullName]}*)obj, visitor, maxDepth - 1);\n"
     code += "}\n\n"
@@ -1572,7 +1572,7 @@ def CodeGenGlobal(path : str) :
     code += f"\tconst auto hashCode = obj ? typeid(*obj).hash_code() : 0;\n"
     code += "\tif (false) {}\n"
     for _, node in TLS().NodeList.items() :
-        if ENode.Cpp in node and node[ENode.Cpp] and node[ENode.Kind] == EKind.Class or node[ENode.Kind] == EKind.Struct :
+        if ENode.Cpp in node and node[ENode.Cpp] and (node[ENode.Kind] == EKind.Class or node[ENode.Kind] == EKind.Struct) :
             code += f"\telse if (hashCode == typeid({node[ENode.FullName]}).hash_code())\n"
             code += f"\t\tpycppgen<{node[ENode.FullName]}>::for_each_var(({node[ENode.FullName]}*)obj, visitor, maxDepth - 1);\n"
     code += "}\n\n"
@@ -1603,7 +1603,7 @@ def CodeGenGlobal(path : str) :
     code += "inline pycppgen<void>::pycppgen(std::string_view name)\n"
     code += "{\n"
     for _, node in TLS().NodeList.items() :
-        if ENode.Cpp in node and node[ENode.Cpp] and node[ENode.Kind] == EKind.Class or node[ENode.Kind] == EKind.Struct :
+        if ENode.Cpp in node and node[ENode.Cpp] and (node[ENode.Kind] == EKind.Class or node[ENode.Kind] == EKind.Struct) :
             if code.endswith("{\n") : code += "\t"
             else : code += f"\telse "
             code += f"if (name == \"{node[ENode.FullName]}\" || name == \"{node[ENode.Name]}\")\n"
@@ -1614,7 +1614,7 @@ def CodeGenGlobal(path : str) :
     code += "{\n"
     code += "\tif (false) {}\n"
     for _, node in TLS().NodeList.items() :
-        if ENode.Cpp in node and node[ENode.Cpp] and node[ENode.Kind] == EKind.Class or node[ENode.Kind] == EKind.Struct :
+        if ENode.Cpp in node and node[ENode.Cpp] and (node[ENode.Kind] == EKind.Class or node[ENode.Kind] == EKind.Struct) :
             code += f"\telse if (HashCode == typeid({node[ENode.FullName]}).hash_code())\n"
             code += f"\t\treturn pycppgen<{node[ENode.FullName]}>::get_var_attributes(name);\n"
     code += "\treturn {};\n"
@@ -1623,7 +1623,7 @@ def CodeGenGlobal(path : str) :
     code += "inline void pycppgen<void>::for_each_var(auto visitor, uint32_t maxDepth) const\n"
     code += "{\n"
     for _, node in TLS().NodeList.items() :
-        if ENode.Cpp in node and node[ENode.Cpp] and node[ENode.Kind] == EKind.Class or node[ENode.Kind] == EKind.Struct :
+        if ENode.Cpp in node and node[ENode.Cpp] and (node[ENode.Kind] == EKind.Class or node[ENode.Kind] == EKind.Struct) :
             code += f"\tif (HashCode == typeid({node[ENode.FullName]}).hash_code())\n"
             code += f"\t\tpycppgen<{node[ENode.FullName]}>::for_each_var(visitor, maxDepth - 1);\n"
     code += "}\n\n"
