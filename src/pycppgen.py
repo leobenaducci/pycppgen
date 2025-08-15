@@ -132,7 +132,11 @@ def ParseComments(cursor, kind : str = EParseComments.BeforeDecl):
         parent = cursor.semantic_parent
 
         tokens = list(parent.get_tokens())
-        firstToken = list(cursor.get_tokens())[0]
+        cursorTokens = list(cursor.get_tokens())
+        if len(cursorTokens) == 0 :
+            return {}
+        
+        firstToken = cursorTokens[0]
         firstTokenIndex = tokens.index(next(x for x in tokens if x.location.line == firstToken.location.line))
 
         if preDeclComments:
@@ -147,7 +151,9 @@ def ParseComments(cursor, kind : str = EParseComments.BeforeDecl):
             while lastTokenIndex < len(tokens) and tokens[lastTokenIndex].kind == clang.cindex.TokenKind.COMMENT:
                 lastTokenIndex += 1
 
-    except (StopIteration, clang.cindex.LibclangError) as e:
+    except StopIteration as e:
+        return {}
+    except clang.cindex.LibclangError as e:
         if DebugMode:
             atomic_print(f"ParseComments error: {str(e)}")
         return {}
@@ -867,7 +873,7 @@ def CalcHlslSize(varType : str) :
 def CodeGenHlslNode(hppCode, node) :
     
     result = ""
-    result += f"struct {node[ENode.FullName].replace("_pyhlslgen", "")}\n"
+    result += f"struct {node[ENode.Name].replace("_pyhlslgen", "")}\n"
     result += "{\n"
 
     offset = 0
@@ -889,7 +895,7 @@ def CodeGenHlslNode(hppCode, node) :
                 if cols and int(cols) > 1:
                     size = int(size * int(cols))
 
-            if offset % 16 != 0 and offset + size > 16 :
+            if offset % 16 != 0 and (offset % 16) + size > 16 :
                 padNum = padNum + 1
                 padSize = int((16 - offset % 16))
                 result += f"\tfloat{int(padSize / 4)}\t\t_pad{padNum};\t// Offset: {offset} - Size: {int(padSize)}\n"
@@ -1271,7 +1277,7 @@ def CodeGen(filePath : str) :
     TLS().NodeList = PerFileData[filePath]["NodeList"]
 
     cppCode = ""
-    hlslCode = "#pragma once\n\n"
+    hlslCode = ""
     hppCode = "#pragma once\n\n"
     hppCode += "#include \"pycppgen.h\"\n"
 
@@ -1328,6 +1334,7 @@ def CodeGen(filePath : str) :
     else :
         atomic_print("generating code for: " + hlslFile)
         with open(hlslFile, mode="wt") as output :
+            hlslCode = "#pragma once\n\n" + hlslCode            
             output.write(hlslCode)            
 
 #codegen: emit for each type call
@@ -1719,7 +1726,7 @@ def main(args : list) :
     OldGenFiles = []
     for root, _, files in os.walk(ProjectPath):
         for file in files:
-            if file.endswith(".pycppgentmp") :
+            if file.endswith(".pycppgentmp") or file.find("__pycppgen_tmp") != -1:
                 os.remove(root + "\\" + file)
                 continue
             if re.match(r".*\.h$", file) and not re.match(r".*\.gen.h$", file) :
