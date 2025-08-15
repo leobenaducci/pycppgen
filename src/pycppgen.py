@@ -1029,7 +1029,7 @@ def CodeGenOutputNode(node) :
                     hppCode += f"\tusing {var[ENode.Name]}_type = decltype({varName});\n"
                     if not var[ENode.Const] :
                         hppCode += f"\tvoid set_{var[ENode.Name]}(const {var[ENode.Name]}_type& value)"
-                        hppCode += "{ if constexpr (!std::is_array<" + var[ENode.Name] + "_type> ) { " + varName + " = value; } }\n"
+                        hppCode += "{ if constexpr (!std::is_array<" + var[ENode.Name] + "_type>::value ) { " + varName + " = value; } }\n"
                     hppCode += "\tconst auto& get_" + var[ENode.Name] + "() const { return " + varName + "; }\n"
                     hppCode += "\tauto& get_" + var[ENode.Name] + "_ref() { return " + varName + "; }\n"
                     hppCode += "\tstatic auto get_" + var[ENode.Name] + "_member_variable_info() {\n"
