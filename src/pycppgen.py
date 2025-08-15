@@ -905,7 +905,7 @@ def CalcHlslSize(varType : str) :
 def CodeGenHlslNode(hlslCode, node) :
     
     hppResult = ""
-    hppResult += f"struct {node[ENode.FullName].replace("_pyhlslgen", "")}\n"
+    hppResult += f"struct {node[ENode.Name].replace("_pyhlslgen", "")}\n"
     hppResult += "{\n"
 
     hlslResult = ""
