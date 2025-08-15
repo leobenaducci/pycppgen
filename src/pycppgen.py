@@ -560,7 +560,7 @@ def ParseCursor(cursor, forceInclude : bool = False)  -> None:
             if node :
                 AppendToStackTop(node, ENode.Structs)
                 TLS().NodeList[node[ENode.FullName]] = node
-                return
+            return
         
         if cursor.is_definition() :
             node = ParseStruct(cursor)   
