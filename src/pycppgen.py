@@ -539,11 +539,8 @@ def ParseCursor(cursor, forceInclude : bool = False)  -> None:
 
     isHlslDecl = fullName.endswith("_pyhlslgen")
 
-    if isHlslDecl :
-        forceInclude = isHlslDecl
-
     #check if it should be parsed
-    if not forceInclude :
+    if not forceInclude and not isHlslDecl:
         flags = ParseComments(cursor, EKind.Unknown)
         if kInclude in flags : 
             if str(flags[kInclude]) == "False" :
