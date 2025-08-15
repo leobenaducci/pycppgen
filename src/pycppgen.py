@@ -120,6 +120,7 @@ class TLS_Data:
         self.NodeList: dict[str, Any] = {}
         self.NodeTree: dict[str, Any] = {}
         self.NodeStack: list[dict[str, Any]] = [self.NodeTree]
+        self.HlslNodeList: dict[str, Any] = {}
         self.pycppdefine: str = ""
 
 _ctx: contextvars.ContextVar[TLS_Data] = contextvars.ContextVar("tls")
@@ -241,7 +242,7 @@ def AppendToStackTop(node, node_type : str, appendToList : bool = False) :
         TLS().NodeList[node[ENode.FullName]] = node
 
 #common node push code
-def PushNode(cursor, kind : str = kInvalid) :
+def ParseNode(cursor, kind : str = kInvalid) :
     node = dict()
     node[ENode.Name] = str(cursor.spelling)
     node[ENode.FullName] = GetFullName(cursor)
@@ -263,7 +264,11 @@ def PushNode(cursor, kind : str = kInvalid) :
 
     if node[ENode.Namespace].endswith("::") :
         node[ENode.Namespace] = node[ENode.Namespace][:-2]
-    
+
+    return node
+
+def PushNode(cursor, kind : str = kInvalid) :
+    node = ParseNode(cursor, kind)
     TLS().NodeStack.append(node)
     return TLS().NodeStack[-1]
 
@@ -537,10 +542,21 @@ def ParseCursor(cursor, forceInclude : bool = False)  -> None:
         ParseNamespace(cursor)
         return
 
-    isHlslDecl = fullName.endswith("_pyhlslgen")
+    #ignore this kind for now
+    if cursor.kind == CursorKind.TYPE_REF or cursor.kind == CursorKind.TEMPLATE_REF or cursor.kind == CursorKind.NAMESPACE_REF:
+        return
+
+    isStruct = cursor.kind == CursorKind.STRUCT_DECL or cursor.kind == CursorKind.CLASS_DECL
+    isStruct |= cursor.kind == CursorKind.CLASS_TEMPLATE or cursor.kind == CursorKind.CLASS_TEMPLATE_PARTIAL_SPECIALIZATION
+    isHlslDecl = isStruct and fullName.endswith("_pyhlslgen")
+    
+    if isHlslDecl :
+        node = ParseHlslStruct(cursor)
+        if node :
+            TLS().HlslNodeList[fullName] = node
 
     #check if it should be parsed
-    if not forceInclude and not isHlslDecl:
+    if not forceInclude :
         flags = ParseComments(cursor, EKind.Unknown)
         if kInclude in flags : 
             if str(flags[kInclude]) == "False" :
@@ -548,20 +564,7 @@ def ParseCursor(cursor, forceInclude : bool = False)  -> None:
         elif not fullName in TLS().NodesToInclude :
             return
 
-    #ignore this kind for now
-    if cursor.kind == CursorKind.TYPE_REF or cursor.kind == CursorKind.TEMPLATE_REF or cursor.kind == CursorKind.NAMESPACE_REF:
-        return
-
-    isStruct = cursor.kind == CursorKind.STRUCT_DECL or cursor.kind == CursorKind.CLASS_DECL
-    isStruct |= cursor.kind == CursorKind.CLASS_TEMPLATE or cursor.kind == CursorKind.CLASS_TEMPLATE_PARTIAL_SPECIALIZATION
     if isStruct :
-        if isHlslDecl :
-            node = ParseHlslStruct(cursor)
-            if node :
-                AppendToStackTop(node, ENode.Structs)
-                TLS().NodeList[node[ENode.FullName]] = node
-            return
-        
         if cursor.is_definition() :
             node = ParseStruct(cursor)   
             AppendToStackTop(node, ENode.Structs)
@@ -606,6 +609,7 @@ def ParseTranslationUnit(tu, file) :
     TLS().NodeList = {}
     TLS().NodeTree = {}
     TLS().NodeStack = [TLS().NodeTree] 
+    TLS().HlslNodeList = {}
     
     currentFile = str(pathlib.Path(file).resolve())
     #first = next(x for x in tu.cursor.get_children() if x.location.file and x.location.file.name in FilesToParse)
@@ -659,7 +663,8 @@ def ParseFile(filePath : str, options : list) :
 def CodeGenOutputHeaderDefines(code, node) :
     
     #make a unique name
-    pycppdefine = TLS_Data().pycppdefine = "_pycppgen_" + node[ENode.FullName].replace("::", "_").replace("<","_").replace(">","_")
+    TLS().pycppdefine = "_pycppgen_" + node[ENode.FullName].replace("::", "_").replace("<","_").replace(">","_")
+    pycppdefine = TLS().pycppdefine
 
     lines = [
         f"//<autogen_{pycppdefine}>\n",
@@ -698,7 +703,7 @@ def CodeGenOutputMetaHeader(code, node) :
 
 #codegen: common type footer
 def CodeGenOutputMetaFooter(code, node) :
-    pycppdefine = TLS_Data().pycppdefine
+    pycppdefine = TLS().pycppdefine
 
     code += "};\n\n"
     code += f"#endif //{pycppdefine}\n"
@@ -987,10 +992,7 @@ def CodeGenHlslNode(hlslCode, node) :
 #codegen: emit a node
 def CodeGenOutputNode(node) :
    
-    hppCode = cppCode = hlslCode = ""
-
-    if node[ENode.Kind] == EKind.Struct and node[ENode.Name].endswith("_pyhlslgen") :
-        hlslCode = CodeGenHlslNode(hlslCode, node)
+    hppCode = cppCode = ""
 
     #class or structs
     if node[ENode.Kind] == EKind.Class or node[ENode.Kind] == EKind.ClassTemplate or node[ENode.Kind] == EKind.Struct :
@@ -1317,7 +1319,7 @@ def CodeGenOutputNode(node) :
 
         hppCode = CodeGenOutputMetaFooter(hppCode, node)
 
-    return hppCode, cppCode, hlslCode
+    return hppCode, cppCode
 
 #codegen: output file
 def CodeGen(filePath : str) :
@@ -1328,6 +1330,7 @@ def CodeGen(filePath : str) :
     TLS().NodeStack = [TLS().NodeTree]   
 
     TLS().NodeList = PerFileData[filePath]["NodeList"]
+    TLS().HlslNodeList = PerFileData[filePath]["HlslNodeList"]
 
     cppCode = ""
     hlslCode = ""
@@ -1343,10 +1346,12 @@ def CodeGen(filePath : str) :
     hppCode += "#include \"" + str(pathlib.Path(filePath).relative_to(ProjectPath, walk_up=True)) + "\"\n\n"
 
     for key in TLS().NodeList :
-        newHppCode, newCppCode, newHlslCode = CodeGenOutputNode(TLS().NodeList[key])
+        newHppCode, newCppCode = CodeGenOutputNode(TLS().NodeList[key])
         hppCode += newHppCode
         cppCode += newCppCode
-        hlslCode += newHlslCode
+
+    for key in TLS().HlslNodeList :
+        hlslCode += CodeGenHlslNode(hlslCode, TLS().HlslNodeList[key])
 
     hppCode += "namespace pycppgen_globals {\n"
     
@@ -1707,7 +1712,9 @@ def ProcessFile(file : str, compilerOptions) :
                 atomic_print(f"outdated include {f} in {file}")
 
     if needsParseTU : 
-        PerFileData[file]["NodeList"] = ParseTranslationUnit(tu, tmpFilePath)
+        ParseTranslationUnit(tu, tmpFilePath)
+        PerFileData[file]["NodeList"] = TLS().NodeList
+        PerFileData[file]["HlslNodeList"] = TLS().HlslNodeList
 
     if needsParseTU or needsCodeGen :
         FilesToCodeGen.add(file)
@@ -1857,6 +1864,8 @@ def main(args : list) :
     for n, v in sorted(PerFileData.items()) : 
         if "NodeList" in v :
             TLS().NodeList.update(v["NodeList"])
+        if "HlslNodeList" in v :
+            TLS().HlslNodeList.update(v["HlslNodeList"])
 
     if len(OutdatedFiles) > 0 or not "pycppgen.gen.h" in CachedPerFileData or CachedPerFileData["pycppgen.gen.h"] != TLS().NodeList :
         atomic_print(f"global code gen step, outdated files -> {OutdatedFiles}")
