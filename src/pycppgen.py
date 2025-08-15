@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from clang.cindex import CursorKind
 from clang.cindex import AccessSpecifier
 
-DebugMode = False
+DebugMode = True
 
 @dataclass(frozen=True, slots=True)
 class _Kinds:
@@ -276,7 +276,7 @@ def ParseFunction(cursor, isFreeFunction : bool = False) :
     for child in cursor.get_children() :
         if child.kind == CursorKind.PARM_DECL:
             param = PushNode(child, EKind.Parameter)
-            param[ENode.DefaultValue] = ""
+            param[ENode.DefaultValue] = ParseDefaultValue(child)
             PopNode()
 
             #append parameter to parent (function)
@@ -295,11 +295,35 @@ def ParseFunction(cursor, isFreeFunction : bool = False) :
 
     return node
 
+#@todo
+def ParseDefaultValue(cursor) :
+
+    for child in cursor.get_children() :
+        """
+        if child.kind == CursorKind.TYPE_REF:
+            result += f"{child.spelling}("
+            for it in child.get_children() :
+                result = it.spelling + ", "
+            result = result[:-2]
+            result += ")"
+            return result
+
+        if child.kind in [CursorKind.INTEGER_LITERAL, CursorKind.FLOATING_LITERAL, CursorKind.STRING_LITERAL, CursorKind.CHARACTER_LITERAL]:
+            tokens = list(child.get_tokens())
+            if len(tokens) == 1:
+               return tokens[0].spelling
+        """
+       
+    return ""
+
+
 #parse variable or class/struct field
 def ParseVar(cursor, isFreeVariable : bool = False):
 
     node = PushNode(cursor, EKind.Variable)
     PopNode()
+
+    node[ENode.DefaultValue] = ParseDefaultValue(cursor)
 
     if isFreeVariable : 
         node[ENode.Kind] = EKind.FreeVariable
@@ -870,16 +894,23 @@ def CalcHlslSize(varType : str) :
     
 
 #codegen: emit a hlsl node
-def CodeGenHlslNode(hppCode, node) :
+def CodeGenHlslNode(hppCode, hlslCode, node) :
     
-    result = ""
-    result += f"struct {node[ENode.Name].replace("_pyhlslgen", "")}\n"
-    result += "{\n"
+    hppResult = ""
+    hppResult += f"struct {node[ENode.FullName].replace("_pyhlslgen", "")}\n"
+    hppResult += "{\n"
+
+    hlslResult = ""
+    hlslResult += f"struct {node[ENode.Name].replace("_pyhlslgen", "")}\n"
+    hlslResult += "{\n"
 
     offset = 0
     padNum = 0
     if ENode.Variables in node :
         for _, var in node[ENode.Variables].items() :
+
+            newDecl = ""
+
             size, baseType, arraySize, rows, cols = CalcHlslSize(var[ENode.Type])
             
             if size == None :
@@ -898,37 +929,49 @@ def CodeGenHlslNode(hppCode, node) :
             if offset % 16 != 0 and (offset % 16) + size > 16 :
                 padNum = padNum + 1
                 padSize = int((16 - offset % 16))
-                result += f"\tfloat{int(padSize / 4)}\t\t_pad{padNum};\t// Offset: {offset} - Size: {int(padSize)}\n"
+                newDecl += f"\tfloat{int(padSize / 4)}\t\t_pad{padNum};\t// Offset: {offset} - Size: {int(padSize)}\n"
                 offset = offset + int(padSize)
 
-            result += f"\t{baseType}"
+            newDecl += f"\t{baseType}"
             
             if rows and int(rows) > 1:
-                result += f"{rows}"
+                newDecl += f"{rows}"
             if cols and int(cols) > 1:
-                result += f"x{cols}"
+                newDecl += f"x{cols}"
             else :
-                result += f"\t"
+                newDecl += f"\t"
 
-            result += f"\t{var[ENode.Name]}"
+            newDecl += f"\t{var[ENode.Name]}"
             if arraySize and int(arraySize) > 1:
-                result += f"[{arraySize}];"
+                newDecl += f"[{arraySize}]"
             else :
-                result += f";\t"
-            result += f"\t// Offset: {offset} - Size: {size}\n"
+                newDecl += f""
+
+            hppResult += newDecl
+            hlslResult += newDecl
+
+            if ENode.DefaultValue in var and var[ENode.DefaultValue] != "" :
+                hppResult += f" = {var[ENode.DefaultValue]}"
+
+            hppResult += f";\t// Offset: {offset} - Size: {size}\n"
+            hlslResult += f";\t// Offset: {offset} - Size: {size}\n"
 
             offset += size     
 
     if offset % 16 != 0 :
         padNum = padNum + 1
         padSize = int((16 - offset % 16))
-        result += f"\tfloat{int(padSize / 4)}\t\t_pad{padNum};\t// Offset: {offset} - Size: {int(padSize)}\n"
+        hppResult += f"\tfloat{int(padSize / 4)}\t\t_pad{padNum};\t// Offset: {offset} - Size: {int(padSize)}\n"
+        hlslResult += f"\tfloat{int(padSize / 4)}\t\t_pad{padNum};\t// Offset: {offset} - Size: {int(padSize)}\n"
         offset = offset + int(padSize)
 
-    result += "};"
-    result = f"// Size = {offset}\n" + result 
+    hppResult += "};"
+    hppResult = f"// Size = {offset}\n{hppResult}\n"
 
-    return hppCode + result
+    hlslResult += "};"
+    hlslResult = f"// Size = {offset}\n{hlslResult}\n"
+
+    return hppCode + hppResult, hlslCode + hlslResult
 
 #codegen: emit a node
 def CodeGenOutputNode(node) :
@@ -939,7 +982,7 @@ def CodeGenOutputNode(node) :
         hppCode = CodeGenOutputHeaderDefines(hppCode, node)
 
     if node[ENode.Kind] == EKind.Struct and node[ENode.Name].endswith("_pyhlslgen") :
-        hlslCode = CodeGenHlslNode(hlslCode, node)
+        hppCode, hlslCode = CodeGenHlslNode(hppCode, hlslCode, node)
 
     #class or structs
     if node[ENode.Kind] == EKind.Class or node[ENode.Kind] == EKind.ClassTemplate or node[ENode.Kind] == EKind.Struct :

@@ -9,8 +9,11 @@ path = os.getcwd()
 if not path.endswith("tests") :
     exit(-1)
 
-#main(["../tests/lib"])
-#main(["../tests/app", "--P../lib"])
+main(["../tests/lib"])
+main(["../tests/app", "--P../lib"])
+
+exit()
+
 #
 #os.makedirs("build", exist_ok=True)
 #os.chdir("build")
