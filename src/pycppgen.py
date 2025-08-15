@@ -981,9 +981,9 @@ def CodeGenHlslNode(hlslCode, node) :
 
     result = "#ifdef __hlsl_dx_compiler\n"
     result += hlslResult
-    result = "#else\n"
+    result += "#else\n"
     result += hppResult
-    result = "#endif\n\n"
+    result += "#endif\n\n"
 
     return hlslCode + result
 
