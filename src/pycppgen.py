@@ -1,5 +1,6 @@
 import os
 import pathlib
+import subprocess
 import sys
 import clang.cindex
 import re
@@ -100,15 +101,16 @@ ParseCommentsMode = {
     EKind.TemplateTemplateParameter : EParseComments.BeforeDecl,
 }
 
-kHlslTypes: Final[list]= ["float", "int", "uint", "bool", "half", "double", "uint64"]
+kHlslTypes: Final[list]= ["int", "uint", "float", "double", "bool", "uint64_t", "float16_t", "int16_t", "uint16_t"]
 
 def GenHlslDeclarations() :
-    result = "#define cbuffer struct\n"
+    result = "\n"
     for t in kHlslTypes :
         for m in range(2, 5) :
             for n in range(2, 5) :
                 result += f"using {t}{m}x{n} = float;\n"
             result += f"using {t}{m} = float;\n"
+    result += "using float16_t = float;\n"
     result += "using uint = unsigned int;\n"
     result += "\n"
 
@@ -554,7 +556,7 @@ def ParseCursor(cursor, forceInclude : bool = False)  -> None:
 
     isStruct = cursor.kind == CursorKind.STRUCT_DECL or cursor.kind == CursorKind.CLASS_DECL
     isStruct |= cursor.kind == CursorKind.CLASS_TEMPLATE or cursor.kind == CursorKind.CLASS_TEMPLATE_PARTIAL_SPECIALIZATION
-    isHlslDecl = isStruct and fullName.endswith("_pyhlslgen")
+    isHlslDecl = isStruct and (fullName.endswith("_pyhlslgen") or fullName.endswith("_pyhlslgen_cbuffer"))
 
     #check if it should be parsed
     included = True
@@ -886,39 +888,60 @@ def GenerateMemberFunctionInfo(node, func, infoName) :
 
     return result
 
-def CalcHlslSize(varType : str) :
+def CalcHlslSize(varType : str, isCbuffer : bool) :
 
     #match type<n>x<m>[s] patterns
     match = re.fullmatch(rf'({"|".join(kHlslTypes)})(\d)?(?:x(\d))?(?:\[(\w+)\])?', varType)
     if match:
         baseType, rows, cols, arraySize = match.groups()
-        if rows and cols:
-            size = 4 * int(rows) * int(cols)
-        elif rows:
-            size = 4 * int(rows)
-        else:
+
+        if rows : rows = int(rows)
+        else: rows = 1
+        if cols : cols = int(cols)
+        else: cols = 1
+        if arraySize : arraySize = int(arraySize)
+        else: arraySize = 1
+
+        if baseType.startswith('uint64_t') | baseType.startswith('double'):
+            size = 8
+        elif baseType.find('16_t') != -1 :
+            size = 2
+        else :
             size = 4
-        if baseType.startswith('uint64') | baseType.startswith('double'):
-            size *= 2
-        if baseType.startswith('half'):
-            size /= 2
+
+        if isCbuffer : #Rule 1a: Vector types are aligned according to their scalar component type.
+            alignment = size 
+            if rows > 1 and cols > 1 :
+                alignment = 16 #matrices are always aligned to 16
+                rows = 4
+                size *= rows * cols
+            elif rows > 1:
+                size *= rows
+        else :
+            alignment = 1
+            if rows > 1 and cols > 1:
+                size *= rows * cols
+            elif rows > 1:
+                size *= rows
+
         if arraySize:
-            size *= int(arraySize)
-        return size, baseType, arraySize, rows, cols
+            size *= arraySize
+
+        return int(alignment), int(size), baseType, int(arraySize), int(rows), int(cols)
     
-    return None, None, None, None, None
+    return 1, 0, None, 1, 1, 1
     
 
 #codegen: emit a hlsl node
 def CodeGenHlslNode(hlslCode, node) :
     
-    hppResult = ""
-    hppResult += f"struct {node[ENode.Name].replace("_pyhlslgen", "")}\n"
-    hppResult += "{\n"
-
+    isCbuffer = node[ENode.Name].find("_cbuffer") != -1
     hlslResult = ""
-    hlslResult += f"struct {node[ENode.Name].replace("_pyhlslgen", "")}\n"
+
+    hlslResult += f"struct {node[ENode.Name].replace("_pyhlslgen", "").replace("_cbuffer", "")}\n"
     hlslResult += "{\n"
+
+    hppResult = hlslResult
 
     offset = 0
     padNum = 0
@@ -927,32 +950,32 @@ def CodeGenHlslNode(hlslCode, node) :
 
             newDecl = ""
 
-            size, baseType, arraySize, rows, cols = CalcHlslSize(var[ENode.Type])
+            alignment, size, baseType, arraySize, rows, cols = CalcHlslSize(var[ENode.Type], isCbuffer)
             
-            if size == None :
+            if size == 0 :
                 continue
 
-            if cols and int(cols) > 1:
-                rows = "4"
-                size = int(16 * int(cols))
-                
-            if arraySize and int(arraySize) > 1 and rows and int(rows) > 1:
-                rows = "4"
-                size = int(16 * int(arraySize))
-                if cols and int(cols) > 1:
-                    size = int(size * int(cols))
-
-            if offset % 16 != 0 and (offset % 16) + size > 16 :
-                padNum = padNum + 1
-                padSize = int((16 - offset % 16))
-                newDecl += f"\tfloat{int(padSize / 4)}\t\t_pad{padNum};\t// Offset: {offset} - Size: {int(padSize)}\n"
-                offset = offset + int(padSize)
+            if isCbuffer :
+                offsetMod16 = offset % 16
+                offsetModAlignment = offset % alignment
+                if offsetMod16 + size > 16 and offsetMod16 != 0:
+                    padNum = padNum + 1
+                    padSize = 16 - offsetMod16
+                    newDecl += f"\tuint{int(padSize / 4)}\t\t_pad{padNum};\t// Offset: {offset} - Size: {padSize}\n"
+                    offset = offset + int(padSize)
+                elif offsetModAlignment != 0:
+                    padNum = padNum + 1
+                    padSize = alignment - offsetModAlignment#
+                    if padSize % 4 != 0 :
+                        newDecl += f"\tuint16_t{padSize / 2}\t\t_pad{padNum};\t// Offset: {offset} - Size: {padSize}\n"
+                    else :
+                        newDecl += f"\tuint{padSize / 4}\t\t_pad{padNum};\t// Offset: {offset} - Size: {padSize}\n"
+                    offset = offset + padSize
 
             newDecl += f"\t{baseType}"
-            
-            if rows and int(rows) > 1:
+            if rows > 1:
                 newDecl += f"{rows}"
-            if cols and int(cols) > 1:
+            if cols > 1:
                 newDecl += f"x{cols}"
             else :
                 newDecl += f"\t"
@@ -963,35 +986,32 @@ def CodeGenHlslNode(hlslCode, node) :
             else :
                 newDecl += f""
 
-            hppResult += newDecl
             hlslResult += newDecl
-
-            if ENode.DefaultValue in var and var[ENode.DefaultValue] != "" :
-                hppResult += f" = {var[ENode.DefaultValue]}"
-
-            hppResult += f";\t// Offset: {offset} - Size: {size}\n"
             hlslResult += f";\t// Offset: {offset} - Size: {size}\n"
 
             offset += size     
 
-    if offset % 16 != 0 :
-        padNum = padNum + 1
-        padSize = int((16 - offset % 16))
-        hppResult += f"\tfloat{int(padSize / 4)}\t\t_pad{padNum};\t// Offset: {offset} - Size: {int(padSize)}\n"
-        hlslResult += f"\tfloat{int(padSize / 4)}\t\t_pad{padNum};\t// Offset: {offset} - Size: {int(padSize)}\n"
-        offset = offset + int(padSize)
+    if isCbuffer:
+        offsetMod16 = offset % 16
+        if offsetMod16 != 0 :
+            padNum = padNum + 1
+            padSize = 16 - offsetMod16
+            padDecl = f"\tuint{int(padSize / 4)}\t\t_pad{padNum};\t// Offset: {offset} - Size: {int(padSize)}\n"
+            hlslResult += padDecl
+            offset = offset + int(padSize)
 
-    hppResult += "};"
-    hppResult = f"// Size = {offset}\n{hppResult}\n"
+    hlslResult = f"// Size = {offset}\n{hlslResult + "};"}\n"
+    #hppResult = f"// Size = {offset}\n{hlslResult + "};"}\n"
 
-    hlslResult += "};"
-    hlslResult = f"// Size = {offset}\n{hlslResult}\n"
+    hppResult = hlslResult
+    result = hlslResult
 
-    result = "#ifdef __hlsl_dx_compiler\n"
-    result += hlslResult
-    result += "#else\n"
-    result += hppResult
-    result += "#endif\n\n"
+    if hlslResult != hppResult :
+        result = "#ifdef __hlsl_dx_compiler\n"
+        result += hlslResult
+        result += "#else\n"
+        result += hppResult
+        result += "#endif\n\n"
 
     return hlslCode + result
 
