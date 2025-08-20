@@ -1,0 +1,131 @@
+{'entryPoints': [
+        {'name': 'main', 'mode': 'comp', 'workgroup_size': [
+                1,
+                1,
+                1
+            ], 'workgroup_size_is_spec_constant_id': [False, False, False
+            ]
+        }
+    ], 'types': {'_3': {'name': 'type.ConstantBuffer.STestShaderData_pyhlslgen_cbuffer', 'members': [
+                {'name': 'A', 'type': 'vec3', 'offset': 0
+                },
+                {'name': 'B', 'type': 'float', 'offset': 12
+                },
+                {'name': 'C', 'type': 'vec4', 'offset': 16
+                },
+                {'name': 'D', 'type': 'vec2', 'offset': 32
+                },
+                {'name': 'E', 'type': 'mat3', 'offset': 48, 'matrix_stride': 16, 'row_major': True
+                },
+                {'name': 'F', 'type': 'vec2', 'array': [
+                        4
+                    ], 'array_size_is_literal': [True
+                    ], 'offset': 96, 'array_stride': 16
+                },
+                {'name': 'G', 'type': 'double', 'offset': 160
+                },
+                {'name': 'H', 'type': 'float', 'offset': 168
+                }
+            ]
+        }, '_6': {'name': 'STestShaderData_pyhlslgen_cbuffer', 'members': [
+                {'name': 'A', 'type': 'vec3', 'offset': 0
+                },
+                {'name': 'B', 'type': 'float', 'offset': 12
+                },
+                {'name': 'C', 'type': 'vec4', 'offset': 16
+                },
+                {'name': 'D', 'type': 'vec2', 'offset': 32
+                },
+                {'name': 'E', 'type': 'mat3', 'offset': 48, 'matrix_stride': 16, 'row_major': True
+                },
+                {'name': 'F', 'type': 'vec2', 'array': [
+                        4
+                    ], 'array_size_is_literal': [True
+                    ], 'offset': 96, 'array_stride': 8
+                },
+                {'name': 'G', 'type': 'double', 'offset': 128
+                },
+                {'name': 'H', 'type': 'float', 'offset': 136
+                }
+            ]
+        }, '_5': {'name': 'type.RWStructuredBuffer.STestShaderData_pyhlslgen_cbuffer', 'members': [
+                {'name': '_m0', 'type': '_6', 'array': [
+                        0
+                    ], 'array_size_is_literal': [True
+                    ], 'offset': 0, 'array_stride': 144
+                }
+            ]
+        }
+    }, 'ssbos': [
+        {'type': '_5', 'name': 'outBuffer', 'block_size': 0, 'set': 0, 'binding': 1
+        }
+    ], 'ubos': [
+        {'type': '_3', 'name': 'type.ConstantBuffer.STestShaderData_pyhlslgen_cbuffer', 'block_size': 172, 'set': 0, 'binding': 0
+        }
+    ]
+}{'entryPoints': [
+        {'name': 'main', 'mode': 'comp', 'workgroup_size': [
+                1,
+                1,
+                1
+            ], 'workgroup_size_is_spec_constant_id': [False, False, False
+            ]
+        }
+    ], 'types': {'_3': {'name': 'type.ConstantBuffer.STestShaderData_pyhlslgen_cbuffer', 'members': [
+                {'name': 'A', 'type': 'vec3', 'offset': 0
+                },
+                {'name': 'B', 'type': 'float', 'offset': 12
+                },
+                {'name': 'C', 'type': 'vec4', 'offset': 16
+                },
+                {'name': 'D', 'type': 'vec2', 'offset': 32
+                },
+                {'name': 'E', 'type': 'mat3', 'offset': 48, 'matrix_stride': 16, 'row_major': True
+                },
+                {'name': 'F', 'type': 'vec2', 'array': [
+                        4
+                    ], 'array_size_is_literal': [True
+                    ], 'offset': 96, 'array_stride': 16
+                },
+                {'name': 'G', 'type': 'double', 'offset': 160
+                },
+                {'name': 'H', 'type': 'float', 'offset': 168
+                }
+            ]
+        }, '_6': {'name': 'STestShaderData_pyhlslgen_cbuffer', 'members': [
+                {'name': 'A', 'type': 'vec3', 'offset': 0
+                },
+                {'name': 'B', 'type': 'float', 'offset': 12
+                },
+                {'name': 'C', 'type': 'vec4', 'offset': 16
+                },
+                {'name': 'D', 'type': 'vec2', 'offset': 32
+                },
+                {'name': 'E', 'type': 'mat3', 'offset': 48, 'matrix_stride': 16, 'row_major': True
+                },
+                {'name': 'F', 'type': 'vec2', 'array': [
+                        4
+                    ], 'array_size_is_literal': [True
+                    ], 'offset': 96, 'array_stride': 8
+                },
+                {'name': 'G', 'type': 'double', 'offset': 128
+                },
+                {'name': 'H', 'type': 'float', 'offset': 136
+                }
+            ]
+        }, '_5': {'name': 'type.RWStructuredBuffer.STestShaderData_pyhlslgen_cbuffer', 'members': [
+                {'name': '_m0', 'type': '_6', 'array': [
+                        0
+                    ], 'array_size_is_literal': [True
+                    ], 'offset': 0, 'array_stride': 144
+                }
+            ]
+        }
+    }, 'ssbos': [
+        {'type': '_5', 'name': 'outBuffer', 'block_size': 0, 'set': 0, 'binding': 1
+        }
+    ], 'ubos': [
+        {'type': '_3', 'name': 'type.ConstantBuffer.STestShaderData_pyhlslgen_cbuffer', 'block_size': 172, 'set': 0, 'binding': 0
+        }
+    ]
+}

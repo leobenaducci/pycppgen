@@ -101,7 +101,7 @@ ParseCommentsMode = {
     EKind.TemplateTemplateParameter : EParseComments.BeforeDecl,
 }
 
-kHlslTypes: Final[list]= ["int", "uint", "float", "double", "bool", "uint64_t", "float16_t", "int16_t", "uint16_t"]
+kHlslTypes: Final[list]= ["int", "uint", "float", "bool", "double", "uint64_t", "float16_t", "int16_t", "uint16_t", "int8_t", "uint8_t"]
 
 def GenHlslDeclarations() :
     result = "\n"
@@ -116,7 +116,53 @@ def GenHlslDeclarations() :
 
     return result
 
+def GenVkToHlslMappings() :
+    vkToHlsl = {}
+
+    for t in kHlslTypes :
+        vkToHlsl[t] = t
+
+    for r in range(2, 5) :
+        vkToHlsl[f"ivec{r}"] = f"int{r}"
+        vkToHlsl[f"uvec{r}"] = f"uint{r}"
+        vkToHlsl[f"vec{r}"] = f"float{r}"
+        vkToHlsl[f"bvec{r}"] = f"bool{r}"
+        vkToHlsl[f"dvec{r}"] = f"double{r}"
+        vkToHlsl[f"u64vec{r}"] = f"uint64_t{r}"        
+        vkToHlsl[f"f16vec{r}"] = f"float16_t{r}"
+        vkToHlsl[f"i16vec{r}"] = f"int16_t{r}"
+        vkToHlsl[f"u16vec{r}"] = f"uint16_t{r}"
+        vkToHlsl[f"i8vec{r}"] = f"int8_t{r}"
+        vkToHlsl[f"u8vec{r}"] = f"uint8_t{r}"
+
+        vkToHlsl[f"mat{r}"] = f"float{r}x{r}"
+        vkToHlsl[f"imat{r}"] = f"int{r}x{r}"
+        vkToHlsl[f"umat{r}"] = f"uint{r}x{r}"
+        vkToHlsl[f"bmat{r}"] = f"bool{r}x{r}"
+        vkToHlsl[f"dmat{r}"] = f"double{r}x{r}"
+        vkToHlsl[f"u64mat{r}"] = f"uint64_t{r}x{r}"
+        vkToHlsl[f"f16mat{r}"] = f"float16_t{r}x{r}"
+        vkToHlsl[f"i16mat{r}"] = f"int16_t{r}x{r}"
+        vkToHlsl[f"u16mat{r}"] = f"uint16_t{r}x{r}"
+        vkToHlsl[f"i8mat{r}"] = f"int8_t{r}x{r}"
+        vkToHlsl[f"u8mat{r}"] = f"uint8_t{r}x{r}"
+        for c in range(2, 5) :
+            vkToHlsl[f"mat{r}x{c}"] = f"float{r}x{c}"
+            vkToHlsl[f"dmat{r}x{c}"] = f"double{r}x{c}"
+            vkToHlsl[f"imat{r}x{c}"] = f"int{r}x{c}"
+            vkToHlsl[f"umat{r}x{c}"] = f"uint{r}x{c}"
+            vkToHlsl[f"bmat{r}x{c}"] = f"bool{r}x{c}"
+            vkToHlsl[f"u64mat{r}x{c}"] = f"uint64_t{r}x{c}"
+            vkToHlsl[f"f16mat{r}x{c}"] = f"float16_t{r}x{c}"
+            vkToHlsl[f"i16mat{r}x{c}"] = f"int16_t{r}x{c}"
+            vkToHlsl[f"u16mat{r}x{c}"] = f"uint16_t{r}x{c}"
+            vkToHlsl[f"i8mat{r}x{c}"] = f"int8_t{r}x{c}"
+            vkToHlsl[f"u8mat{r}x{c}"] = f"uint8_t{r}x{c}"
+
+    return vkToHlsl
+
 kHlslDeclarations : Final[str] = GenHlslDeclarations()
+kVkToHlsl : Final[dict] = GenVkToHlslMappings()
 
 class TLS_Data:
     def __init__(self):
@@ -911,6 +957,15 @@ def CalcHlslSize(varType : str, isCbuffer : bool) :
 
         if isCbuffer : #Rule 1a: Vector types are aligned according to their scalar component type.
             alignment = size 
+            if arraySize > 1:
+                if size == 8 :
+                    rows = ((rows + 1) / 2) * 2
+                elif size == 2 :
+                    return 0, 0, baseType, int(arraySize), int(rows), int(cols)
+                else :
+                    rows = 4
+                alignment = 16 #array elements are aligned to 16
+
             if rows > 1 and cols > 1 :
                 alignment = 16 #matrices are always aligned to 16
                 rows = 4
@@ -929,50 +984,24 @@ def CalcHlslSize(varType : str, isCbuffer : bool) :
 
         return int(alignment), int(size), baseType, int(arraySize), int(rows), int(cols)
     
-    return 1, 0, None, 1, 1, 1
+    return 0, 0, None, 1, 1, 1
     
-
 #codegen: emit a hlsl node
-def CodeGenHlslNode(hlslCode, node) :
+def CodeGenHlslNode(hlslCode, node) -> str:
     
     isCbuffer = node[ENode.Name].find("_cbuffer") != -1
-    hlslResult = ""
+    hlslTemp = f"struct {node[ENode.Name]}\n{{\n"
 
-    hlslResult += f"struct {node[ENode.Name].replace("_pyhlslgen", "").replace("_cbuffer", "")}\n"
-    hlslResult += "{\n"
+    nameSizeMap = {}
 
-    hppResult = hlslResult
-
-    offset = 0
-    padNum = 0
     if ENode.Variables in node :
         for _, var in node[ENode.Variables].items() :
-
-            newDecl = ""
-
+            
             alignment, size, baseType, arraySize, rows, cols = CalcHlslSize(var[ENode.Type], isCbuffer)
             
-            if size == 0 :
-                continue
+            nameSizeMap[var[ENode.Name]] = size
 
-            if isCbuffer :
-                offsetMod16 = offset % 16
-                offsetModAlignment = offset % alignment
-                if offsetMod16 + size > 16 and offsetMod16 != 0:
-                    padNum = padNum + 1
-                    padSize = 16 - offsetMod16
-                    newDecl += f"\tuint{int(padSize / 4)}\t\t_pad{padNum};\t// Offset: {offset} - Size: {padSize}\n"
-                    offset = offset + int(padSize)
-                elif offsetModAlignment != 0:
-                    padNum = padNum + 1
-                    padSize = alignment - offsetModAlignment#
-                    if padSize % 4 != 0 :
-                        newDecl += f"\tuint16_t{padSize / 2}\t\t_pad{padNum};\t// Offset: {offset} - Size: {padSize}\n"
-                    else :
-                        newDecl += f"\tuint{padSize / 4}\t\t_pad{padNum};\t// Offset: {offset} - Size: {padSize}\n"
-                    offset = offset + padSize
-
-            newDecl += f"\t{baseType}"
+            newDecl = f"\t{baseType}"
             if rows > 1:
                 newDecl += f"{rows}"
             if cols > 1:
@@ -983,28 +1012,113 @@ def CodeGenHlslNode(hlslCode, node) :
             newDecl += f"\t{var[ENode.Name]}"
             if arraySize and int(arraySize) > 1:
                 newDecl += f"[{arraySize}]"
+
+            if size == 0 :
+                print(f"HLSL Error: Unsupported type {newDecl.replace("\t", " ")} in {node[ENode.Name]}")
+                continue
+
+            hlslTemp += newDecl + ";\n"
+
+    hlslTemp += "};\n"
+
+    if isCbuffer :
+        hlslTemp += f"ConstantBuffer<{node[ENode.Name]}> inBuffer;\n"
+    else :
+        hlslTemp += f"StructuredBuffer<{node[ENode.Name]}> inBuffer;\n"
+
+    hlslTemp += f"RWStructuredBuffer<{node[ENode.Name]}> outBuffer;\n"
+    hlslTemp += "\n"
+    hlslTemp += "[numthreads(1,1,1)]\n"
+    hlslTemp += "void main(uint d : SV_DispatchThreadId) {\n"
+    hlslTemp += "\toutBuffer[d] = inBuffer"
+    if not isCbuffer :
+        hlslTemp += "[0]"
+    hlslTemp += ";\n}\n"
+    
+    fileName = os.path.abspath(f"tmp__{node[ENode.Name]}.tmp_hlsl")
+    with open(fileName, "wt") as file:
+        file.write(hlslTemp)
+
+    result = subprocess.run(["dxc", "-spirv", "-fspv-target-env=vulkan1.3", "-fspv-reflect", "-fvk-use-dx-layout", "-fspv-use-vulkan-memory-model", "-enable-16bit-types", "-T cs_6_2", "-E main", f"-Fo {fileName}.spv", fileName], capture_output=True)
+    if os.path.exists(f"{fileName}"):
+        os.remove(f"{fileName}")
+
+    if result.stderr and len(result.stderr) > 0:
+        atomic_print(result.stderr.decode())
+        return hlslCode
+
+    result = subprocess.run(["spirv-cross", f"{fileName}.spv", "--reflect", "--hlsl", "--hlsl-enable-16bit-types"], capture_output=True)
+    if os.path.exists(f"{fileName}.spv"):
+        os.remove(f"{fileName}.spv")
+
+    if result.stderr and len(result.stderr) > 0:
+        atomic_print(result.stderr.decode())
+        return hlslCode
+
+    parsed = json.loads(result.stdout.decode())
+
+    typePrefix = ""
+    if isCbuffer :
+        typePrefix = "ConstantBuffer."
+
+    expectedType = None
+    for t in parsed["types"] :
+        if parsed["types"][t]["name"].find(f"{typePrefix}{node[ENode.Name]}") != -1 :
+            expectedType = parsed["types"][t]
+            break
+
+    if expectedType == None :
+        return hlslCode
+    
+    offset = 0
+    padNum = 0
+    hlslResult = f"struct {node[ENode.Name].replace("_pyhlslgen", "").replace("_cbuffer", "")}\n{{\n"
+
+    def applyPad(padSize : int) :
+        nonlocal offset, padNum, hlslResult
+        while padSize > 0 :
+            pad = min(padSize, 16)
+            if pad % 4 != 0 :
+                newDecl = f"\tuint16_t{pad >> 1} _pad{padNum};"
             else :
-                newDecl += f""
-
+                newDecl = f"\tuint{pad >> 2} _pad{padNum};"
+            newDecl += f"\t\t// Offset: {offset} - Size: {pad}\n"
+            padNum = padNum + 1
+            offset = offset + int(pad)
+            padSize -= pad
             hlslResult += newDecl
-            hlslResult += f";\t// Offset: {offset} - Size: {size}\n"
 
-            offset += size     
+    for member in expectedType["members"]:
+
+        if offset != member["offset"]:
+            applyPad(int(member["offset"]) - offset)
+
+        newDecl = "\t"
+
+        if member["type"] in kVkToHlsl :
+            newDecl += kVkToHlsl[member["type"]]
+        else :
+            newDecl += member["type"]
+
+        newDecl += f" {member["name"]}"
+
+        if "array" in member:
+            for a in member["array"]:
+                newDecl += f"[{a}]"
+
+        size = int(nameSizeMap[member["name"]])
+        hlslResult += f"{newDecl};\t\t// Offset: {offset} - Size: {size}\n"
+        offset += size
 
     if isCbuffer:
         offsetMod16 = offset % 16
         if offsetMod16 != 0 :
-            padNum = padNum + 1
-            padSize = 16 - offsetMod16
-            padDecl = f"\tuint{int(padSize / 4)}\t\t_pad{padNum};\t// Offset: {offset} - Size: {int(padSize)}\n"
-            hlslResult += padDecl
-            offset = offset + int(padSize)
+            applyPad(16 - offsetMod16)
 
     hlslResult = f"// Size = {offset}\n{hlslResult + "};"}\n"
-    #hppResult = f"// Size = {offset}\n{hlslResult + "};"}\n"
 
-    hppResult = hlslResult
-    result = hlslResult
+    #TODO
+    result = hppResult = hlslResult
 
     if hlslResult != hppResult :
         result = "#ifdef __hlsl_dx_compiler\n"
@@ -1379,7 +1493,7 @@ def CodeGen(filePath : str) :
             cppCode += newCppCode
 
         if ENode.Hlsl in node and node[ENode.Hlsl]:
-            hlslCode += CodeGenHlslNode(hlslCode, node)
+            hlslCode = CodeGenHlslNode(hlslCode, node)
 
     hppCode += "namespace pycppgen_globals {\n"
     

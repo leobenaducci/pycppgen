@@ -4,15 +4,22 @@
 
 struct STestShaderData_pyhlslgen
 {
-    float3 A;
-    float B;
-    float4 C;
-    float2 D;
-    float3x3 E;
-    float2 F[4];
-    double G;
-    float H;
+	float A;
+	float3x4 H[16];
+	float B;
 };
+
+
+/*
+ConstantBuffer<STestShaderData_pyhlslgen_cbuffer> inBuffer;
+RWStructuredBuffer<STestShaderData_pyhlslgen_cbuffer> outBuffer;
+
+[numthreads(1,1,1)]
+void main(uint dispatchThreadId : SV_DispatchThreadId)
+{
+    outBuffer[dispatchThreadId] = inBuffer;
+}
+*/
 
 //$[[pycppgen]]
 struct SStructBase
