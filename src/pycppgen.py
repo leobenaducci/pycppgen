@@ -78,6 +78,8 @@ kInclude: Final[str] = "include"
 kSerialize: Final[str] = "serialize"
 kExclude: Final[str] = "exclude"
 
+kHlsliPath: Final[str] = "../../shaders/Common"
+
 EKind = _Kinds()          # use K.Unknown, K.Class … everywhere
 ENode = _NodeType()
 EParseComments = _ParseCommentsType()
@@ -650,11 +652,15 @@ def GetOutputFilePath(filePath : str, ext : str = "h") :
     extStart = filePath.rfind(".")
     outputPath = filePath[:extStart]
     outputPath += f".gen.{ext}"
-    return ResolvePath(outputPath)
+
+    if ext == "hlsli" :
+        outputPath = pathlib.Path(ProjectPath).joinpath(kHlsliPath).joinpath(pathlib.Path(outputPath).name)
+
+    return ResolvePath(str(outputPath))
 
 def GetOutputFileName(filePath : str, ext  : str = "h") :
     outputPath = pathlib.Path(GetOutputFilePath(filePath, ext))
-    return ResolvePath(outputPath.relative_to(outputPath.parent))
+    return ResolvePath(str(outputPath.relative_to(outputPath.parent)))
 
 def ParseTranslationUnit(tu, file) :
     global FilesToParse
@@ -1496,7 +1502,6 @@ def CodeGen(filePath : str) :
             hlslCode = CodeGenHlslNode(hlslCode, node)
 
     hppCode += "namespace pycppgen_globals {\n"
-    
     for _, func in TLS().NodeList.items() :
         if func[ENode.Kind] == EKind.FreeFunction :
             hppCode += "//" + func[ENode.FullName] + "\n"
