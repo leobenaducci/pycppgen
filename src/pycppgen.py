@@ -1045,7 +1045,7 @@ def CodeGenHlslNode(hlslCode, node) -> str:
     with open(fileName, "wt") as file:
         file.write(hlslTemp)
 
-    result = subprocess.run(["dxc", "-spirv", "-fspv-target-env=vulkan1.3", "-fspv-reflect", "-fvk-use-dx-layout", "-fspv-use-vulkan-memory-model", "-enable-16bit-types", "-T cs_6_2", "-E main", f"-Fo {fileName}.spv", fileName], capture_output=True)
+    result = subprocess.run(["dxc", "-spirv", "-fspv-target-env=vulkan1.3", "-fspv-reflect", "-fvk-use-dx-layout", "-enable-16bit-types", "-T cs_6_2", "-E main", f"-Fo {fileName}.spv", fileName], capture_output=True)
     if os.path.exists(f"{fileName}"):
         os.remove(f"{fileName}")
 
