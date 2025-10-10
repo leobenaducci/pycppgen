@@ -184,6 +184,7 @@ def TLS() -> TLS_Data:
         return data
     
 FilesWithPyCppGenTag = dict()
+FilesWithPyHlslGenTag = dict()
 TLS_Dict = {}
 PrintLock = threading.Lock()
 
@@ -1784,20 +1785,29 @@ def IsFileUpToDate(src : str | None, dst : str | None) :
     return srcTime < dstTime  
 
 def IsOutputUpToDate(file : str) :
-    outputFile = GetOutputFilePath(file)
+    if file in FilesWithPyHlslGenTag :
+        if not IsFileUpToDate(file, GetOutputFilePath(file, "hlsli")) :
+            return False
 
-    return IsFileUpToDate(file, outputFile)
+    return IsFileUpToDate(file, GetOutputFilePath(file))
 
 def FileContainsPyCppGenTag(file : str) :
-    global FilesWithPyCppGenTag
+    global FilesWithPyCppGenTag, FilesWithPyHlslGenTag
 
     if file in FilesWithPyCppGenTag :
         return FilesWithPyCppGenTag[file]
 
+    if file in FilesWithPyHlslGenTag :
+        return FilesWithPyHlslGenTag[file]
+
     if os.path.exists(file) :
         with open(file) as f :
             data = f.read()
-            if data.find("$[[pycppgen") != -1 or data.find("pyhlslgen") != -1:
+            if data.find("pyhlslgen") != -1 :
+                FilesWithPyCppGenTag[file] = True
+                FilesWithPyHlslGenTag[file] = True
+                return True
+            elif data.find("$[[pycppgen") != -1 :
                 FilesWithPyCppGenTag[file] = True
                 return True
 
