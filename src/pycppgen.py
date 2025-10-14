@@ -996,6 +996,10 @@ def CalcHlslSize(varType : str, isCbuffer : bool) :
 #codegen: emit a hlsl node
 def CodeGenHlslNode(hlslCode, node) -> str:
     
+    vksdk = os.getenv("VULKAN_SDK")
+    if vksdk == "":
+        return ""
+
     isCbuffer = node[ENode.Name].find("_cbuffer") != -1
     hlslTemp = f"struct {node[ENode.Name]}\n{{\n"
 
@@ -1046,7 +1050,7 @@ def CodeGenHlslNode(hlslCode, node) -> str:
     with open(fileName, "wt") as file:
         file.write(hlslTemp)
 
-    result = subprocess.run(["dxc", "-spirv", "-fspv-target-env=vulkan1.3", "-fspv-reflect", "-fvk-use-dx-layout", "-enable-16bit-types", "-T cs_6_2", "-E main", f"-Fo {fileName}.spv", fileName], capture_output=True)
+    result = subprocess.run([f"{vksdk}\\bin\\dxc.exe", "-spirv", "-fspv-target-env=vulkan1.3", "-fspv-reflect", "-fvk-use-dx-layout", "-enable-16bit-types", "-T cs_6_2", "-E main", f"-Fo {fileName}.spv", fileName], capture_output=True)
     if os.path.exists(f"{fileName}"):
         os.remove(f"{fileName}")
 
@@ -1054,7 +1058,7 @@ def CodeGenHlslNode(hlslCode, node) -> str:
         atomic_print(result.stderr.decode())
         return hlslCode
 
-    result = subprocess.run(["spirv-cross", f"{fileName}.spv", "--reflect", "--hlsl", "--hlsl-enable-16bit-types"], capture_output=True)
+    result = subprocess.run([f"{vksdk}\\bin\\spirv-cross", f"{fileName}.spv", "--reflect", "--hlsl", "--hlsl-enable-16bit-types"], capture_output=True)
     if os.path.exists(f"{fileName}.spv"):
         os.remove(f"{fileName}.spv")
 
@@ -1122,19 +1126,9 @@ def CodeGenHlslNode(hlslCode, node) -> str:
         if offsetMod16 != 0 :
             applyPad(16 - offsetMod16)
 
-    hlslResult = f"// Size = {offset}\n{hlslResult + "};"}\n"
+    hlslResult = f"// Size = {offset}\n{hlslResult + "};"}\n\n"
 
-    #TODO
-    result = hppResult = hlslResult
-
-    if hlslResult != hppResult :
-        result = "#ifdef __hlsl_dx_compiler\n"
-        result += hlslResult
-        result += "#else\n"
-        result += hppResult
-        result += "#endif\n\n"
-
-    return hlslCode + result
+    return hlslCode + hlslResult
 
 #codegen: emit a node
 def CodeGenOutputNode(node) :
