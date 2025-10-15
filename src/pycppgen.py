@@ -66,6 +66,7 @@ class _NodeType:
     Const: Final[str] = "is_const"
     Cpp: Final[str] = "cpp"
     Hlsl: Final[str] = "hlsl"
+    HlslCbuffer: Final[str] = "hlsl_cbuffer"
 
 @dataclass(frozen=True, slots=True)
 class _ParseCommentsType:
@@ -278,9 +279,16 @@ def GetScope(cursor, accum : str = "") :
     
     return accum
 
+def RemoveHlsl(var : str) :
+    return var.replace("_pyhlslgen_cbuffer", "").replace("_pyhlslgen", "")
+
 #scoped cursor name
-def GetFullName(cursor) :
+def GetFullName(cursor, removePyhlsl : bool = True) :
     accum = str(cursor.displayname)
+
+    if removePyhlsl :
+        accum = RemoveHlsl(accum)
+
     return GetScope(cursor, accum)
 
 #append the current node to it's parent and optionally (appendToList) to the global list
@@ -296,7 +304,7 @@ def AppendToStackTop(node, node_type : str, appendToList : bool = False) :
 #common node push code
 def ParseNode(cursor, kind : str = kInvalid) :
     node = dict()
-    node[ENode.Name] = str(cursor.spelling)
+    node[ENode.Name] = RemoveHlsl(str(cursor.spelling))
     node[ENode.FullName] = GetFullName(cursor)
     node[ENode.Kind] = kind
     if kind == EKind.ClassTemplate :
@@ -586,8 +594,13 @@ def ParseCursor(cursor, forceInclude : bool = False)  -> None:
     if cursor.kind == CursorKind.TYPEDEF_DECL : return
     if cursor.kind == CursorKind.PARM_DECL : return    
 
-    fullName = GetFullName(cursor)
+    fullName = GetFullName(cursor, False)
     if fullName == "" : return
+    
+    isHlslDeclCBuffer = fullName.endswith("_pyhlslgen_cbuffer")
+    isHlslDecl = isHlslDeclCBuffer or fullName.endswith("_pyhlslgen") 
+    if isHlslDecl :
+        fullName = RemoveHlsl(fullName)
 
     #allow namespaces to be "duplicated"
     if cursor.kind != CursorKind.NAMESPACE :
@@ -605,7 +618,7 @@ def ParseCursor(cursor, forceInclude : bool = False)  -> None:
 
     isStruct = cursor.kind == CursorKind.STRUCT_DECL or cursor.kind == CursorKind.CLASS_DECL
     isStruct |= cursor.kind == CursorKind.CLASS_TEMPLATE or cursor.kind == CursorKind.CLASS_TEMPLATE_PARTIAL_SPECIALIZATION
-    isHlslDecl = isStruct and (fullName.endswith("_pyhlslgen") or fullName.endswith("_pyhlslgen_cbuffer"))
+    isHlslDecl = isHlslDecl and isStruct
 
     #check if it should be parsed
     included = True
@@ -622,6 +635,7 @@ def ParseCursor(cursor, forceInclude : bool = False)  -> None:
             node = ParseStruct(cursor, isHlslDecl)   
             node[ENode.Cpp] = included
             node[ENode.Hlsl] = isHlslDecl
+            node[ENode.HlslCbuffer] = isHlslDeclCBuffer 
             AppendToStackTop(node, ENode.Structs)
             TLS().NodeList[fullName] = node
         return
@@ -1000,7 +1014,7 @@ def CodeGenHlslNode(hlslCode, node) -> str:
     if vksdk == "":
         return ""
 
-    isCbuffer = node[ENode.Name].find("_cbuffer") != -1
+    isCbuffer = node[ENode.HlslCbuffer]
     hlslTemp = f"struct {node[ENode.Name]}\n{{\n"
 
     nameSizeMap = {}
@@ -1083,7 +1097,7 @@ def CodeGenHlslNode(hlslCode, node) -> str:
     
     offset = 0
     padNum = 0
-    hlslResult = f"struct {node[ENode.Name].replace("_pyhlslgen", "").replace("_cbuffer", "")}\n{{\n"
+    hlslResult = f"struct {node[ENode.Name]}\n{{\n"
 
     def applyPad(padSize : int) :
         nonlocal offset, padNum, hlslResult
@@ -1128,7 +1142,21 @@ def CodeGenHlslNode(hlslCode, node) -> str:
 
     hlslResult = f"// Size = {offset}\n{hlslResult + "};"}\n\n"
 
-    return hlslCode + hlslResult
+    result = hlslResult
+    result += "\n"
+    result += "#ifdef __cplusplus\n"
+    result += "\n"
+    result += f"const char {node[ENode.Name]}_HlslDeclaration[] = {{\n\t\""
+
+    for i in hlslResult :
+        if i == '\n':
+            result += '\\n\"\\\n\t\"'
+        elif i != '\r':
+            result += i
+
+    result += "\"\n};\n#endif\n\n"
+
+    return hlslCode + result
 
 #codegen: emit a node
 def CodeGenOutputNode(node) :
