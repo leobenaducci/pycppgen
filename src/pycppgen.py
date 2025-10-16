@@ -1097,7 +1097,9 @@ def CodeGenHlslNode(hlslCode, node) -> str:
     
     offset = 0
     padNum = 0
-    hlslResult = f"struct {node[ENode.Name]}\n{{\n"
+
+    hlslResult = ""
+    hlslResult += f"struct {node[ENode.Name]}\n{{\n"
 
     def applyPad(padSize : int) :
         nonlocal offset, padNum, hlslResult
@@ -1142,11 +1144,15 @@ def CodeGenHlslNode(hlslCode, node) -> str:
 
     hlslResult = f"// Size = {offset}\n{hlslResult + "};"}\n\n"
 
-    result = hlslResult
-    result += "\n"
+    result = ""
+    result += f"#ifndef __{node[ENode.Name].upper()}_DECL__\n"
+    result += f"#define __{node[ENode.Name].upper()}_DECL__\n\n"
+    result += hlslResult
+    hlslResult = result + f"\n#endif //__{node[ENode.Name].upper()}_DECL__\n"
+
     result += "#ifdef __cplusplus\n"
     result += "\n"
-    result += f"const char {node[ENode.Name]}_HlslDeclaration[] = {{\n\t\""
+    result += f"static constexpr char {node[ENode.Name]}_HlslDeclaration[] = {{\n\t\""
 
     for i in hlslResult :
         if i == '\n':
@@ -1154,7 +1160,8 @@ def CodeGenHlslNode(hlslCode, node) -> str:
         elif i != '\r':
             result += i
 
-    result += "\"\n};\n#endif\n\n"
+    result += "\"\n};\n#endif //__cplusplus\n"
+    result += f"\n#endif //__{node[ENode.Name].upper()}_DECL__\n\n"
 
     return hlslCode + result
 
