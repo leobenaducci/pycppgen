@@ -2,13 +2,6 @@
 
 #include <array> //included for performance profiling
 
-struct STestShaderData_pyhlslgen
-{
-	float A;
-	float3x4 H[16];
-	float B;
-};
-
 
 /*
 ConstantBuffer<STestShaderData_pyhlslgen_cbuffer> inBuffer;
@@ -21,9 +14,33 @@ void main(uint dispatchThreadId : SV_DispatchThreadId)
 }
 */
 
+struct STestShaderData_pyhlslgen
+{
+    float A;
+    float3x4 H[16];
+    float B;
+};
+
+namespace vkfw
+{
+    struct SNamespacedShaderData_pyhlslgen
+    {
+	    float A;
+	    float3x4 H[16];
+	    float B;
+    };
+}
+
 //$[[pycppgen]]
 struct SStructBase
 {
+    struct SShaderData_pyhlslgen
+    {
+    	float A;
+    	float3x4 H[16];
+    	float B;
+    };
+
     //$[[pycppgen visible]]
     static const char size = 'A';
 

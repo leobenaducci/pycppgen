@@ -473,13 +473,14 @@ def ParseStruct(cursor, isHlslDecl : bool = False) :
         flags = ParseComments(child, EKind.Unknown)
 
         #member variables (field)
-        if child.kind == CursorKind.FIELD_DECL :
-            if (kInclude in flags and flags[kInclude] == True) or isHlslDecl:
+        if child.kind == CursorKind.FIELD_DECL:
+            if (kInclude in flags and flags[kInclude] == True) or isHlslDecl :
                 var = ParseVar(child, False)
             continue
 
-        if not kInclude in flags or flags[kInclude] == False:
-            continue
+        if not str(child.spelling).endswith("_pyhlslgen_cbuffer") and not str(child.spelling).endswith("_pyhlslgen") :
+            if not kInclude in flags or flags[kInclude] == False :
+                continue
 
         #class functions
         if child.kind == CursorKind.CXX_METHOD:
@@ -490,8 +491,6 @@ def ParseStruct(cursor, isHlslDecl : bool = False) :
         if child.kind == CursorKind.VAR_DECL :
             var = ParseVar(child, False)
             continue
-
-
 
         #member enum definitions
         if child.kind == CursorKind.ENUM_DECL :
@@ -1098,8 +1097,13 @@ def CodeGenHlslNode(hlslCode, node) -> str:
     offset = 0
     padNum = 0
 
+    hlslNodeName = node[ENode.Name]
+    if node[ENode.FullName].find(node[ENode.Namespace]) != -1 :
+        cppNodeName = node[ENode.FullName].replace(f"{node[ENode.Namespace]}::", "").replace("::", "_")
+    else :
+        cppNodeName = node[ENode.FullName].replace("::", "_")
+
     hlslResult = ""
-    hlslResult += f"struct {node[ENode.Name]}\n{{\n"
 
     def applyPad(padSize : int) :
         nonlocal offset, padNum, hlslResult
@@ -1109,7 +1113,8 @@ def CodeGenHlslNode(hlslCode, node) -> str:
                 newDecl = f"\tuint16_t{pad >> 1} _pad{padNum};"
             else :
                 newDecl = f"\tuint{pad >> 2} _pad{padNum};"
-            newDecl += f"\t\t// Offset: {offset} - Size: {pad}\n"
+            while (len(newDecl.replace("\t", "    ")) / 4) * 4 < 32 : newDecl += '\t'
+            newDecl += f"// Offset: {offset} - Size: {pad}\n"
             padNum = padNum + 1
             offset = offset + int(pad)
             padSize -= pad
@@ -1133,35 +1138,53 @@ def CodeGenHlslNode(hlslCode, node) -> str:
             for a in member["array"]:
                 newDecl += f"[{a}]"
 
+        newDecl += ";"
+
+        while (len(newDecl.replace("\t", "    ")) / 4) * 4 < 32 : newDecl += '\t'
+
         size = int(nameSizeMap[member["name"]])
-        hlslResult += f"{newDecl};\t\t// Offset: {offset} - Size: {size}\n"
+        hlslResult += f"{newDecl}// Offset: {offset} - Size: {size}\n"
+            
         offset += size
 
-    if isCbuffer:
-        offsetMod16 = offset % 16
-        if offsetMod16 != 0 :
-            applyPad(16 - offsetMod16)
-
-    hlslResult = f"// Size = {offset}\n{hlslResult + "};"}\n\n"
+    offsetMod16 = offset % 16
+    if offsetMod16 != 0 :
+        applyPad(16 - offsetMod16)
 
     result = ""
-    result += f"#ifndef __{node[ENode.Name].upper()}_DECL__\n"
-    result += f"#define __{node[ENode.Name].upper()}_DECL__\n\n"
-    result += hlslResult
-    hlslResult = result + f"\n#endif //__{node[ENode.Name].upper()}_DECL__\n"
+    result += f"#ifndef __{cppNodeName.upper()}_DECL__\n"
+    result += f"#define __{cppNodeName.upper()}_DECL__\n\n"
 
+    result += f"// Size = {offset}\n"
     result += "#ifdef __cplusplus\n"
-    result += "\n"
-    result += f"static constexpr char {node[ENode.Name]}_HlslDeclaration[] = {{\n\t\""
+    if node[ENode.Namespace] != "" :
+        result += f"namespace {node[ENode.Namespace]}{{\n"
+    result += f"struct {cppNodeName}\n"
+    result += "#else //__cplusplus\n"
+    result += f"struct {hlslNodeName}\n"
+    result += "#endif //__cplusplus\n"
+    result += "{\n"
+    result += hlslResult
+    result += "};\n"
 
+    if node[ENode.Namespace] != "" :
+        result += "#ifdef __cplusplus\n"
+        result += f"}} // namespace {node[ENode.Namespace]}\n"
+        result += "#endif //__cplusplus\n"
+
+    result += "\n#ifdef __cplusplus\n"
+    result += "\n"
+    result += f"static constexpr char {cppNodeName}_HlslDeclaration[] = {{\n\t\""
+
+    hlslResult = f"struct {hlslNodeName}\n{{\n{hlslResult}\n}};"
     for i in hlslResult :
         if i == '\n':
             result += '\\n\"\\\n\t\"'
         elif i != '\r':
             result += i
 
-    result += "\"\n};\n#endif //__cplusplus\n"
-    result += f"\n#endif //__{node[ENode.Name].upper()}_DECL__\n\n"
+    result += "\"\n};\n\n#endif //__cplusplus\n"
+    result += f"\n#endif //__{cppNodeName.upper()}_DECL__\n\n"
 
     return hlslCode + result
 
