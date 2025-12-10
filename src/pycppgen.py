@@ -79,7 +79,7 @@ kInclude: Final[str] = "include"
 kSerialize: Final[str] = "serialize"
 kExclude: Final[str] = "exclude"
 
-kHlsliPath: Final[str] = "../../shaders/Common"
+kHlsliPath: Final[str] = "../../shaders/Types"
 
 EKind = _Kinds()          # use K.Unknown, K.Class … everywhere
 ENode = _NodeType()
@@ -1146,10 +1146,6 @@ def CodeGenHlslNode(hlslCode, node) -> str:
         hlslResult += f"{newDecl}// Offset: {offset} - Size: {size}\n"
             
         offset += size
-
-    offsetMod16 = offset % 16
-    if offsetMod16 != 0 :
-        applyPad(16 - offsetMod16)
 
     result = ""
     result += f"#ifndef __{cppNodeName.upper()}_DECL__\n"
