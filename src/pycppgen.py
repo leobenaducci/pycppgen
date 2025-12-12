@@ -54,8 +54,8 @@ class _NodeType:
     Parents: Final[str] = "parents"
     Enums: Final[str] = "enums"
     Structs: Final[str] = "structs"
-    Namespaces: Final[str] = "namespaces"
     Namespace: Final[str] = "namespace"
+    Namespaces: Final[str] = "namespaces"
     Parameters: Final[str] = "parameters"
     EnumValues: Final[str] = "enum_values"
     MetaTemplateDecl: Final[str] = "meta_template_decl"
@@ -315,11 +315,13 @@ def ParseNode(cursor, kind : str = kInvalid) :
     node[ENode.Scope] = GetScope(cursor)
     node[ENode.Attributes] = ParseComments(cursor, kind)
     node[ENode.Namespace] = ""
+    node[ENode.Namespaces] = {}
     node[ENode.Const] = cursor.type != None and cursor.type.is_const_qualified() or cursor.is_const_method()
 
     ns_parent = cursor.semantic_parent
-    while ns_parent and ns_parent.kind == CursorKind.NAMESPACE :
-        node[ENode.Namespace] = ns_parent.spelling + "::" + node[ENode.Namespace]
+    while ns_parent :
+        if ns_parent.kind == CursorKind.NAMESPACE :
+            node[ENode.Namespace] = ns_parent.spelling + "::" + node[ENode.Namespace]
         ns_parent = ns_parent.semantic_parent
 
     if node[ENode.Namespace].endswith("::") :
@@ -1097,11 +1099,7 @@ def CodeGenHlslNode(hlslCode, node) -> str:
     offset = 0
     padNum = 0
 
-    hlslNodeName = node[ENode.Name]
-    #if node[ENode.Namespace] != "" and node[ENode.FullName].find(node[ENode.Namespace]) != -1 :
-    #    cppNodeName = node[ENode.FullName].replace(f"{node[ENode.Namespace]}::", "").replace("::", "_")
-    #else :
-    cppNodeName = node[ENode.FullName].replace("::", "_")
+    cppNodeName : str = node[ENode.FullName][len(node[ENode.Namespace]):].lstrip('::').replace("::", "_")
 
     hlslResult = ""
 
@@ -1147,30 +1145,55 @@ def CodeGenHlslNode(hlslCode, node) -> str:
             
         offset += size
 
-    result = ""
-    result += f"#ifndef __{cppNodeName.upper()}_DECL__\n"
-    result += f"#define __{cppNodeName.upper()}_DECL__\n\n"
-    result += f"// Size = {offset}\n"
-    result += f"struct {cppNodeName}\n"
-    result += "{\n"
-    result += hlslResult
-    result += "};\n"
+    hlslResult = f"""
+// Size = {offset}
+struct {cppNodeName}
+{{
+{hlslResult}
+}};
+"""
+    
+    hlslDecl = f"""
+#ifndef __{cppNodeName.upper()}_DECL__
+#define __{cppNodeName.upper()}_DECL__
 
-    hlslResult = result
-    hlslResult += f"\n#endif //__{cppNodeName.upper()}_DECL__\n\n"
+{hlslResult}
 
-    result += "\n#ifdef __cplusplus\n"
-    result += "\n"
-    result += f"static constexpr char {cppNodeName}_HlslDeclaration[] = {{\n\t\""
+#endif //__{cppNodeName.upper()}_DECL__
+"""
+    
+    openNamespaces = ""
+    closeNamespaces = ""
+    if node[ENode.Namespace] != "" :
+        for ns in node[ENode.Namespace].split('::') :
+            openNamespaces += f"namespace {ns} {{\n"
+            closeNamespaces += '}\n'
 
-    for i in hlslResult :
-        if i == '\n':
-            result += '\\n\"\\\n\t\"'
-        elif i != '\r':
-            result += i
+    result = f"""
+#ifndef __{cppNodeName.upper()}_DECL__
+#define __{cppNodeName.upper()}_DECL__
 
-    result += "\"\n};\n\n#endif //__cplusplus\n"
-    result += f"\n#endif //__{cppNodeName.upper()}_DECL__\n\n"
+#ifdef __cplusplus
+{openNamespaces}
+{hlslResult}
+template<> struct pyhlslgen<{cppNodeName}>
+{{
+    using type = {cppNodeName};
+    static constexpr char decl[] = ""\\
+"""
+    
+    for l in hlslDecl.split('\n') :
+        result += f"\t\"{l}\"\\\n"   
+
+    result += f"\"\";\n"    
+    result += f"""
+}};
+{closeNamespaces}
+#else
+    {hlslResult}
+#endif //__cplusplus
+#endif //__{cppNodeName.upper()}_DECL__
+"""
 
     return hlslCode + result
 
@@ -1577,6 +1600,9 @@ def CodeGen(filePath : str) :
             os.remove(hlslFile)
     else :
         atomic_print("generating code for: " + hlslFile)
+        if not os.path.exists(pathlib.Path(hlslFile).parent) :
+            os.makedirs(pathlib.Path(hlslFile).parent)
+            
         with open(hlslFile, mode="wt") as output :
             hlslCode = "#pragma once\n\n" + hlslCode            
             output.write(hlslCode)            
@@ -1615,6 +1641,8 @@ struct function_parameter_info {
 	std::string_view Type;
 	std::string_view DefaultValue;
 };
+
+template<typename T = void> struct pyhlslgen { using type = void; static constexpr char decl[] = ""; };
 
 template<typename T = void> struct pycppgen { static constexpr bool is_valid() { return false; } };
 template<> struct pycppgen<void> 
@@ -1841,11 +1869,11 @@ def FileContainsPyCppGenTag(file : str) :
     if os.path.exists(file) :
         with open(file) as f :
             data = f.read()
-            if data.find("pyhlslgen") != -1 :
+            if data.find("_pyhlslgen") != -1 :
                 FilesWithPyCppGenTag[file] = True
                 FilesWithPyHlslGenTag[file] = True
                 return True
-            elif data.find("$[[pycppgen") != -1 :
+            elif data.find("[[pycppgen") != -1 :
                 FilesWithPyCppGenTag[file] = True
                 return True
 

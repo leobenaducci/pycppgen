@@ -51,12 +51,22 @@ struct SStructBase
     float x;
 };
 
-//$[[pycppgen visible]]
-struct SStructTest : SStructBase
+namespace vkfw
 {
-    //$[[pycppgen visible;serialize]]
-    float y,z;
+    //$[[pycppgen visible]]
+    struct SStructTest : SStructBase
+    {
+        struct SShaderStructTestData_pyhlslgen
+        {
+        	float A;
+        	float3x4 H[16];
+        	float B;
+        };
 
-    //$[[pycppgen pure]
-    static void OnRegister() {}
-};
+        //$[[pycppgen visible;serialize]]
+        float y,z;
+
+        //$[[pycppgen pure]
+        static void OnRegister() {}
+    };
+}
