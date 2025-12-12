@@ -1145,8 +1145,9 @@ def CodeGenHlslNode(hlslCode, node) -> str:
             
         offset += size
 
+
+    cbuffer_alignment = "true" if isCbuffer or padNum == 0 else "false"
     hlslResult = f"""
-// Size = {offset}
 struct {cppNodeName}
 {{
 {hlslResult}
@@ -1168,7 +1169,6 @@ struct {cppNodeName}
         for ns in node[ENode.Namespace].split('::') :
             openNamespaces += f"namespace {ns} {{\n"
             closeNamespaces += '}\n'
-
     result = f"""
 #ifndef __{cppNodeName.upper()}_DECL__
 #define __{cppNodeName.upper()}_DECL__
@@ -1178,20 +1178,17 @@ struct {cppNodeName}
 {hlslResult}
 template<> struct pyhlslgen<{cppNodeName}>
 {{
-    using type = {cppNodeName};
-    static constexpr char name[] = "{cppNodeName}";
-    static constexpr char decl[] = ""\\
-"""
-    
-    for l in hlslDecl.split('\n') :
-        result += f"\t\"{l}\\n\"\\\n"   
-
-    result += f"\"\";\n"    
-    result += f"""
+    using type_t = {cppNodeName};
+    static constexpr bool is_valid = true;
+    static constexpr bool cbuffer_alignment = {cbuffer_alignment};
+    static constexpr char type_name[] = "{cppNodeName}"; 
+    static constexpr char full_decl[] = R"-({hlslDecl})-"; 
+    static constexpr char struct_decl[] = R"-({hlslResult})-"; 
+    static constexpr char cbuffer_decl[] = R"-({hlslResult.replace(f"struct {cppNodeName}", f"cbuffer {cppNodeName}_")})-";
 }};
 {closeNamespaces}
 #else
-    {hlslResult}
+{hlslResult}
 #endif //__cplusplus
 #endif //__{cppNodeName.upper()}_DECL__
 """
@@ -1643,7 +1640,16 @@ struct function_parameter_info {
 	std::string_view DefaultValue;
 };
 
-template<typename T = void> struct pyhlslgen { using type = void; static constexpr char decl[] = ""; };
+template<typename T = void> struct pyhlslgen 
+{
+    using type_t = T; 
+    static constexpr bool is_valid = false;
+    static constexpr bool cbuffer_alignment = false;
+    static constexpr char type_name[] = ""; 
+    static constexpr char full_decl[] = ""; 
+    static constexpr char struct_decl[] = ""; 
+    static constexpr char cbuffer_decl[] = "";
+};
 
 template<typename T = void> struct pycppgen { static constexpr bool is_valid() { return false; } };
 template<> struct pycppgen<void> 
@@ -1663,7 +1669,7 @@ protected:
 };
 
 template<typename T> requires (!std::is_pointer_v<T>)
-auto pycppgen_of(const T& t) 
+auto pycppgen_of(const T&) 
 {
 	return pycppgen<std::decay_t<T>>(); 
 }
