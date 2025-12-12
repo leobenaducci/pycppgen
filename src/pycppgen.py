@@ -1179,11 +1179,12 @@ struct {cppNodeName}
 template<> struct pyhlslgen<{cppNodeName}>
 {{
     using type = {cppNodeName};
+    static constexpr char name[] = "{cppNodeName}";
     static constexpr char decl[] = ""\\
 """
     
     for l in hlslDecl.split('\n') :
-        result += f"\t\"{l}\"\\\n"   
+        result += f"\t\"{l}\\n\"\\\n"   
 
     result += f"\"\";\n"    
     result += f"""
