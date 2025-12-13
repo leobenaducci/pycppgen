@@ -104,7 +104,9 @@ ParseCommentsMode = {
     EKind.TemplateTemplateParameter : EParseComments.BeforeDecl,
 }
 
-kHlslTypes: Final[list]= ["int", "uint", "float", "bool", "double", "uint64_t", "float16_t", "int16_t", "uint16_t", "int8_t", "uint8_t"]
+kHlslTypes: Final[list]= ["int", "uint", "float", "bool", "double", "int64_t", "uint64_t", "float16_t", "int16_t", "uint16_t", "int8_t", "uint8_t"]
+kPyHlslVectorTypes: Final[list]= ["int", "uint", "float", "bool", "double", "int64_t", "uint64_t", "int16_t", "uint16_t", "int8_t", "uint8_t"]
+kPyHlslMatrixTypes: Final[list]= ["int", "uint", "float", "bool", "double", "int64_t", "uint64_t"]
 
 def GenHlslDeclarations() :
     result = "\n"
@@ -132,6 +134,7 @@ def GenVkToHlslMappings() :
         vkToHlsl[f"bvec{r}"] = f"bool{r}"
         vkToHlsl[f"dvec{r}"] = f"double{r}"
         vkToHlsl[f"u64vec{r}"] = f"uint64_t{r}"        
+        vkToHlsl[f"i64vec{r}"] = f"int64_t{r}"        
         vkToHlsl[f"f16vec{r}"] = f"float16_t{r}"
         vkToHlsl[f"i16vec{r}"] = f"int16_t{r}"
         vkToHlsl[f"u16vec{r}"] = f"uint16_t{r}"
@@ -166,6 +169,17 @@ def GenVkToHlslMappings() :
 
 kHlslDeclarations : Final[str] = GenHlslDeclarations()
 kVkToHlsl : Final[dict] = GenVkToHlslMappings()
+kPyhlslgenPrimitiveTypes : str = ""
+
+for v in kPyHlslVectorTypes :
+    kPyhlslgenPrimitiveTypes += f"""template<> struct pyhlslgen<{v}> {{ using type_t = {v}; static constexpr bool is_valid = true; static constexpr bool is_primitive = true; static constexpr char type_name[] = "{v}";  }};\n"""
+    for i in range(2, 5) :
+        kPyhlslgenPrimitiveTypes += f"""template<> struct pyhlslgen<{v}{i}> {{ using type_t = {v}{i}; static constexpr bool is_valid = true; static constexpr bool is_primitive = true; static constexpr char type_name[] = "{v}{i}";  }};\n"""
+
+for v in kPyHlslMatrixTypes :
+    for i in range(2, 5) :
+        for e in range(2, 5) :
+            kPyhlslgenPrimitiveTypes += f"""template<> struct pyhlslgen<{v}{i}x{e}> {{ using type_t = {v}{i}x{e}; static constexpr bool is_valid = true; static constexpr bool is_primitive = true; static constexpr char type_name[] = "{v}{i}x{e}";  }};\n"""
 
 class TLS_Data:
     def __init__(self):
@@ -1180,10 +1194,10 @@ template<> struct pyhlslgen<{cppNodeName}>
 {{
     using type_t = {cppNodeName};
     static constexpr bool is_valid = true;
+    static constexpr bool is_primitive = false;
     static constexpr bool cbuffer_alignment = {cbuffer_alignment};
     static constexpr char type_name[] = "{cppNodeName}"; 
-    static constexpr char full_decl[] = R"-({hlslDecl})-"; 
-    static constexpr char struct_decl[] = R"-({hlslResult})-"; 
+    static constexpr char struct_decl[] = R"-({hlslDecl})-"; 
     static constexpr char cbuffer_decl[] = R"-({hlslResult.replace(f"struct {cppNodeName}", f"cbuffer {cppNodeName}_")})-";
 }};
 {closeNamespaces}
@@ -1644,6 +1658,7 @@ template<typename T = void> struct pyhlslgen
 {
     using type_t = T; 
     static constexpr bool is_valid = false;
+    static constexpr bool is_primitive = false;
     static constexpr bool cbuffer_alignment = false;
     static constexpr char type_name[] = ""; 
     static constexpr char full_decl[] = ""; 
@@ -1651,6 +1666,7 @@ template<typename T = void> struct pyhlslgen
     static constexpr char cbuffer_decl[] = "";
 };
 
+""" + kPyhlslgenPrimitiveTypes + """
 template<typename T = void> struct pycppgen { static constexpr bool is_valid() { return false; } };
 template<> struct pycppgen<void> 
 {
