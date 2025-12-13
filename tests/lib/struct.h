@@ -11,10 +11,33 @@ RWStructuredBuffer<STestShaderData_pyhlslgen_cbuffer> outBuffer;
 void main(uint dispatchThreadId : SV_DispatchThreadId)
 {
     outBuffer[dispatchThreadId] = inBuffer;
+
+
 }
 */
 
-struct STestShaderData_pyhlslgen
+// ubo430 layout (Uniform Buffer default)
+struct UBO_pyhlslgen
+{
+    float3 pos;   // offset 0, size 12, BUT aligned to 16
+    float2  scale; // offset 16 (not 12!), size 4
+};
+
+
+// ssbo layout (Storage Buffer default, or UBO with extension)
+struct SSBBO_pyhlslgen_relaxed
+{
+    float3 pos;   // offset 0, size 12, aligned to 4
+    float2 scale; // offset 12, size 4 (tightly packed)
+};
+
+// scalar layout (Storage Buffer default, or UBO with extension)
+struct SBuffer_pyhlslgen_scalar
+{
+    float2 pos;
+};
+
+struct STestShaderData_pyhlslgen_uniform
 {
     float A;
     float3x4 H[16];
@@ -23,7 +46,7 @@ struct STestShaderData_pyhlslgen
 
 namespace vkfw
 {
-    struct SNamespacedShaderData_pyhlslgen
+    struct SNamespacedShaderData_pyhlslgen_relaxed
     {
 	    float A;
 	    float3x4 H[16];

@@ -66,7 +66,7 @@ class _NodeType:
     Const: Final[str] = "is_const"
     Cpp: Final[str] = "cpp"
     Hlsl: Final[str] = "hlsl"
-    HlslCbuffer: Final[str] = "hlsl_cbuffer"
+    HlslLayout: Final[str] = "hlsl_layout"
 
 @dataclass(frozen=True, slots=True)
 class _ParseCommentsType:
@@ -169,17 +169,19 @@ def GenVkToHlslMappings() :
 
 kHlslDeclarations : Final[str] = GenHlslDeclarations()
 kVkToHlsl : Final[dict] = GenVkToHlslMappings()
-kPyhlslgenPrimitiveTypes : str = ""
+kPyhlslgenPrimitiveTypes : str = "#ifdef _HLSL_TYPES_DECLARED_\n"
 
 for v in kPyHlslVectorTypes :
-    kPyhlslgenPrimitiveTypes += f"""template<> struct pyhlslgen<{v}> {{ using type_t = {v}; static constexpr bool is_valid = true; static constexpr bool is_primitive = true; static constexpr char type_name[] = "{v}";  }};\n"""
+    kPyhlslgenPrimitiveTypes += f"""template<> struct pyhlslgen<{v}> {{ using type_t = {v}; static constexpr bool is_valid = true; static constexpr bool is_primitive = true; static constexpr bool scalar_alignment = true; static constexpr char type_name[] = "{v}";  }};\n"""
     for i in range(2, 5) :
-        kPyhlslgenPrimitiveTypes += f"""template<> struct pyhlslgen<{v}{i}> {{ using type_t = {v}{i}; static constexpr bool is_valid = true; static constexpr bool is_primitive = true; static constexpr char type_name[] = "{v}{i}";  }};\n"""
+        kPyhlslgenPrimitiveTypes += f"""template<> struct pyhlslgen<{v}{i}> {{ using type_t = {v}{i}; static constexpr bool is_valid = true; static constexpr bool is_primitive = true; static constexpr bool scalar_alignment = true; static constexpr char type_name[] = "{v}{i}";  }};\n"""
 
 for v in kPyHlslMatrixTypes :
     for i in range(2, 5) :
         for e in range(2, 5) :
-            kPyhlslgenPrimitiveTypes += f"""template<> struct pyhlslgen<{v}{i}x{e}> {{ using type_t = {v}{i}x{e}; static constexpr bool is_valid = true; static constexpr bool is_primitive = true; static constexpr char type_name[] = "{v}{i}x{e}";  }};\n"""
+            kPyhlslgenPrimitiveTypes += f"""template<> struct pyhlslgen<{v}{i}x{e}> {{ using type_t = {v}{i}x{e}; static constexpr bool is_valid = true; static constexpr bool is_primitive = true; static constexpr bool scalar_alignment = true; static constexpr char type_name[] = "{v}{i}x{e}";  }};\n"""
+
+kPyhlslgenPrimitiveTypes += "#endif // _HLSL_TYPES_DECLARED_\n"
 
 class TLS_Data:
     def __init__(self):
@@ -294,7 +296,7 @@ def GetScope(cursor, accum : str = "") :
     return accum
 
 def RemoveHlsl(var : str) :
-    return var.replace("_pyhlslgen_cbuffer", "").replace("_pyhlslgen", "")
+    return var.replace("_pyhlslgen_uniform", "").replace("_pyhlslgen_relaxed", "").replace("_pyhlslgen_scalar", "").replace("_pyhlslgen", "")
 
 #scoped cursor name
 def GetFullName(cursor, removePyhlsl : bool = True) :
@@ -494,7 +496,7 @@ def ParseStruct(cursor, isHlslDecl : bool = False) :
                 var = ParseVar(child, False)
             continue
 
-        if not str(child.spelling).endswith("_pyhlslgen_cbuffer") and not str(child.spelling).endswith("_pyhlslgen") :
+        if not str(child.spelling).endswith("_pyhlslgen_uniform") and not str(child.spelling).endswith("_pyhlslgen_relaxed") and not str(child.spelling).endswith("_pyhlslgen_scalar") and not str(child.spelling).endswith("_pyhlslgen") :
             if not kInclude in flags or flags[kInclude] == False :
                 continue
 
@@ -612,8 +614,10 @@ def ParseCursor(cursor, forceInclude : bool = False)  -> None:
     fullName = GetFullName(cursor, False)
     if fullName == "" : return
     
-    isHlslDeclCBuffer = fullName.endswith("_pyhlslgen_cbuffer")
-    isHlslDecl = isHlslDeclCBuffer or fullName.endswith("_pyhlslgen") 
+    isHlslDeclUniform = fullName.endswith("_pyhlslgen_uniform") or fullName.endswith("_pyhlslgen")
+    isHlslDeclRelaxed = fullName.endswith("_pyhlslgen_relaxed")
+    isHlslDeclScalar = fullName.endswith("_pyhlslgen_scalar")
+    isHlslDecl = isHlslDeclRelaxed or isHlslDeclScalar or isHlslDeclUniform
     if isHlslDecl :
         fullName = RemoveHlsl(fullName)
 
@@ -650,7 +654,12 @@ def ParseCursor(cursor, forceInclude : bool = False)  -> None:
             node = ParseStruct(cursor, isHlslDecl)   
             node[ENode.Cpp] = included
             node[ENode.Hlsl] = isHlslDecl
-            node[ENode.HlslCbuffer] = isHlslDeclCBuffer 
+            if isHlslDeclRelaxed:
+                node[ENode.HlslLayout] = "relaxed"
+            elif isHlslDeclScalar:
+                node[ENode.HlslLayout] = "scalar"
+            else :
+                node[ENode.HlslLayout] = "uniform"
             AppendToStackTop(node, ENode.Structs)
             TLS().NodeList[fullName] = node
         return
@@ -970,7 +979,7 @@ def GenerateMemberFunctionInfo(node, func, infoName) :
 
     return result
 
-def CalcHlslSize(varType : str, isCbuffer : bool) :
+def PreParseHlsl(varType : str, layout : str) -> tuple[int, str, int, int, int]:
 
     #match type<n>x<m>[s] patterns
     match = re.fullmatch(rf'({"|".join(kHlslTypes)})(\d)?(?:x(\d))?(?:\[(\w+)\])?', varType)
@@ -991,25 +1000,45 @@ def CalcHlslSize(varType : str, isCbuffer : bool) :
         else :
             size = 4
 
-        if isCbuffer : #Rule 1a: Vector types are aligned according to their scalar component type.
-            alignment = size 
+        #strict ubo140?
+        #if layout == "uniform" : #Rule 1a: Vector types are aligned according to their scalar component type.
+        #    vrows = 1
+        #    
+        #    if arraySize > 1:
+        #        if size == 8 :
+        #            rows = ((rows + 1) / 2) * 2
+        #        elif size == 2 :
+        #            return 0, baseType, int(arraySize), int(rows), int(cols)
+        #        else :
+        #            rows = 4
+        #    else :
+        #        if size == 8 :
+        #            vrows = ((rows + 1) / 2) * 2
+        #        elif size == 2 :
+        #            vrows = 8
+        #        else :
+        #            vrows = 4
+        #        
+        #    if rows > 1 and cols > 1 :
+        #        rows = 4
+        #        size *= rows * cols
+        #    elif rows > 1:
+        #        size *= rows
+        #    size *= vrows
+        #    size /= rows
+        if layout == "uniform" :
             if arraySize > 1:
                 if size == 8 :
                     rows = ((rows + 1) / 2) * 2
                 elif size == 2 :
-                    return 0, 0, baseType, int(arraySize), int(rows), int(cols)
+                    return 0, baseType, int(arraySize), int(rows), int(cols)
                 else :
                     rows = 4
-                alignment = 16 #array elements are aligned to 16
-
-            if rows > 1 and cols > 1 :
-                alignment = 16 #matrices are always aligned to 16
-                rows = 4
+            if rows > 1 and cols > 1:
                 size *= rows * cols
             elif rows > 1:
                 size *= rows
         else :
-            alignment = 1
             if rows > 1 and cols > 1:
                 size *= rows * cols
             elif rows > 1:
@@ -1018,9 +1047,9 @@ def CalcHlslSize(varType : str, isCbuffer : bool) :
         if arraySize:
             size *= arraySize
 
-        return int(alignment), int(size), baseType, int(arraySize), int(rows), int(cols)
+        return int(size), baseType, int(arraySize), int(rows), int(cols)
     
-    return 0, 0, None, 1, 1, 1
+    return 0, "", 1, 1, 1
     
 #codegen: emit a hlsl node
 def CodeGenHlslNode(hlslCode, node) -> str:
@@ -1029,7 +1058,7 @@ def CodeGenHlslNode(hlslCode, node) -> str:
     if vksdk == "":
         return ""
 
-    isCbuffer = node[ENode.HlslCbuffer]
+    hlslLayout = node[ENode.HlslLayout]
     hlslTemp = f"struct {node[ENode.Name]}\n{{\n"
 
     nameSizeMap = {}
@@ -1037,7 +1066,7 @@ def CodeGenHlslNode(hlslCode, node) -> str:
     if ENode.Variables in node :
         for _, var in node[ENode.Variables].items() :
             
-            alignment, size, baseType, arraySize, rows, cols = CalcHlslSize(var[ENode.Type], isCbuffer)
+            size, baseType, arraySize, rows, cols = PreParseHlsl(var[ENode.Type], hlslLayout)
             
             nameSizeMap[var[ENode.Name]] = size
 
@@ -1061,9 +1090,11 @@ def CodeGenHlslNode(hlslCode, node) -> str:
 
     hlslTemp += "};\n"
 
-    if isCbuffer :
+    if hlslLayout == "uniform" :
         hlslTemp += f"ConstantBuffer<{node[ENode.Name]}> inBuffer;\n"
-    else :
+    elif hlslLayout == "scalar" :
+        hlslTemp += f"RWStructuredBuffer<{node[ENode.Name]}> inBuffer;\n"
+    elif hlslLayout == "relaxed" :
         hlslTemp += f"StructuredBuffer<{node[ENode.Name]}> inBuffer;\n"
 
     hlslTemp += f"RWStructuredBuffer<{node[ENode.Name]}> outBuffer;\n"
@@ -1071,7 +1102,7 @@ def CodeGenHlslNode(hlslCode, node) -> str:
     hlslTemp += "[numthreads(1,1,1)]\n"
     hlslTemp += "void main(uint d : SV_DispatchThreadId) {\n"
     hlslTemp += "\toutBuffer[d] = inBuffer"
-    if not isCbuffer :
+    if hlslLayout != "uniform" :
         hlslTemp += "[0]"
     hlslTemp += ";\n}\n"
     
@@ -1079,7 +1110,11 @@ def CodeGenHlslNode(hlslCode, node) -> str:
     with open(fileName, "wt") as file:
         file.write(hlslTemp)
 
-    result = subprocess.run([f"{vksdk}\\bin\\dxc.exe", "-spirv", "-fspv-target-env=vulkan1.3", "-fspv-reflect", "-fvk-use-dx-layout", "-enable-16bit-types", "-T cs_6_2", "-E main", f"-Fo {fileName}.spv", fileName], capture_output=True)
+    if hlslLayout == "scalar" :
+        vk_layout = "-fvk-use-scalar-layout"
+    else :
+        vk_layout = "-fvk-use-dx-layout"
+    result = subprocess.run([f"{vksdk}\\bin\\dxc.exe", "-spirv", "-fspv-target-env=vulkan1.3", "-fspv-reflect", vk_layout, "-enable-16bit-types", "-T cs_6_2", "-E main", f"-Fo {fileName}.spv", fileName], capture_output=True)
     if os.path.exists(f"{fileName}"):
         os.remove(f"{fileName}")
 
@@ -1098,7 +1133,7 @@ def CodeGenHlslNode(hlslCode, node) -> str:
     parsed = json.loads(result.stdout.decode())
 
     typePrefix = ""
-    if isCbuffer :
+    if hlslLayout == "uniform" :
         typePrefix = "ConstantBuffer."
 
     expectedType = None
@@ -1112,6 +1147,7 @@ def CodeGenHlslNode(hlslCode, node) -> str:
     
     offset = 0
     padNum = 0
+    size = 0
 
     cppNodeName : str = node[ENode.FullName][len(node[ENode.Namespace]):].lstrip('::').replace("::", "_")
 
@@ -1135,7 +1171,7 @@ def CodeGenHlslNode(hlslCode, node) -> str:
     for member in expectedType["members"]:
 
         if offset != member["offset"]:
-            applyPad(int(member["offset"]) - offset)
+            applyPad(abs(int(member["offset"]) - offset))
 
         newDecl = "\t"
 
@@ -1159,13 +1195,17 @@ def CodeGenHlslNode(hlslCode, node) -> str:
             
         offset += size
 
+    uniform_alignment = True if hlslLayout == "uniform" else False
+    scalar_alignment = True if hlslLayout == "scalar" else False
 
-    cbuffer_alignment = "true" if isCbuffer or padNum == 0 else "false"
+    if not scalar_alignment :
+        if offset % 16 != 0 :
+            applyPad(16 - offset % 16)
+
     hlslResult = f"""
 struct {cppNodeName}
 {{
-{hlslResult}
-}};
+{hlslResult}}}; // Size: {offset}
 """
     
     hlslDecl = f"""
@@ -1195,10 +1235,12 @@ template<> struct pyhlslgen<{cppNodeName}>
     using type_t = {cppNodeName};
     static constexpr bool is_valid = true;
     static constexpr bool is_primitive = false;
-    static constexpr bool cbuffer_alignment = {cbuffer_alignment};
+    static constexpr bool uniform_alignment = {"true" if uniform_alignment else "false"};
+    static constexpr bool relaxed_alignment = {"true" if not uniform_alignment and not scalar_alignment else "false"};
+    static constexpr bool scalar_alignment = {"true" if scalar_alignment else "false"};
     static constexpr char type_name[] = "{cppNodeName}"; 
     static constexpr char struct_decl[] = R"-({hlslDecl})-"; 
-    static constexpr char cbuffer_decl[] = R"-({hlslResult.replace(f"struct {cppNodeName}", f"cbuffer {cppNodeName}_")})-";
+    static constexpr char uniform_decl[] = R"-({hlslResult.replace(f"struct {cppNodeName}", f"cbuffer {cppNodeName}_")})-";
 }};
 {closeNamespaces}
 #else
@@ -1659,7 +1701,9 @@ template<typename T = void> struct pyhlslgen
     using type_t = T; 
     static constexpr bool is_valid = false;
     static constexpr bool is_primitive = false;
-    static constexpr bool cbuffer_alignment = false;
+    static constexpr bool uniform_alignment = false;
+    static constexpr bool relaxed_alignment = false;
+    static constexpr bool scalar_alignment = false;
     static constexpr char type_name[] = ""; 
     static constexpr char full_decl[] = ""; 
     static constexpr char struct_decl[] = ""; 
