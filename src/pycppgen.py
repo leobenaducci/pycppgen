@@ -614,8 +614,8 @@ def ParseCursor(cursor, forceInclude : bool = False)  -> None:
     fullName = GetFullName(cursor, False)
     if fullName == "" : return
     
-    isHlslDeclUniform = fullName.endswith("_pyhlslgen_uniform") or fullName.endswith("_pyhlslgen")
-    isHlslDeclRelaxed = fullName.endswith("_pyhlslgen_relaxed")
+    isHlslDeclUniform = fullName.endswith("_pyhlslgen_uniform")
+    isHlslDeclRelaxed = fullName.endswith("_pyhlslgen_relaxed") or fullName.endswith("_pyhlslgen")
     isHlslDeclScalar = fullName.endswith("_pyhlslgen_scalar")
     isHlslDecl = isHlslDeclRelaxed or isHlslDeclScalar or isHlslDeclUniform
     if isHlslDecl :
@@ -1062,6 +1062,7 @@ def CodeGenHlslNode(hlslCode, node) -> str:
     hlslTemp = f"struct {node[ENode.Name]}\n{{\n"
 
     nameSizeMap = {}
+    member = ""
 
     if ENode.Variables in node :
         for _, var in node[ENode.Variables].items() :
@@ -1086,6 +1087,11 @@ def CodeGenHlslNode(hlslCode, node) -> str:
                 print(f"HLSL Error: Unsupported type {newDecl.replace("\t", " ")} in {node[ENode.Name]}")
                 continue
 
+            if member == "" :
+                member = var[ENode.Name]
+                if arraySize > 1 :
+                    member += "[0]"
+
             hlslTemp += newDecl + ";\n"
 
     hlslTemp += "};\n"
@@ -1101,10 +1107,10 @@ def CodeGenHlslNode(hlslCode, node) -> str:
     hlslTemp += "\n"
     hlslTemp += "[numthreads(1,1,1)]\n"
     hlslTemp += "void main(uint d : SV_DispatchThreadId) {\n"
-    hlslTemp += "\toutBuffer[d] = inBuffer"
+    hlslTemp += f"\toutBuffer[d].{member} = inBuffer"
     if hlslLayout != "uniform" :
         hlslTemp += "[0]"
-    hlslTemp += ";\n}\n"
+    hlslTemp += f".{member};\n}}\n"
     
     fileName = os.path.abspath(f"tmp__{node[ENode.Name]}.tmp_hlsl")
     with open(fileName, "wt") as file:
