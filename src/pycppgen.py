@@ -14,6 +14,7 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from clang.cindex import CursorKind
 from clang.cindex import AccessSpecifier
+from pyhlslgen import *
 
 DebugMode = False
 
@@ -104,85 +105,6 @@ ParseCommentsMode = {
     EKind.TemplateTemplateParameter : EParseComments.BeforeDecl,
 }
 
-kHlslTypes: Final[list]= ["int", "uint", "float", "bool", "double", "int64_t", "uint64_t", "float16_t", "int16_t", "uint16_t", "int8_t", "uint8_t"]
-kPyHlslVectorTypes: Final[list]= ["int", "uint", "float", "bool", "double", "int64_t", "uint64_t", "int16_t", "uint16_t", "int8_t", "uint8_t"]
-kPyHlslMatrixTypes: Final[list]= ["int", "uint", "float", "bool", "double", "int64_t", "uint64_t"]
-
-def GenHlslDeclarations() :
-    result = "\n"
-    for t in kHlslTypes :
-        for m in range(2, 5) :
-            for n in range(2, 5) :
-                result += f"using {t}{m}x{n} = float;\n"
-            result += f"using {t}{m} = float;\n"
-    result += "using float16_t = float;\n"
-    result += "using uint = unsigned int;\n"
-    result += "\n"
-
-    return result
-
-def GenVkToHlslMappings() :
-    vkToHlsl = {}
-
-    for t in kHlslTypes :
-        vkToHlsl[t] = t
-
-    for r in range(2, 5) :
-        vkToHlsl[f"ivec{r}"] = f"int{r}"
-        vkToHlsl[f"uvec{r}"] = f"uint{r}"
-        vkToHlsl[f"vec{r}"] = f"float{r}"
-        vkToHlsl[f"bvec{r}"] = f"bool{r}"
-        vkToHlsl[f"dvec{r}"] = f"double{r}"
-        vkToHlsl[f"u64vec{r}"] = f"uint64_t{r}"        
-        vkToHlsl[f"i64vec{r}"] = f"int64_t{r}"        
-        vkToHlsl[f"f16vec{r}"] = f"float16_t{r}"
-        vkToHlsl[f"i16vec{r}"] = f"int16_t{r}"
-        vkToHlsl[f"u16vec{r}"] = f"uint16_t{r}"
-        vkToHlsl[f"i8vec{r}"] = f"int8_t{r}"
-        vkToHlsl[f"u8vec{r}"] = f"uint8_t{r}"
-
-        vkToHlsl[f"mat{r}"] = f"float{r}x{r}"
-        vkToHlsl[f"imat{r}"] = f"int{r}x{r}"
-        vkToHlsl[f"umat{r}"] = f"uint{r}x{r}"
-        vkToHlsl[f"bmat{r}"] = f"bool{r}x{r}"
-        vkToHlsl[f"dmat{r}"] = f"double{r}x{r}"
-        vkToHlsl[f"u64mat{r}"] = f"uint64_t{r}x{r}"
-        vkToHlsl[f"f16mat{r}"] = f"float16_t{r}x{r}"
-        vkToHlsl[f"i16mat{r}"] = f"int16_t{r}x{r}"
-        vkToHlsl[f"u16mat{r}"] = f"uint16_t{r}x{r}"
-        vkToHlsl[f"i8mat{r}"] = f"int8_t{r}x{r}"
-        vkToHlsl[f"u8mat{r}"] = f"uint8_t{r}x{r}"
-        for c in range(2, 5) :
-            vkToHlsl[f"mat{r}x{c}"] = f"float{r}x{c}"
-            vkToHlsl[f"dmat{r}x{c}"] = f"double{r}x{c}"
-            vkToHlsl[f"imat{r}x{c}"] = f"int{r}x{c}"
-            vkToHlsl[f"umat{r}x{c}"] = f"uint{r}x{c}"
-            vkToHlsl[f"bmat{r}x{c}"] = f"bool{r}x{c}"
-            vkToHlsl[f"u64mat{r}x{c}"] = f"uint64_t{r}x{c}"
-            vkToHlsl[f"f16mat{r}x{c}"] = f"float16_t{r}x{c}"
-            vkToHlsl[f"i16mat{r}x{c}"] = f"int16_t{r}x{c}"
-            vkToHlsl[f"u16mat{r}x{c}"] = f"uint16_t{r}x{c}"
-            vkToHlsl[f"i8mat{r}x{c}"] = f"int8_t{r}x{c}"
-            vkToHlsl[f"u8mat{r}x{c}"] = f"uint8_t{r}x{c}"
-
-    return vkToHlsl
-
-kHlslDeclarations : Final[str] = GenHlslDeclarations()
-kVkToHlsl : Final[dict] = GenVkToHlslMappings()
-kPyhlslgenPrimitiveTypes : str = "#ifdef _HLSL_TYPES_DECLARED_\n"
-
-for v in kPyHlslVectorTypes :
-    kPyhlslgenPrimitiveTypes += f"""template<> struct pyhlslgen<{v}> {{ using type_t = {v}; static constexpr bool is_valid = true; static constexpr bool is_primitive = true; static constexpr bool scalar_alignment = true; static constexpr char type_name[] = "{v}";  }};\n"""
-    for i in range(2, 5) :
-        kPyhlslgenPrimitiveTypes += f"""template<> struct pyhlslgen<{v}{i}> {{ using type_t = {v}{i}; static constexpr bool is_valid = true; static constexpr bool is_primitive = true; static constexpr bool scalar_alignment = true; static constexpr char type_name[] = "{v}{i}";  }};\n"""
-
-for v in kPyHlslMatrixTypes :
-    for i in range(2, 5) :
-        for e in range(2, 5) :
-            kPyhlslgenPrimitiveTypes += f"""template<> struct pyhlslgen<{v}{i}x{e}> {{ using type_t = {v}{i}x{e}; static constexpr bool is_valid = true; static constexpr bool is_primitive = true; static constexpr bool scalar_alignment = true; static constexpr char type_name[] = "{v}{i}x{e}";  }};\n"""
-
-kPyhlslgenPrimitiveTypes += "#endif // _HLSL_TYPES_DECLARED_\n"
-
 class TLS_Data:
     def __init__(self):
         self.NodesToInclude: list[str] = []
@@ -203,11 +125,6 @@ def TLS() -> TLS_Data:
 FilesWithPyCppGenTag = dict()
 FilesWithPyHlslGenTag = dict()
 TLS_Dict = {}
-PrintLock = threading.Lock()
-
-def atomic_print(text : str) :
-    with PrintLock :
-        print(f"pycppgen: {text}")
 
 #try to parse the comments before or after the cursor (hacky but, cursor.raw_comments isn't working as expected)
 def ParseComments(cursor, kind : str = EParseComments.BeforeDecl):
@@ -1702,21 +1619,8 @@ struct function_parameter_info {
 	std::string_view DefaultValue;
 };
 
-template<typename T = void> struct pyhlslgen 
-{
-    using type_t = T; 
-    static constexpr bool is_valid = false;
-    static constexpr bool is_primitive = false;
-    static constexpr bool uniform_alignment = false;
-    static constexpr bool relaxed_alignment = false;
-    static constexpr bool scalar_alignment = false;
-    static constexpr char type_name[] = ""; 
-    static constexpr char full_decl[] = ""; 
-    static constexpr char struct_decl[] = ""; 
-    static constexpr char cbuffer_decl[] = "";
-};
+""" + kPyhlslgenHeader + """
 
-""" + kPyhlslgenPrimitiveTypes + """
 template<typename T = void> struct pycppgen { static constexpr bool is_valid() { return false; } };
 template<> struct pycppgen<void> 
 {
