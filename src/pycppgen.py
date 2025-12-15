@@ -1164,9 +1164,9 @@ def CodeGenHlslNode(hlslCode, node) -> str:
         while padSize > 0 :
             pad = min(padSize, 16)
             if pad % 4 != 0 :
-                newDecl = f"\tuint16_t{pad >> 1} _pad{padNum};"
+                newDecl = f"\tuint16_t{pad >> 1} _pad{padNum}_{node[ENode.Name]};"
             else :
-                newDecl = f"\tuint{pad >> 2} _pad{padNum};"
+                newDecl = f"\tuint{pad >> 2} _pad{padNum}_{node[ENode.Name]};"
             while (len(newDecl.replace("\t", "    ")) / 4) * 4 < 40 : newDecl += '\t'
             newDecl += f"// Offset: {offset} - Size: {pad}\n"
             padNum = padNum + 1
@@ -1176,7 +1176,7 @@ def CodeGenHlslNode(hlslCode, node) -> str:
 
     for member in expectedType["members"]:
 
-        if offset != member["offset"]:
+        if offset != member["offset"] and hlslLayout != "scalar":
             applyPad(abs(int(member["offset"]) - offset))
 
         newDecl = "\t"
@@ -1204,7 +1204,7 @@ def CodeGenHlslNode(hlslCode, node) -> str:
     uniform_alignment = True if hlslLayout == "uniform" else False
     scalar_alignment = True if hlslLayout == "scalar" else False
 
-    if not scalar_alignment :
+    if not uniform_alignment and not scalar_alignment :
         if offset % 16 != 0 :
             applyPad(16 - offset % 16)
 
