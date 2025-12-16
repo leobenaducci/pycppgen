@@ -2,7 +2,7 @@ from common import *
 
 kHlslTypes: Final[list]= ["int", "uint", "float", "bool", "double", "int64_t", "uint64_t", "float16_t", "int16_t", "uint16_t", "int8_t", "uint8_t"]
 kPyHlslVectorTypes: Final[list]= ["int", "uint", "float", "bool", "double", "int64_t", "uint64_t", "int16_t", "uint16_t", "int8_t", "uint8_t"]
-kPyHlslMatrixTypes: Final[list]= ["int", "uint", "float", "bool", "double", "int64_t", "uint64_t"]
+kPyHlslMatrixTypes: Final[list]= ["int", "uint", "float", "double", "int64_t", "uint64_t"]
 
 def GenHlslDeclarations() :
     result = "\n"
@@ -81,7 +81,7 @@ template<typename T = void> struct pyhlslgen
     static constexpr char cbuffer_decl[] = "";
 };
 
-#ifdef _HLSL_TYPES_DECLARED_
+#ifndef _HLSL_TYPES_DECLARED_
 """
 
 for v in kPyHlslVectorTypes :
@@ -111,37 +111,6 @@ def GetHlslAlignment(var : str) :
         return "relaxed"
     
     return "NONE"
-
-#parse struct/class
-def ParseHlslStruct(cursor) :
-    kind = EGlobals.kInvalid
-    if cursor.kind == CursorKind.CLASS_TEMPLATE or cursor.kind == CursorKind.CLASS_DECL :
-        return
-    kind = EKind.Struct
-
-    node = PushNode(cursor, kind)
-    node[ENode.MetaTemplateDecl] = ""
-    node[ENode.Functions] = {}
-    node[ENode.MemberAttributesOverride] = {}
-
-    for child in cursor.get_children() :
-        
-        #inheritance
-        if child.kind == CursorKind.CXX_BASE_SPECIFIER :
-            if child.referenced :
-                childFullName = GetFullName(child.referenced)
-                ParseComments(child.referenced, EKind.Unknown)
-                AppendToStackTop({ENode.FullName: childFullName}, ENode.Parents)
-            continue
-
-        #member variables (field)
-        if child.kind == CursorKind.FIELD_DECL :
-            ParseVar(child, False)
-            continue
-
-    PopNode()
-
-    return node
 
 def PreParseHlsl(varType : str, layout : str) -> tuple[int, str, int, int, int]:
 
