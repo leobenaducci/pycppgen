@@ -1,18 +1,18 @@
 import os
+import re
+import subprocess
+import json
 import pathlib
 import subprocess
 import sys
-import clang.cindex
 import re
 import inspect
-import threading
 import json
 import contextvars
+import threading
 from typing import Final, Any
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
-from clang.cindex import CursorKind
-from clang.cindex import AccessSpecifier
 
 DebugMode = False
 
@@ -105,6 +105,14 @@ ParseCommentsMode = {
     EKind.TemplateTemplateParameter : EParseComments.BeforeDecl,
 }
 
+class TLS_Data:
+    def __init__(self):
+        self.NodesToInclude: list[str] = []
+        self.NodeList: dict[str, Any] = {}
+        self.NodeTree: dict[str, Any] = {}
+        self.NodeStack: list[dict[str, Any]] = [self.NodeTree]
+        self.pycppdefine: str = ""
+    
 PrintLock = threading.Lock()
 
 def atomic_print(text : str) :

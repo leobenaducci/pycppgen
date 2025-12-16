@@ -1,119 +1,9 @@
-import os
-import pathlib
-import subprocess
-import sys
 import clang.cindex
-import re
-import inspect
-import itertools
-import threading
-import json
-import contextvars
-from typing import Final, Any
-from concurrent.futures import ThreadPoolExecutor
-from dataclasses import dataclass
 from clang.cindex import CursorKind
 from clang.cindex import AccessSpecifier
 from pyhlslgen import *
+from common import *
 
-DebugMode = False
-
-@dataclass(frozen=True, slots=True)
-class _Kinds:
-    Unknown: Final[str] = "kind_unknown"
-    Namespace: Final[str] = "kind_namespace"
-    Alias: Final[str] = "kind_alias"
-    Enum: Final[str] = "kind_enum"
-    EnumValue: Final[str] = "kind_enum_value"
-    ClassTemplate: Final[str] = "kind_class_template"
-    Class: Final[str] = "kind_class"
-    Struct: Final[str] = "kind_struct"
-    Function: Final[str] = "kind_function"
-    Parameter: Final[str] = "kind_parameter"
-    Variable: Final[str] = "kind_variable"
-    FreeFunction: Final[str] = "kind_free_function"
-    FreeVariable: Final[str] = "kind_free_variable"
-    TemplateTypeParameter: Final[str] = "kind_template_type_parameter"
-    TemplateNonTypeParameter: Final[str] = "kind_template_non_type_parameter"
-    TemplateTemplateParameter: Final[str] = "kind_template_template_parameter"
-
-@dataclass(frozen=True, slots=True)
-class _NodeType:
-    Name: Final[str] = "name"
-    FullName: Final[str] = "full_name"
-    Kind: Final[str] = "kind"
-    Type: Final[str] = "type"
-    UnderlyingType: Final[str] = "underlying_type"
-    Access: Final[str] = "access"
-    Scope: Final[str] = "scope"
-    Variables: Final[str] = "variables"
-    StaticVariables: Final[str] = "static_variables"
-    Functions: Final[str] = "functions"
-    StaticFunctions: Final[str] = "static_functions"
-    FreeVariables: Final[str] = "free_variables"
-    FreeFunctions: Final[str] = "free_functions"
-    Parents: Final[str] = "parents"
-    Enums: Final[str] = "enums"
-    Structs: Final[str] = "structs"
-    Namespace: Final[str] = "namespace"
-    Namespaces: Final[str] = "namespaces"
-    Parameters: Final[str] = "parameters"
-    EnumValues: Final[str] = "enum_values"
-    MetaTemplateDecl: Final[str] = "meta_template_decl"
-    ReturnType: Final[str] = "return_type"
-    Attributes: Final[str] = "attributes"
-    DefaultValue: Final[str] = "default_value"
-    MemberAttributesOverride: Final[str] = "member_attribs_override"
-    Const: Final[str] = "is_const"
-    Cpp: Final[str] = "cpp"
-    Hlsl: Final[str] = "hlsl"
-    HlslLayout: Final[str] = "hlsl_layout"
-
-@dataclass(frozen=True, slots=True)
-class _ParseCommentsType:
-    BeforeDecl: Final[str] = "comments_before_decl"
-    AfterDecl: Final[str] = "comments_after_decl"
-
-# Add to global constants
-kInvalid: Final[str] = "invalid"
-kInclude: Final[str] = "include"
-kSerialize: Final[str] = "serialize"
-kExclude: Final[str] = "exclude"
-
-kHlsliPath: Final[str] = "../../shaders/Types"
-
-EKind = _Kinds()          # use K.Unknown, K.Class … everywhere
-ENode = _NodeType()
-EParseComments = _ParseCommentsType()
-
-ParseCommentsMode = {
-    EKind.Unknown : EParseComments.BeforeDecl,
-    EKind.Namespace : EParseComments.BeforeDecl,
-    EKind.Alias : EParseComments.BeforeDecl,
-    EKind.Enum : EParseComments.BeforeDecl,
-    EKind.EnumValue : EParseComments.AfterDecl,
-    EKind.ClassTemplate : EParseComments.BeforeDecl,
-    EKind.Class : EParseComments.BeforeDecl,
-    EKind.Struct : EParseComments.BeforeDecl,
-    EKind.Function : EParseComments.BeforeDecl,
-    EKind.Parameter : EParseComments.AfterDecl,
-    EKind.Variable : EParseComments.BeforeDecl,
-    EKind.FreeFunction : EParseComments.BeforeDecl,
-    EKind.FreeVariable : EParseComments.BeforeDecl,
-    EKind.TemplateTypeParameter : EParseComments.BeforeDecl,
-    EKind.TemplateNonTypeParameter : EParseComments.BeforeDecl,
-    EKind.TemplateTemplateParameter : EParseComments.BeforeDecl,
-}
-
-class TLS_Data:
-    def __init__(self):
-        self.NodesToInclude: list[str] = []
-        self.NodeList: dict[str, Any] = {}
-        self.NodeTree: dict[str, Any] = {}
-        self.NodeStack: list[dict[str, Any]] = [self.NodeTree]
-        self.pycppdefine: str = ""
-
-_ctx: contextvars.ContextVar[TLS_Data] = contextvars.ContextVar("tls")
 def TLS() -> TLS_Data:
     try:
         return _ctx.get()
@@ -121,7 +11,9 @@ def TLS() -> TLS_Data:
         data = TLS_Data()
         _ctx.set(data)
         return data
-    
+
+_ctx: contextvars.ContextVar[TLS_Data] = contextvars.ContextVar("tls")
+
 FilesWithPyCppGenTag = dict()
 FilesWithPyHlslGenTag = dict()
 TLS_Dict = {}
@@ -195,11 +87,11 @@ def ParseComments(cursor, kind : str = EParseComments.BeforeDecl):
             if len(kv) > 0 : key = kv[0].strip()
             if len(kv) > 1 : value = kv[1].strip()
 
-            if key.lower() == kExclude : result[kInclude] = str(bool(value != None and value == True))
+            if key.lower() == EGlobals.kExclude : result[EGlobals.kInclude] = str(bool(value != None and value == True))
             else : result[key] = value
 
-    if oneMatch and not kExclude.casefold() in result :
-        result[kInclude] = True
+    if oneMatch and not EGlobals.kExclude.casefold() in result :
+        result[EGlobals.kInclude] = True
 
     return result
     
@@ -235,7 +127,7 @@ def AppendToStackTop(node, node_type : str, appendToList : bool = False) :
         TLS().NodeList[node[ENode.FullName]] = node
 
 #common node push code
-def ParseNode(cursor, kind : str = kInvalid) :
+def ParseNode(cursor, kind : str = EGlobals.kInvalid) :
     node = dict()
     node[ENode.Name] = RemoveHlsl(str(cursor.spelling))
     node[ENode.FullName] = GetFullName(cursor)
@@ -262,7 +154,7 @@ def ParseNode(cursor, kind : str = kInvalid) :
 
     return node
 
-def PushNode(cursor, kind : str = kInvalid) :
+def PushNode(cursor, kind : str = EGlobals.kInvalid) :
     node = ParseNode(cursor, kind)
     node[ENode.Cpp] = True
     TLS().NodeStack.append(node)
@@ -352,7 +244,7 @@ def ParseVar(cursor, isFreeVariable : bool = False):
 
 #parse struct/class
 def ParseStruct(cursor, isHlslDecl : bool = False) :
-    kind = kInvalid
+    kind = EGlobals.kInvalid
     if cursor.kind == CursorKind.CLASS_TEMPLATE :
         kind = EKind.ClassTemplate
     elif cursor.kind == CursorKind.CLASS_DECL :
@@ -372,8 +264,8 @@ def ParseStruct(cursor, isHlslDecl : bool = False) :
             if child.referenced :
                 childFullName = GetFullName(child.referenced)
                 flags = ParseComments(child.referenced, EKind.Unknown)
-                if kInclude in flags: 
-                    if str(flags[kInclude]) == "False" :
+                if EGlobals.kInclude in flags: 
+                    if str(flags[EGlobals.kInclude]) == "False" :
                         continue
                 elif not childFullName in TLS().NodesToInclude :
                     continue
@@ -383,7 +275,7 @@ def ParseStruct(cursor, isHlslDecl : bool = False) :
         #template parameters
         if child.kind == CursorKind.TEMPLATE_TYPE_PARAMETER or child.kind == CursorKind.TEMPLATE_NON_TYPE_PARAMETER or child.kind == CursorKind.TEMPLATE_TEMPLATE_PARAMETER:
             
-            kind = kInvalid
+            kind = EGlobals.kInvalid
             if child.kind == CursorKind.TEMPLATE_TYPE_PARAMETER :
                 kind = EKind.TemplateTypeParameter
             elif child.kind == CursorKind.TEMPLATE_NON_TYPE_PARAMETER :
@@ -409,12 +301,12 @@ def ParseStruct(cursor, isHlslDecl : bool = False) :
 
         #member variables (field)
         if child.kind == CursorKind.FIELD_DECL:
-            if (kInclude in flags and flags[kInclude] == True) or isHlslDecl :
+            if (EGlobals.kInclude in flags and flags[EGlobals.kInclude] == True) or isHlslDecl :
                 var = ParseVar(child, False)
             continue
 
         if not str(child.spelling).endswith("_pyhlslgen_uniform") and not str(child.spelling).endswith("_pyhlslgen_relaxed") and not str(child.spelling).endswith("_pyhlslgen_scalar") and not str(child.spelling).endswith("_pyhlslgen") :
-            if not kInclude in flags or flags[kInclude] == False :
+            if not EGlobals.kInclude in flags or flags[EGlobals.kInclude] == False :
                 continue
 
         #class functions
@@ -455,7 +347,7 @@ def ParseStruct(cursor, isHlslDecl : bool = False) :
 
 #parse struct/class
 def ParseHlslStruct(cursor) :
-    kind = kInvalid
+    kind = EGlobals.kInvalid
     if cursor.kind == CursorKind.CLASS_TEMPLATE or cursor.kind == CursorKind.CLASS_DECL :
         return
     kind = EKind.Struct
@@ -560,8 +452,8 @@ def ParseCursor(cursor, forceInclude : bool = False)  -> None:
     included = True
     if not forceInclude :
         flags = ParseComments(cursor, EKind.Unknown)
-        if kInclude in flags : 
-            if str(flags[kInclude]) == "False" :
+        if EGlobals.kInclude in flags : 
+            if str(flags[EGlobals.kInclude]) == "False" :
                 included = False
         elif not fullName in TLS().NodesToInclude :
             included = False
@@ -610,7 +502,7 @@ def GetOutputFilePath(filePath : str, ext : str = "h") :
     outputPath += f".gen.{ext}"
 
     if ext == "hlsli" :
-        outputPath = pathlib.Path(ProjectPath).joinpath(kHlsliPath).joinpath(pathlib.Path(outputPath).name)
+        outputPath = pathlib.Path(ProjectPath).joinpath(EGlobals.kHlsliPath).joinpath(pathlib.Path(outputPath).name)
 
     return ResolvePath(str(outputPath))
 
@@ -740,7 +632,7 @@ def CodeGenOutputAttributes(node, depth : int = 0) -> str:
         result = "{\n"
 
         for k, v in attribs.items() :
-            if k == kInclude : continue
+            if k == EGlobals.kInclude : continue
             result += "\t" * depth
             result += "{ \"" + k + "\", "
             if len(str(v)) > 0 :
@@ -1366,7 +1258,7 @@ def CodeGenOutputNode(node) :
         if ENode.Variables in node and len(node[ENode.Variables]) > 0 :
             #serialize the values
             for _, var in node[ENode.Variables].items() :
-                if kSerialize in var[ENode.Attributes] and (var[ENode.Access] == str(AccessSpecifier.PUBLIC) or var[ENode.Access] == str(AccessSpecifier.PROTECTED)) :
+                if EGlobals.kSerialize in var[ENode.Attributes] and (var[ENode.Access] == str(AccessSpecifier.PUBLIC) or var[ENode.Access] == str(AccessSpecifier.PROTECTED)) :
                     hppCode += f"\t\tresult[\"{var[ENode.Name]}\"] = static_cast<const pycppgen_t*>(obj)->get_{var[ENode.Name]}();\n"
         hppCode += "\t\treturn true;\n"
         hppCode += "\t}\n\n"
@@ -1377,7 +1269,7 @@ def CodeGenOutputNode(node) :
                 hppCode += f"\t\tpycppgen<{parent}>::parse(data, obj);\n"
         if ENode.Variables in node and len(node[ENode.Variables]) > 0 :
             for _, var in node[ENode.Variables].items() :
-                if kSerialize in var[ENode.Attributes] and (var[ENode.Access] == str(AccessSpecifier.PUBLIC) or var[ENode.Access] == str(AccessSpecifier.PROTECTED)) :
+                if EGlobals.kSerialize in var[ENode.Attributes] and (var[ENode.Access] == str(AccessSpecifier.PUBLIC) or var[ENode.Access] == str(AccessSpecifier.PROTECTED)) :
                     hppCode += "\t\tif (data.contains(\"" + var[ENode.Name]+ "\"))\n"
                     hppCode += "\t\t\tstatic_cast<pycppgen_t*>(obj)->set_" + var[ENode.Name] + "(data[\"" + var[ENode.Name]+ "\"]);\n"
         hppCode += "\t\treturn true;\n"
@@ -1765,7 +1657,7 @@ def CodeGenGlobal(path : str) :
     code += f"\tconst auto hashCode = obj ? typeid(*obj).hash_code() : 0;\n"
     code += "\tif (false) {}\n"
     for _, node in TLS().NodeList.items() :
-        if ENode.Cpp in node and node[ENode.Cpp] and (node[ENode.Kind] == EKind.Class or node[ENode.Kind] == EKind.Struct) and kSerialize in node[ENode.Attributes] :
+        if ENode.Cpp in node and node[ENode.Cpp] and (node[ENode.Kind] == EKind.Class or node[ENode.Kind] == EKind.Struct) and EGlobals.kSerialize in node[ENode.Attributes] :
             code += f"\telse if (hashCode == typeid({node[ENode.FullName]}).hash_code())\n"
             code += f"\t\treturn pycppgen<{node[ENode.FullName]}>::dump(result, (const {node[ENode.FullName]}*)obj);\n"
     code += "\treturn false;\n"
@@ -1776,7 +1668,7 @@ def CodeGenGlobal(path : str) :
     code += f"\tconst auto hashCode = obj ? typeid(*obj).hash_code() : 0;\n"
     code += "\tif (false) {}\n"
     for _, node in TLS().NodeList.items() :
-        if ENode.Cpp in node and node[ENode.Cpp] and (node[ENode.Kind] == EKind.Class or node[ENode.Kind] == EKind.Struct) and kSerialize in node[ENode.Attributes] :
+        if ENode.Cpp in node and node[ENode.Cpp] and (node[ENode.Kind] == EKind.Class or node[ENode.Kind] == EKind.Struct) and EGlobals.kSerialize in node[ENode.Attributes] :
             code += f"\telse if (hashCode == typeid({node[ENode.FullName]}).hash_code())\n"
             code += f"\t\treturn pycppgen<{node[ENode.FullName]}>::parse(data, (const {node[ENode.FullName]}*)obj);\n"
     code += "\treturn false;\n"

@@ -81,7 +81,7 @@ template<typename T = void> struct pyhlslgen
     static constexpr char cbuffer_decl[] = "";
 };
 
-#ifndef _HLSL_TYPES_DECLARED_
+#ifdef _HLSL_TYPES_DECLARED_
 """
 
 for v in kPyHlslVectorTypes :
