@@ -17,10 +17,11 @@ void main(uint dispatchThreadId : SV_DispatchThreadId)
 */
 
 // ubo430 layout (Uniform Buffer default)
-struct UBO_pyhlslgen
+struct UBO_pyhlslgen_uniform
 {
-    float3 pos;   // offset 0, size 12, BUT aligned to 16
-    float2  scale; // offset 16 (not 12!), size 4
+    float A;
+    float2x2 H[16];
+    float B;
 };
 
 
