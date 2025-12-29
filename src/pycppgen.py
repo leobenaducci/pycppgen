@@ -501,7 +501,7 @@ def GetOutputFilePath(filePath : str, ext : str = "h") :
     outputPath = filePath[:extStart]
     outputPath += f".gen.{ext}"
 
-    if ext == "hlsli" :
+    if ext == kHlslExtension :
         outputPath = pathlib.Path(ProjectPath).joinpath(EGlobals.kHlsliPath).joinpath(pathlib.Path(outputPath).name)
 
     return ResolvePath(str(outputPath))
@@ -1167,7 +1167,7 @@ def CodeGen(filePath : str) :
 
     hppFile = GetOutputFilePath(filePath, "h")
     cppFile = GetOutputFilePath(filePath, "cpp")
-    hlslFile = GetOutputFilePath(filePath, "hlsli")
+    hlslFile = GetOutputFilePath(filePath, kHlslExtension)
     
     if hppCode == "" :
         if os.path.exists(hppFile) :
@@ -1453,7 +1453,7 @@ def IsFileUpToDate(src : str | None, dst : str | None) :
 
 def IsOutputUpToDate(file : str) :
     if file in FilesWithPyHlslGenTag :
-        if not IsFileUpToDate(file, GetOutputFilePath(file, "hlsli")) :
+        if not IsFileUpToDate(file, GetOutputFilePath(file, kHlslExtension)) :
             return False
 
     return IsFileUpToDate(file, GetOutputFilePath(file))

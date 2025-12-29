@@ -1,5 +1,6 @@
 from common import *
 
+kHlslExtension : Final[str] = "hlsli"
 kHlslTypes: Final[list]= ["int", "uint", "float", "bool", "double", "int64_t", "uint64_t", "float16_t", "int16_t", "uint16_t", "int8_t", "uint8_t"]
 kPyHlslVectorTypes: Final[list]= ["int", "uint", "float", "bool", "double", "int64_t", "uint64_t", "int16_t", "uint16_t", "int8_t", "uint8_t"]
 kPyHlslMatrixTypes: Final[list]= ["int", "uint", "float", "double", "int64_t", "uint64_t"]
