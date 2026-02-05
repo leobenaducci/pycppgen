@@ -18,6 +18,6 @@ enum class EAnotherEnum : unsigned
     Zero,
     One,
     Two,
-    Three,
+    Three, //$[[pycppgen hidden]
     COUNT, //$[[pycppgen hidden]
 };
