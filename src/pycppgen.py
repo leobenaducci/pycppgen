@@ -1491,7 +1491,7 @@ def IsFileDifferent(file, content) :
     
     return fileContent != content
 
-def ProcessFile(file : str, compilerOptions) :
+def ProcessFile(file : str, compilerOptions, cacheFileTime: float) :
     global OutdatedFiles, FilesToCodeGen, PerFileData
 
     file = ResolvePath(file)
@@ -1504,11 +1504,7 @@ def ProcessFile(file : str, compilerOptions) :
     if not "IncludedFiles" in PerFileData[file] :
         PerFileData[file]["IncludedFiles"] = []
 
-    fileTime = 0
-    if os.path.exists(GetOutputFilePath(file)) :
-        fileTime = os.path.getmtime(GetOutputFilePath(file))
-
-    isOutdated = file in OutdatedFiles
+    isOutdated = file in OutdatedFiles or not os.path.exists(GetOutputFilePath(file))
     needsCodeGen = isOutdated
     needsParseTU = False
 
@@ -1529,7 +1525,7 @@ def ProcessFile(file : str, compilerOptions) :
         PerFileData[file]["IncludedFiles"] = list(set(includedFiles))
 
     for f in PerFileData[file]["IncludedFiles"] :
-        if not f.endswith("pycppgen.h") and os.path.getmtime(f) > fileTime :
+        if not f.endswith("pycppgen.h") and os.path.getmtime(f) > cacheFileTime :
             needsCodeGen = True
             if not f in FilesToParse and FileContainsPyCppGenTag(f) :
                 FilesToParse.append(f)
@@ -1647,22 +1643,25 @@ def main(args : list) :
      
     #load cache
     CachedPerFileData = {}
+    cacheFileTime = 0
     if os.path.exists(CacheFile) :
         with open(CacheFile, "rt") as file :
             try :
                 CachedPerFileData = json.loads(file.read())
+                cacheFileTime = os.path.getmtime(CacheFile)
             except :
                 CachedPerFileData = {}
+                cacheFileTime = 0
 
     PerFileData = {}
 
     if DebugMode :
         for file in FilesToParse :
-            ProcessFile(file, compilerOptions)
+            ProcessFile(file, compilerOptions, cacheFileTime)
     else :
         with ThreadPoolExecutor() as pool :
             for file in FilesToParse :
-                pool.submit(ProcessFile, file, compilerOptions)
+                pool.submit(ProcessFile, file, compilerOptions, cacheFileTime)
 
     if DebugMode :
         for file in FilesToCodeGen :
