@@ -118,3 +118,29 @@ PrintLock = threading.Lock()
 def atomic_print(text : str) :
     with PrintLock :
         print(f"pycppgen: {text}")
+
+def write_file_if_different(file : str, content : str | None) :
+    inputContent : str = ""
+
+    if content == None :
+        if os.path.exists(file) :
+            atomic_print(f"removing {file}")
+            os.remove(file)
+        return
+
+    try:
+        with open(file, mode="rt") as inputFile :
+            inputContent = inputFile.read()
+    except:
+        inputContent = ""
+
+    if content == inputContent :
+        atomic_print(f"skipping {file} as it didn't change")
+        return
+
+    if not os.path.exists(pathlib.Path(file).parent) :
+        os.makedirs(pathlib.Path(file).parent)
+
+    with open(file, mode="wt") as outputFile :
+        atomic_print(f"writing {file}")
+        outputFile.write(content)

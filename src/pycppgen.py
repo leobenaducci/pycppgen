@@ -1169,44 +1169,9 @@ def CodeGen(filePath : str) :
     cppFile = GetOutputFilePath(filePath, "cpp")
     hlslFile = GetOutputFilePath(filePath, kHlslExtension)
     
-    if hppCode == "" :
-        if os.path.exists(hppFile) :
-            os.remove(hppFile)
-    else :
-        atomic_print("generating code for: " + hppFile)
-        with open(hppFile, mode="wt") as output :
-            output.write(hppCode)
-
-    if cppCode == "" :
-        if os.path.exists(cppFile) :
-            os.remove(cppFile)
-    else :
-        atomic_print("generating code for: " + cppFile)
-        cppCode = f"#include \"{hppFile}\"\n\n" + cppCode
-        with open(cppFile, mode="wt") as output :
-            output.write(cppCode)
-
-    if hlslCode == "" :
-        if os.path.exists(hlslFile) :
-            os.remove(hlslFile)
-    else :
-        atomic_print("generating code for: " + hlslFile)
-        if not os.path.exists(pathlib.Path(hlslFile).parent) :
-            os.makedirs(pathlib.Path(hlslFile).parent)
-            
-        with open(hlslFile, mode="wt") as output :
-            hlslCode = f"""
-////////////////////////////////
-//{pathlib.Path(hlslFile).name}
-
-#pragma once
-
-{hlslCode}
-
-//{pathlib.Path(hlslFile).name}
-////////////////////////////////
-"""
-            output.write(hlslCode)            
+    write_file_if_different(hppFile, hppCode if hppCode != "" else None)
+    write_file_if_different(cppFile, f"#include \"{hppFile}\"\n\n{cppCode}" if cppCode != "" else None)
+    write_file_if_different(hlslFile, get_final_hlsl_conent(hlslCode, hlslFile) if hlslCode != "" else None)
 
 #codegen: emit for each type call
 def CodeGenGlobalAddForEachTypeCall(code, node) :

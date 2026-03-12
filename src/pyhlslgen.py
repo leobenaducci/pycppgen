@@ -390,3 +390,17 @@ template<> struct pyhlslgen<{cppNodeName}>
 """
 
     return hlslCode + result
+
+def get_final_hlsl_conent(hlslCode : str, hlslFile : str) :
+
+    return f"""
+////////////////////////////////
+//{pathlib.Path(hlslFile).name}
+
+#pragma once
+
+{hlslCode}
+
+//{pathlib.Path(hlslFile).name}
+////////////////////////////////
+"""
