@@ -1578,7 +1578,7 @@ def main(args : list) :
                 filePath = os.path.join(root, file)
                 if FileContainsPyCppGenTag(filePath) :
                     FilesToParse.append(os.path.join(root, file))
-            if file != "pycppgen.gen.h" and re.match(r".*\.gen.h$", file) :
+            if file != "pycppgen.gen.h" and (re.match(r".*\.gen.h$", file) or re.match(fr".*\.gen.{kHlslExtension}$", file)) :
                 OldGenFiles += [os.path.join(root, file)]
     
     compilerOptions = []
@@ -1586,15 +1586,12 @@ def main(args : list) :
         compilerOptions = args[1:]
 
     GenFiles = list(map(lambda x : GetOutputFilePath(x), FilesToParse))
+    GenFiles += list(map(lambda x : GetOutputFilePath(x, kHlslExtension), FilesToParse))
     OldGenFiles = list(map(lambda x : ResolvePath(x), OldGenFiles))
 
     #if the script is newer than the cache, remove all files as we need to rebuild everything
     if not IsFileUpToDate(inspect.getsourcefile(sys.modules[__name__]), CacheFile) :
         atomic_print("Outdated file cache")
-        for file in OldGenFiles :
-            if os.path.exists(file) :
-                os.remove(file)
-        OldGenFiles = []
         OutdatedFiles = set(FilesToParse)
     else :
         #mark the outdated files
@@ -1604,7 +1601,6 @@ def main(args : list) :
                 OutdatedFiles.add(file)
 
     FilesToRemove = list(set(OldGenFiles).difference(GenFiles))
-    FilesToAdd = list(set(GenFiles).difference(OldGenFiles))
      
     #load cache
     CachedPerFileData = {}

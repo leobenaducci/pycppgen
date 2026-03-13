@@ -119,6 +119,9 @@ def atomic_print(text : str) :
     with PrintLock :
         print(f"pycppgen: {text}")
 
+def normalize_cr(text: str) -> str:
+    return text.replace("\r\n", "\n").replace("\r", "\n")
+
 def write_file_if_different(file : str, content : str | None) :
     inputContent : str = ""
 
@@ -134,7 +137,7 @@ def write_file_if_different(file : str, content : str | None) :
     except:
         inputContent = ""
 
-    if content == inputContent :
+    if normalize_cr(content) == normalize_cr(inputContent) :
         atomic_print(f"skipping {file} as it didn't change")
         return
 
