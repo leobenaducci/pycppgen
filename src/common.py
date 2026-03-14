@@ -139,6 +139,7 @@ def write_file_if_different(file : str, content : str | None) :
 
     if normalize_cr(content) == normalize_cr(inputContent) :
         atomic_print(f"skipping {file} as it didn't change")
+        os.utime(file, None)
         return
 
     if not os.path.exists(pathlib.Path(file).parent) :
