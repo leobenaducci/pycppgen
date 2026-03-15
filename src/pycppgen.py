@@ -1668,7 +1668,7 @@ def main(args : list) :
 
     #save cache
     with open(CacheFile, "wt") as file :
-        PerFileData[EGlobals.kCacheVersion] = EGlobals.CurrentCacheVersion
+        PerFileData[EGlobals.kCacheVersion] = EGlobals.kCurrentCacheVersion
         file.write(json.dumps(PerFileData))
 
     #remove old files
