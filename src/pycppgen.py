@@ -1612,11 +1612,6 @@ def main(args : list) :
             try :
                 CachedPerFileData = json.loads(file.read())
                 cacheFileTime = os.path.getmtime(CacheFile)
-                if not EGlobals.kCacheVersion in CachedPerFileData :
-                    CachedPerFileData = {}
-                if CachedPerFileData[EGlobals.kCacheVersion] != EGlobals.kCurrentCacheVersion :
-                    CachedPerFileData = {}
-
             except :
                 CachedPerFileData = {}
                 cacheFileTime = 0
@@ -1646,10 +1641,6 @@ def main(args : list) :
                 try :
                     depCachedData = json.loads(file.read())
                     PerFileData.update(depCachedData)
-                    if not EGlobals.kCacheVersion in PerFileData :
-                        PerFileData = {}
-                    if PerFileData[EGlobals.kCacheVersion] != EGlobals.kCurrentCacheVersion :
-                        PerFileData = {}
                 except :
                     atomic_print("failed to load dependency data: " + dep)
 
@@ -1668,7 +1659,6 @@ def main(args : list) :
 
     #save cache
     with open(CacheFile, "wt") as file :
-        PerFileData[EGlobals.kCacheVersion] = EGlobals.kCurrentCacheVersion
         file.write(json.dumps(PerFileData))
 
     #remove old files
