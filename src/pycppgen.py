@@ -1490,7 +1490,7 @@ def ProcessFile(file : str, compilerOptions, cacheFileTime: float) :
         PerFileData[file]["IncludedFiles"] = list(set(includedFiles))
 
     for f in PerFileData[file]["IncludedFiles"] :
-        if not f.endswith("pycppgen.h") and os.path.getmtime(f) > cacheFileTime :
+        if not f.endswith("pycppgen.h") and (os.path.getmtime(f) > cacheFileTime) if os.path.exists(f) else True :
             needsCodeGen = True
             if not f in FilesToParse and FileContainsPyCppGenTag(f) :
                 FilesToParse.append(f)
@@ -1590,9 +1590,11 @@ def main(args : list) :
     OldGenFiles = list(map(lambda x : ResolvePath(x), OldGenFiles))
 
     #if the script is newer than the cache, remove all files as we need to rebuild everything
+    outdatedCache = False
     if not IsFileUpToDate(inspect.getsourcefile(sys.modules[__name__]), CacheFile) :
         atomic_print("Outdated file cache")
         OutdatedFiles = set(FilesToParse)
+        outdatedCache = True
     else :
         #mark the outdated files
         for file in FilesToParse :
@@ -1605,11 +1607,16 @@ def main(args : list) :
     #load cache
     CachedPerFileData = {}
     cacheFileTime = 0
-    if os.path.exists(CacheFile) :
+    if os.path.exists(CacheFile) and not outdatedCache:
         with open(CacheFile, "rt") as file :
             try :
                 CachedPerFileData = json.loads(file.read())
                 cacheFileTime = os.path.getmtime(CacheFile)
+                if not EGlobals.kCacheVersion in CachedPerFileData :
+                    CachedPerFileData = {}
+                if CachedPerFileData[EGlobals.kCacheVersion] != EGlobals.kCurrentCacheVersion :
+                    CachedPerFileData = {}
+
             except :
                 CachedPerFileData = {}
                 cacheFileTime = 0
@@ -1639,6 +1646,10 @@ def main(args : list) :
                 try :
                     depCachedData = json.loads(file.read())
                     PerFileData.update(depCachedData)
+                    if not EGlobals.kCacheVersion in PerFileData :
+                        PerFileData = {}
+                    if PerFileData[EGlobals.kCacheVersion] != EGlobals.kCurrentCacheVersion :
+                        PerFileData = {}
                 except :
                     atomic_print("failed to load dependency data: " + dep)
 
@@ -1657,6 +1668,7 @@ def main(args : list) :
 
     #save cache
     with open(CacheFile, "wt") as file :
+        PerFileData[EGlobals.kCacheVersion] = EGlobals.CurrentCacheVersion
         file.write(json.dumps(PerFileData))
 
     #remove old files

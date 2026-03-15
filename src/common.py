@@ -80,6 +80,8 @@ class _Globals:
     kSerialize: Final[str] = "serialize"
     kExclude: Final[str] = "exclude"
     kHlsliPath: Final[str] = "../../shaders/Types"
+    kCacheVersion : Final[str] = "cache_version"
+    kCurrentCacheVersion : Final[str] = "20260315a"
 
 EKind = _Kinds()          # use K.Unknown, K.Class … everywhere
 ENode = _NodeType()
