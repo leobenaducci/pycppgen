@@ -1513,7 +1513,12 @@ def ProcessFile(file : str, compilerOptions, cacheFileTime: float) :
     if not IsFileUpToDate(file, CacheFile) or not IsFileUpToDate(GetOutputFilePath(file), CacheFile) :
         needsParseTU = True
         if not isOutdated :
-            atomic_print(f"outdated cache entry for {file}") 
+            atomic_print(f"outdated cache entry for {file}")
+
+    # if the file is outdated but has no cached NodeList (e.g. script was updated and
+    # the old cache file still exists on disk), we must re-parse to rebuild the NodeList
+    if isOutdated and "NodeList" not in PerFileData[file] :
+        needsParseTU = True
 
     tu = None
     tmpFilePath = None
