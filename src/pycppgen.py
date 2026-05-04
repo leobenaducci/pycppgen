@@ -1151,8 +1151,44 @@ def CodeGen(filePath : str) :
             hppCode += newHppCode
             cppCode += newCppCode
 
-        if ENode.Hlsl in node and node[ENode.Hlsl]:
-            hlslCode = CodeGenHlslNode(hlslCode, node)
+    # Collect all HLSL nodes and process them in dependency order so nested
+    # user-struct members are always generated before the structs that use them.
+    hlslNodes = [(key, TLS().NodeList[key]) for key in TLS().NodeList
+                 if ENode.Hlsl in TLS().NodeList[key] and TLS().NodeList[key][ENode.Hlsl]]
+
+    generatedStructs = {}   # name -> (hlsl_definition_block, total_size_bytes)
+    pending = list(hlslNodes)
+
+    while pending :
+        progress = False
+        nextPending = []
+        for key, node in pending :
+            # Check whether all user-struct member types are already resolved
+            allResolved = True
+            if ENode.Variables in node :
+                for _, var in node[ENode.Variables].items() :
+                    size, baseType, _, _, _ = PreParseHlsl(var[ENode.Type], node[ENode.HlslLayout], generatedStructs)
+                    if size == 0 :
+                        # size==0 means truly unknown type (not a user struct in generatedStructs)
+                        # Check if it's a potential user struct that just hasn't been generated yet
+                        userMatch = re.fullmatch(r'(\w+)\s*(?:\[(\w+)\])?', var[ENode.Type])
+                        if userMatch :
+                            baseName = RemoveHlsl(userMatch.group(1))
+                            # If this name is a known HLSL node that is still pending, defer
+                            if any(n[ENode.Name] == baseName for _, n in pending if (_, n) != (key, node)) :
+                                allResolved = False
+                                break
+            if allResolved :
+                hlslCode = CodeGenHlslNode(hlslCode, node, generatedStructs)
+                progress = True
+            else :
+                nextPending.append((key, node))
+        if not progress :
+            # No progress possible — cycle or missing dep; process remaining as-is
+            for key, node in nextPending :
+                hlslCode = CodeGenHlslNode(hlslCode, node, generatedStructs)
+            break
+        pending = nextPending
 
     hppCode += "namespace pycppgen_globals {\n"
     for _, func in TLS().NodeList.items() :

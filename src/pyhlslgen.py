@@ -113,7 +113,7 @@ def GetHlslAlignment(var : str) :
     
     return "NONE"
 
-def PreParseHlsl(varType : str, layout : str) -> tuple[int, str, int, int, int]:
+def PreParseHlsl(varType : str, layout : str, knownStructs : dict = {}) -> tuple[int, str, int, int, int]:
 
     #match type<n>x<m>[s] patterns
     match = re.fullmatch(rf'({"|".join(kHlslTypes)})(\d)?(?:x(\d))?(?:\[(\w+)\])?', varType)
@@ -183,52 +183,82 @@ def PreParseHlsl(varType : str, layout : str) -> tuple[int, str, int, int, int]:
 
         return int(size), baseType, int(arraySize), int(rows), int(cols)
     
+    # Check if it's a known user-defined struct (with optional array suffix).
+    # Strip any _pyhlslgen* suffix from the type name before lookup, since the
+    # type spelling from libclang preserves the original C++ name (e.g.
+    # "SInner_pyhlslgen") while generatedStructs keys are the cleaned names.
+    # libclang may spell array types with a space before the bracket, e.g.
+    # "SInner_pyhlslgen [2]", so we allow an optional space.
+    userMatch = re.fullmatch(r'(\w+)\s*(?:\[(\w+)\])?', varType)
+    if userMatch:
+        baseName, arraySize = userMatch.groups()
+        cleanName = RemoveHlsl(baseName)
+        if cleanName in knownStructs:
+            structSize = knownStructs[cleanName][1]  # total size in bytes
+            arraySize = int(arraySize) if arraySize else 1
+            return structSize * arraySize, cleanName, arraySize, 1, 1
+
     return 0, "", 1, 1, 1
     
 #codegen: emit a hlsl node
-def CodeGenHlslNode(hlslCode, node) -> str:
+def CodeGenHlslNode(hlslCode, node, generatedStructs : dict = {}) -> str:
     
     vksdk = os.getenv("VULKAN_SDK")
     if vksdk == "":
         return ""
 
     hlslLayout = node[ENode.HlslLayout]
-    hlslTemp = f"struct {node[ENode.Name]}\n{{\n"
 
     nameSizeMap = {}
     member = ""
 
+    # Collect nested user-struct dependencies to prepend to the synthetic shader
+    nestedDefs = ""
+    alreadyPrepended = set()
+
+    structFields = ""
     if ENode.Variables in node :
         for _, var in node[ENode.Variables].items() :
             
-            size, baseType, arraySize, rows, cols = PreParseHlsl(var[ENode.Type], hlslLayout)
+            size, baseType, arraySize, rows, cols = PreParseHlsl(var[ENode.Type], hlslLayout, generatedStructs)
             
             nameSizeMap[var[ENode.Name]] = size
 
-            newDecl = f"\t{baseType}"
-            if rows > 1:
-                newDecl += f"{rows}"
-            if cols > 1:
-                newDecl += f"x{cols}"
+            # Build the field declaration for the synthetic HLSL shader
+            isUserStruct = size > 0 and baseType in generatedStructs
+            if isUserStruct :
+                # User-defined struct member: emit as "StructName varName[N];"
+                newDecl = f"\t{baseType}\t"
             else :
-                newDecl += f"\t"
+                newDecl = f"\t{baseType}"
+                if rows > 1:
+                    newDecl += f"{rows}"
+                if cols > 1:
+                    newDecl += f"x{cols}"
+                else :
+                    newDecl += f"\t"
 
             newDecl += f"\t{var[ENode.Name]}"
             if arraySize and int(arraySize) > 1:
                 newDecl += f"[{arraySize}]"
 
             if size == 0 :
-                print(f"HLSL Error: Unsupported type {newDecl.replace("\t", " ")} in {node[ENode.Name]}")
+                print(f"HLSL Error: Unsupported type {newDecl.replace(chr(9), ' ')} in {node[ENode.Name]}")
                 continue
+
+            # Prepend the nested struct's HLSL definition if not already done
+            if isUserStruct and baseType not in alreadyPrepended:
+                nestedDefs += generatedStructs[baseType][0]
+                alreadyPrepended.add(baseType)
 
             if member == "" :
                 member = var[ENode.Name]
                 if arraySize > 1 :
                     member += "[0]"
 
-            hlslTemp += newDecl + ";\n"
+            structFields += newDecl + ";\n"
 
-    hlslTemp += "};\n"
+    hlslTemp = nestedDefs + f"struct {node[ENode.Name]}\n{{\n" + structFields + "};\n"
 
     if hlslLayout == "uniform" :
         hlslTemp += f"ConstantBuffer<{node[ENode.Name]}> inBuffer;\n"
@@ -315,10 +345,17 @@ def CodeGenHlslNode(hlslCode, node) -> str:
 
         newDecl = "\t"
 
-        if member["type"] in kVkToHlsl :
-            newDecl += kVkToHlsl[member["type"]]
+        memberTypeName = member["type"]
+        if memberTypeName in kVkToHlsl :
+            newDecl += kVkToHlsl[memberTypeName]
         else :
-            newDecl += member["type"]
+            # Resolve spirv-cross type ID to actual name (e.g. "_7" -> "SInner")
+            if memberTypeName in parsed["types"] :
+                resolvedName = parsed["types"][memberTypeName]["name"]
+                cleanName = RemoveHlsl(resolvedName)
+                if cleanName in generatedStructs :
+                    memberTypeName = cleanName
+            newDecl += memberTypeName
 
         newDecl += f" {member["name"]}"
 
@@ -388,6 +425,9 @@ template<> struct pyhlslgen<{cppNodeName}>
 #endif //__cplusplus
 #endif //__{cppNodeName.upper()}_DECL__
 """
+
+    # Register this struct so subsequent structs can use it as a member type
+    generatedStructs[node[ENode.Name]] = (hlslResult, offset)
 
     return hlslCode + result
 
