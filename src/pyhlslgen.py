@@ -1,8 +1,8 @@
 from common import *
 
 kHlslExtension : Final[str] = "hlsli"
-kHlslTypes: Final[list]= ["int", "uint", "float", "bool", "double", "int64_t", "uint64_t", "float16_t", "int16_t", "uint16_t", "int8_t", "uint8_t"]
-kPyHlslVectorTypes: Final[list]= ["int", "uint", "float", "bool", "double", "int64_t", "uint64_t", "int16_t", "uint16_t", "int8_t", "uint8_t"]
+kHlslTypes: Final[list]= ["int", "uint", "float", "half", "bool",  "double", "int64_t", "uint64_t", "float16_t", "int16_t", "uint16_t", "int8_t", "uint8_t"]
+kPyHlslVectorTypes: Final[list]= ["int", "uint", "float", "half", "bool", "double", "int64_t", "uint64_t", "int16_t", "uint16_t", "int8_t", "uint8_t"]
 kPyHlslMatrixTypes: Final[list]= ["int", "uint", "float", "double", "int64_t", "uint64_t"]
 
 def GenHlslDeclarations() :
@@ -28,6 +28,7 @@ def GenVkToHlslMappings() :
         vkToHlsl[f"ivec{r}"] = f"int{r}"
         vkToHlsl[f"uvec{r}"] = f"uint{r}"
         vkToHlsl[f"vec{r}"] = f"float{r}"
+        vkToHlsl[f"hvec{r}"] = f"half{r}"
         vkToHlsl[f"bvec{r}"] = f"bool{r}"
         vkToHlsl[f"dvec{r}"] = f"double{r}"
         vkToHlsl[f"u64vec{r}"] = f"uint64_t{r}"        
@@ -41,6 +42,7 @@ def GenVkToHlslMappings() :
         vkToHlsl[f"mat{r}"] = f"float{r}x{r}"
         vkToHlsl[f"imat{r}"] = f"int{r}x{r}"
         vkToHlsl[f"umat{r}"] = f"uint{r}x{r}"
+        vkToHlsl[f"hmat{r}"] = f"half{r}x{r}"
         vkToHlsl[f"bmat{r}"] = f"bool{r}x{r}"
         vkToHlsl[f"dmat{r}"] = f"double{r}x{r}"
         vkToHlsl[f"u64mat{r}"] = f"uint64_t{r}x{r}"
@@ -51,6 +53,7 @@ def GenVkToHlslMappings() :
         vkToHlsl[f"u8mat{r}"] = f"uint8_t{r}x{r}"
         for c in range(2, 5) :
             vkToHlsl[f"mat{r}x{c}"] = f"float{r}x{c}"
+            vkToHlsl[f"hmat{r}x{c}"] = f"half{r}x{c}"
             vkToHlsl[f"dmat{r}x{c}"] = f"double{r}x{c}"
             vkToHlsl[f"imat{r}x{c}"] = f"int{r}x{c}"
             vkToHlsl[f"umat{r}x{c}"] = f"uint{r}x{c}"
@@ -87,7 +90,7 @@ template<typename T = void> struct pyhlslgen
 
 for v in kPyHlslVectorTypes :
     kPyhlslgenHeader += f"""template<> struct pyhlslgen<{v}> {{ using type_t = {v}; static constexpr bool is_valid = true; static constexpr bool is_primitive = true; static constexpr bool scalar_alignment = true; static constexpr char type_name[] = "{v}";  }};\n"""
-    for i in range(2, 5) :
+    for i in range(1, 5) :
         kPyhlslgenHeader += f"""template<> struct pyhlslgen<{v}{i}> {{ using type_t = {v}{i}; static constexpr bool is_valid = true; static constexpr bool is_primitive = true; static constexpr bool scalar_alignment = true; static constexpr char type_name[] = "{v}{i}";  }};\n"""
 
 for v in kPyHlslMatrixTypes :
