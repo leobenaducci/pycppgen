@@ -71,18 +71,21 @@ kHlslDeclarations : Final[str] = GenHlslDeclarations()
 kVkToHlsl : Final[dict] = GenVkToHlslMappings()
 
 kPyhlslgenHeader = """
-template<typename T = void> struct pyhlslgen 
+template<typename T = void> struct pyhlslgen
 {
-    using type_t = T; 
+    using type_t = T;
     static constexpr bool is_valid = false;
     static constexpr bool is_primitive = false;
+    static constexpr bool is_enum = false;
+    static constexpr bool is_bitmask = false;
     static constexpr bool uniform_alignment = false;
     static constexpr bool relaxed_alignment = false;
     static constexpr bool scalar_alignment = false;
-    static constexpr char type_name[] = ""; 
-    static constexpr char full_decl[] = ""; 
-    static constexpr char struct_decl[] = ""; 
+    static constexpr char type_name[] = "";
+    static constexpr char full_decl[] = "";
+    static constexpr char struct_decl[] = "";
     static constexpr char cbuffer_decl[] = "";
+    static constexpr char enum_decl[] = "";
 };
 
 #ifdef _HLSL_TYPES_DECLARED_
@@ -432,6 +435,58 @@ template<> struct pyhlslgen<{cppNodeName}>
     # Register this struct so subsequent structs can use it as a member type
     generatedStructs[node[ENode.Name]] = (hlslResult, offset)
 
+    return hlslCode + result
+
+def _GetHlslEnumType(underlyingType : str) -> str:
+    signed = {"int", "signed", "signed int"}
+    if any(underlyingType == s for s in signed):
+        return "int"
+    return "uint"
+
+def CodeGenHlslEnumNode(hlslCode : str, node) -> str:
+    enumName  = node[ENode.Name]
+    fullName  = node[ENode.FullName]
+    namespace = node[ENode.Namespace]
+    isBitmask = "bitmask" in node.get(ENode.Attributes, {})
+    hlslType  = _GetHlslEnumType(node.get(ENode.UnderlyingType, "unsigned"))
+
+    cppNodeName : str = fullName[len(namespace):].lstrip('::').replace("::", "_")
+    guardMacro = f"__{cppNodeName.upper()}_ENUM_DECL__"
+
+    constantsBlock = ""
+    if ENode.EnumValues in node:
+        for valueName, valueData in node[ENode.EnumValues].items():
+            constantsBlock += f"static const {hlslType} {enumName}_{valueName} = {valueData['value']};\n"
+
+    openNamespaces = ""
+    closeNamespaces = ""
+    if namespace:
+        for ns in namespace.split('::'):
+            openNamespaces  += f"namespace {ns} {{\n"
+            closeNamespaces += "}\n"
+
+    result = f"""
+#ifndef {guardMacro}
+#define {guardMacro}
+
+#ifdef __cplusplus
+{openNamespaces}
+template<> struct pyhlslgen<{fullName}>
+{{
+    using type_t = {fullName};
+    static constexpr bool is_valid     = true;
+    static constexpr bool is_primitive = false;
+    static constexpr bool is_enum      = true;
+    static constexpr bool is_bitmask   = {"true" if isBitmask else "false"};
+    static constexpr char type_name[]  = "{enumName}";
+    static constexpr char enum_decl[]  = R"-({constantsBlock})-";
+}};
+{closeNamespaces}
+#else
+{constantsBlock}
+#endif //__cplusplus
+#endif //{guardMacro}
+"""
     return hlslCode + result
 
 def get_final_hlsl_conent(hlslCode : str, hlslFile : str) :

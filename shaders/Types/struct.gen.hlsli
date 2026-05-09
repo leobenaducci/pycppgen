@@ -1,3 +1,7 @@
+
+////////////////////////////////
+//struct.gen.hlsli
+
 #pragma once
 
 
@@ -11,25 +15,9 @@ struct UBO
 {
 	float A;							// Offset: 0 - Size: 4
 	uint3 _pad0_UBO;					// Offset: 4 - Size: 12
-	float2x2 H[16];						// Offset: 16 - Size: 256
-	uint4 _pad1_UBO;					// Offset: 272 - Size: 16
-	uint4 _pad2_UBO;					// Offset: 288 - Size: 16
-	uint4 _pad3_UBO;					// Offset: 304 - Size: 16
-	uint4 _pad4_UBO;					// Offset: 320 - Size: 16
-	uint4 _pad5_UBO;					// Offset: 336 - Size: 16
-	uint4 _pad6_UBO;					// Offset: 352 - Size: 16
-	uint4 _pad7_UBO;					// Offset: 368 - Size: 16
-	uint4 _pad8_UBO;					// Offset: 384 - Size: 16
-	uint4 _pad9_UBO;					// Offset: 400 - Size: 16
-	uint4 _pad10_UBO;					// Offset: 416 - Size: 16
-	uint4 _pad11_UBO;					// Offset: 432 - Size: 16
-	uint4 _pad12_UBO;					// Offset: 448 - Size: 16
-	uint4 _pad13_UBO;					// Offset: 464 - Size: 16
-	uint4 _pad14_UBO;					// Offset: 480 - Size: 16
-	uint4 _pad15_UBO;					// Offset: 496 - Size: 16
-	uint2 _pad16_UBO;					// Offset: 512 - Size: 8
-	float B;							// Offset: 520 - Size: 4
-}; // Size: 524
+	float4x2 H[16];						// Offset: 16 - Size: 512
+	float B;							// Offset: 528 - Size: 4
+}; // Size: 532
 
 template<> struct pyhlslgen<UBO>
 {
@@ -49,25 +37,9 @@ struct UBO
 {
 	float A;							// Offset: 0 - Size: 4
 	uint3 _pad0_UBO;					// Offset: 4 - Size: 12
-	float2x2 H[16];						// Offset: 16 - Size: 256
-	uint4 _pad1_UBO;					// Offset: 272 - Size: 16
-	uint4 _pad2_UBO;					// Offset: 288 - Size: 16
-	uint4 _pad3_UBO;					// Offset: 304 - Size: 16
-	uint4 _pad4_UBO;					// Offset: 320 - Size: 16
-	uint4 _pad5_UBO;					// Offset: 336 - Size: 16
-	uint4 _pad6_UBO;					// Offset: 352 - Size: 16
-	uint4 _pad7_UBO;					// Offset: 368 - Size: 16
-	uint4 _pad8_UBO;					// Offset: 384 - Size: 16
-	uint4 _pad9_UBO;					// Offset: 400 - Size: 16
-	uint4 _pad10_UBO;					// Offset: 416 - Size: 16
-	uint4 _pad11_UBO;					// Offset: 432 - Size: 16
-	uint4 _pad12_UBO;					// Offset: 448 - Size: 16
-	uint4 _pad13_UBO;					// Offset: 464 - Size: 16
-	uint4 _pad14_UBO;					// Offset: 480 - Size: 16
-	uint4 _pad15_UBO;					// Offset: 496 - Size: 16
-	uint2 _pad16_UBO;					// Offset: 512 - Size: 8
-	float B;							// Offset: 520 - Size: 4
-}; // Size: 524
+	float4x2 H[16];						// Offset: 16 - Size: 512
+	float B;							// Offset: 528 - Size: 4
+}; // Size: 532
 
 
 #endif //__UBO_DECL__
@@ -77,25 +49,9 @@ cbuffer UBO_
 {
 	float A;							// Offset: 0 - Size: 4
 	uint3 _pad0_UBO;					// Offset: 4 - Size: 12
-	float2x2 H[16];						// Offset: 16 - Size: 256
-	uint4 _pad1_UBO;					// Offset: 272 - Size: 16
-	uint4 _pad2_UBO;					// Offset: 288 - Size: 16
-	uint4 _pad3_UBO;					// Offset: 304 - Size: 16
-	uint4 _pad4_UBO;					// Offset: 320 - Size: 16
-	uint4 _pad5_UBO;					// Offset: 336 - Size: 16
-	uint4 _pad6_UBO;					// Offset: 352 - Size: 16
-	uint4 _pad7_UBO;					// Offset: 368 - Size: 16
-	uint4 _pad8_UBO;					// Offset: 384 - Size: 16
-	uint4 _pad9_UBO;					// Offset: 400 - Size: 16
-	uint4 _pad10_UBO;					// Offset: 416 - Size: 16
-	uint4 _pad11_UBO;					// Offset: 432 - Size: 16
-	uint4 _pad12_UBO;					// Offset: 448 - Size: 16
-	uint4 _pad13_UBO;					// Offset: 464 - Size: 16
-	uint4 _pad14_UBO;					// Offset: 480 - Size: 16
-	uint4 _pad15_UBO;					// Offset: 496 - Size: 16
-	uint2 _pad16_UBO;					// Offset: 512 - Size: 8
-	float B;							// Offset: 520 - Size: 4
-}; // Size: 524
+	float4x2 H[16];						// Offset: 16 - Size: 512
+	float B;							// Offset: 528 - Size: 4
+}; // Size: 532
 )-";
 };
 
@@ -105,25 +61,9 @@ struct UBO
 {
 	float A;							// Offset: 0 - Size: 4
 	uint3 _pad0_UBO;					// Offset: 4 - Size: 12
-	float2x2 H[16];						// Offset: 16 - Size: 256
-	uint4 _pad1_UBO;					// Offset: 272 - Size: 16
-	uint4 _pad2_UBO;					// Offset: 288 - Size: 16
-	uint4 _pad3_UBO;					// Offset: 304 - Size: 16
-	uint4 _pad4_UBO;					// Offset: 320 - Size: 16
-	uint4 _pad5_UBO;					// Offset: 336 - Size: 16
-	uint4 _pad6_UBO;					// Offset: 352 - Size: 16
-	uint4 _pad7_UBO;					// Offset: 368 - Size: 16
-	uint4 _pad8_UBO;					// Offset: 384 - Size: 16
-	uint4 _pad9_UBO;					// Offset: 400 - Size: 16
-	uint4 _pad10_UBO;					// Offset: 416 - Size: 16
-	uint4 _pad11_UBO;					// Offset: 432 - Size: 16
-	uint4 _pad12_UBO;					// Offset: 448 - Size: 16
-	uint4 _pad13_UBO;					// Offset: 464 - Size: 16
-	uint4 _pad14_UBO;					// Offset: 480 - Size: 16
-	uint4 _pad15_UBO;					// Offset: 496 - Size: 16
-	uint2 _pad16_UBO;					// Offset: 512 - Size: 8
-	float B;							// Offset: 520 - Size: 4
-}; // Size: 524
+	float4x2 H[16];						// Offset: 16 - Size: 512
+	float B;							// Offset: 528 - Size: 4
+}; // Size: 532
 
 #endif //__cplusplus
 #endif //__UBO_DECL__
@@ -248,25 +188,9 @@ struct STestShaderData
 {
 	float A;							// Offset: 0 - Size: 4
 	uint3 _pad0_STestShaderData;		// Offset: 4 - Size: 12
-	float3x4 H[16];						// Offset: 16 - Size: 768
-	uint4 _pad1_STestShaderData;		// Offset: 784 - Size: 16
-	uint4 _pad2_STestShaderData;		// Offset: 800 - Size: 16
-	uint4 _pad3_STestShaderData;		// Offset: 816 - Size: 16
-	uint4 _pad4_STestShaderData;		// Offset: 832 - Size: 16
-	uint4 _pad5_STestShaderData;		// Offset: 848 - Size: 16
-	uint4 _pad6_STestShaderData;		// Offset: 864 - Size: 16
-	uint4 _pad7_STestShaderData;		// Offset: 880 - Size: 16
-	uint4 _pad8_STestShaderData;		// Offset: 896 - Size: 16
-	uint4 _pad9_STestShaderData;		// Offset: 912 - Size: 16
-	uint4 _pad10_STestShaderData;		// Offset: 928 - Size: 16
-	uint4 _pad11_STestShaderData;		// Offset: 944 - Size: 16
-	uint4 _pad12_STestShaderData;		// Offset: 960 - Size: 16
-	uint4 _pad13_STestShaderData;		// Offset: 976 - Size: 16
-	uint4 _pad14_STestShaderData;		// Offset: 992 - Size: 16
-	uint4 _pad15_STestShaderData;		// Offset: 1008 - Size: 16
-	uint3 _pad16_STestShaderData;		// Offset: 1024 - Size: 12
-	float B;							// Offset: 1036 - Size: 4
-}; // Size: 1040
+	float4x4 H[16];						// Offset: 16 - Size: 1024
+	float B;							// Offset: 1040 - Size: 4
+}; // Size: 1044
 
 template<> struct pyhlslgen<STestShaderData>
 {
@@ -286,25 +210,9 @@ struct STestShaderData
 {
 	float A;							// Offset: 0 - Size: 4
 	uint3 _pad0_STestShaderData;		// Offset: 4 - Size: 12
-	float3x4 H[16];						// Offset: 16 - Size: 768
-	uint4 _pad1_STestShaderData;		// Offset: 784 - Size: 16
-	uint4 _pad2_STestShaderData;		// Offset: 800 - Size: 16
-	uint4 _pad3_STestShaderData;		// Offset: 816 - Size: 16
-	uint4 _pad4_STestShaderData;		// Offset: 832 - Size: 16
-	uint4 _pad5_STestShaderData;		// Offset: 848 - Size: 16
-	uint4 _pad6_STestShaderData;		// Offset: 864 - Size: 16
-	uint4 _pad7_STestShaderData;		// Offset: 880 - Size: 16
-	uint4 _pad8_STestShaderData;		// Offset: 896 - Size: 16
-	uint4 _pad9_STestShaderData;		// Offset: 912 - Size: 16
-	uint4 _pad10_STestShaderData;		// Offset: 928 - Size: 16
-	uint4 _pad11_STestShaderData;		// Offset: 944 - Size: 16
-	uint4 _pad12_STestShaderData;		// Offset: 960 - Size: 16
-	uint4 _pad13_STestShaderData;		// Offset: 976 - Size: 16
-	uint4 _pad14_STestShaderData;		// Offset: 992 - Size: 16
-	uint4 _pad15_STestShaderData;		// Offset: 1008 - Size: 16
-	uint3 _pad16_STestShaderData;		// Offset: 1024 - Size: 12
-	float B;							// Offset: 1036 - Size: 4
-}; // Size: 1040
+	float4x4 H[16];						// Offset: 16 - Size: 1024
+	float B;							// Offset: 1040 - Size: 4
+}; // Size: 1044
 
 
 #endif //__STESTSHADERDATA_DECL__
@@ -314,25 +222,9 @@ cbuffer STestShaderData_
 {
 	float A;							// Offset: 0 - Size: 4
 	uint3 _pad0_STestShaderData;		// Offset: 4 - Size: 12
-	float3x4 H[16];						// Offset: 16 - Size: 768
-	uint4 _pad1_STestShaderData;		// Offset: 784 - Size: 16
-	uint4 _pad2_STestShaderData;		// Offset: 800 - Size: 16
-	uint4 _pad3_STestShaderData;		// Offset: 816 - Size: 16
-	uint4 _pad4_STestShaderData;		// Offset: 832 - Size: 16
-	uint4 _pad5_STestShaderData;		// Offset: 848 - Size: 16
-	uint4 _pad6_STestShaderData;		// Offset: 864 - Size: 16
-	uint4 _pad7_STestShaderData;		// Offset: 880 - Size: 16
-	uint4 _pad8_STestShaderData;		// Offset: 896 - Size: 16
-	uint4 _pad9_STestShaderData;		// Offset: 912 - Size: 16
-	uint4 _pad10_STestShaderData;		// Offset: 928 - Size: 16
-	uint4 _pad11_STestShaderData;		// Offset: 944 - Size: 16
-	uint4 _pad12_STestShaderData;		// Offset: 960 - Size: 16
-	uint4 _pad13_STestShaderData;		// Offset: 976 - Size: 16
-	uint4 _pad14_STestShaderData;		// Offset: 992 - Size: 16
-	uint4 _pad15_STestShaderData;		// Offset: 1008 - Size: 16
-	uint3 _pad16_STestShaderData;		// Offset: 1024 - Size: 12
-	float B;							// Offset: 1036 - Size: 4
-}; // Size: 1040
+	float4x4 H[16];						// Offset: 16 - Size: 1024
+	float B;							// Offset: 1040 - Size: 4
+}; // Size: 1044
 )-";
 };
 
@@ -342,25 +234,9 @@ struct STestShaderData
 {
 	float A;							// Offset: 0 - Size: 4
 	uint3 _pad0_STestShaderData;		// Offset: 4 - Size: 12
-	float3x4 H[16];						// Offset: 16 - Size: 768
-	uint4 _pad1_STestShaderData;		// Offset: 784 - Size: 16
-	uint4 _pad2_STestShaderData;		// Offset: 800 - Size: 16
-	uint4 _pad3_STestShaderData;		// Offset: 816 - Size: 16
-	uint4 _pad4_STestShaderData;		// Offset: 832 - Size: 16
-	uint4 _pad5_STestShaderData;		// Offset: 848 - Size: 16
-	uint4 _pad6_STestShaderData;		// Offset: 864 - Size: 16
-	uint4 _pad7_STestShaderData;		// Offset: 880 - Size: 16
-	uint4 _pad8_STestShaderData;		// Offset: 896 - Size: 16
-	uint4 _pad9_STestShaderData;		// Offset: 912 - Size: 16
-	uint4 _pad10_STestShaderData;		// Offset: 928 - Size: 16
-	uint4 _pad11_STestShaderData;		// Offset: 944 - Size: 16
-	uint4 _pad12_STestShaderData;		// Offset: 960 - Size: 16
-	uint4 _pad13_STestShaderData;		// Offset: 976 - Size: 16
-	uint4 _pad14_STestShaderData;		// Offset: 992 - Size: 16
-	uint4 _pad15_STestShaderData;		// Offset: 1008 - Size: 16
-	uint3 _pad16_STestShaderData;		// Offset: 1024 - Size: 12
-	float B;							// Offset: 1036 - Size: 4
-}; // Size: 1040
+	float4x4 H[16];						// Offset: 16 - Size: 1024
+	float B;							// Offset: 1040 - Size: 4
+}; // Size: 1044
 
 #endif //__cplusplus
 #endif //__STESTSHADERDATA_DECL__
@@ -493,6 +369,132 @@ struct SStructBase_SShaderData
 #endif //__cplusplus
 #endif //__SSTRUCTBASE_SSHADERDATA_DECL__
 
+#ifndef __SINNER_DECL__
+#define __SINNER_DECL__
+
+#ifdef __cplusplus
+
+
+struct SInner
+{
+	float x;							// Offset: 0 - Size: 4
+	float y;							// Offset: 4 - Size: 4
+	float z;							// Offset: 8 - Size: 4
+	float w;							// Offset: 12 - Size: 4
+}; // Size: 16
+
+template<> struct pyhlslgen<SInner>
+{
+    using type_t = SInner;
+    static constexpr bool is_valid = true;
+    static constexpr bool is_primitive = false;
+    static constexpr bool uniform_alignment = false;
+    static constexpr bool relaxed_alignment = true;
+    static constexpr bool scalar_alignment = false;
+    static constexpr char type_name[] = "SInner"; 
+    static constexpr char struct_decl[] = R"-(
+#ifndef __SINNER_DECL__
+#define __SINNER_DECL__
+
+
+struct SInner
+{
+	float x;							// Offset: 0 - Size: 4
+	float y;							// Offset: 4 - Size: 4
+	float z;							// Offset: 8 - Size: 4
+	float w;							// Offset: 12 - Size: 4
+}; // Size: 16
+
+
+#endif //__SINNER_DECL__
+)-"; 
+    static constexpr char uniform_decl[] = R"-(
+cbuffer SInner_
+{
+	float x;							// Offset: 0 - Size: 4
+	float y;							// Offset: 4 - Size: 4
+	float z;							// Offset: 8 - Size: 4
+	float w;							// Offset: 12 - Size: 4
+}; // Size: 16
+)-";
+};
+
+#else
+
+struct SInner
+{
+	float x;							// Offset: 0 - Size: 4
+	float y;							// Offset: 4 - Size: 4
+	float z;							// Offset: 8 - Size: 4
+	float w;							// Offset: 12 - Size: 4
+}; // Size: 16
+
+#endif //__cplusplus
+#endif //__SINNER_DECL__
+
+#ifndef __SOUTER_DECL__
+#define __SOUTER_DECL__
+
+#ifdef __cplusplus
+
+
+struct SOuter
+{
+	SInner A;							// Offset: 0 - Size: 16
+	uint3 B;							// Offset: 16 - Size: 12
+	SInner C[2];						// Offset: 28 - Size: 32
+	uint1 _pad0_SOuter;					// Offset: 60 - Size: 4
+}; // Size: 64
+
+template<> struct pyhlslgen<SOuter>
+{
+    using type_t = SOuter;
+    static constexpr bool is_valid = true;
+    static constexpr bool is_primitive = false;
+    static constexpr bool uniform_alignment = false;
+    static constexpr bool relaxed_alignment = true;
+    static constexpr bool scalar_alignment = false;
+    static constexpr char type_name[] = "SOuter"; 
+    static constexpr char struct_decl[] = R"-(
+#ifndef __SOUTER_DECL__
+#define __SOUTER_DECL__
+
+
+struct SOuter
+{
+	SInner A;							// Offset: 0 - Size: 16
+	uint3 B;							// Offset: 16 - Size: 12
+	SInner C[2];						// Offset: 28 - Size: 32
+	uint1 _pad0_SOuter;					// Offset: 60 - Size: 4
+}; // Size: 64
+
+
+#endif //__SOUTER_DECL__
+)-"; 
+    static constexpr char uniform_decl[] = R"-(
+cbuffer SOuter_
+{
+	SInner A;							// Offset: 0 - Size: 16
+	uint3 B;							// Offset: 16 - Size: 12
+	SInner C[2];						// Offset: 28 - Size: 32
+	uint1 _pad0_SOuter;					// Offset: 60 - Size: 4
+}; // Size: 64
+)-";
+};
+
+#else
+
+struct SOuter
+{
+	SInner A;							// Offset: 0 - Size: 16
+	uint3 B;							// Offset: 16 - Size: 12
+	SInner C[2];						// Offset: 28 - Size: 32
+	uint1 _pad0_SOuter;					// Offset: 60 - Size: 4
+}; // Size: 64
+
+#endif //__cplusplus
+#endif //__SOUTER_DECL__
+
 #ifndef __SSTRUCTTEST_SSHADERSTRUCTTESTDATA_DECL__
 #define __SSTRUCTTEST_SSHADERSTRUCTTESTDATA_DECL__
 
@@ -557,3 +559,7 @@ struct SStructTest_SShaderStructTestData
 
 #endif //__cplusplus
 #endif //__SSTRUCTTEST_SSHADERSTRUCTTESTDATA_DECL__
+
+
+//struct.gen.hlsli
+////////////////////////////////

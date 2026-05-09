@@ -478,7 +478,11 @@ def ParseCursor(cursor, forceInclude : bool = False)  -> None:
     
     if cursor.kind == CursorKind.ENUM_DECL :
         if cursor.is_definition() :
-            node = ParseEnum(cursor, True)
+            ParseEnum(cursor, True)
+            if fullName in TLS().NodeList :
+                enumNode = TLS().NodeList[fullName]
+                if "hlsl" in enumNode.get(ENode.Attributes, {}) :
+                    enumNode[ENode.Hlsl] = True
         return
 
     if cursor.kind == CursorKind.VAR_DECL :
@@ -1119,6 +1123,13 @@ def CodeGenOutputNode(node) :
 
         hppCode = CodeGenOutputMetaFooter(hppCode, node)
 
+        if "bitmask" in node.get(ENode.Attributes, {}) :
+            T = node[ENode.FullName]
+            hppCode += f"inline {T} operator|({T} a, {T} b) {{ using U = std::underlying_type_t<{T}>; return static_cast<{T}>(static_cast<U>(a) | static_cast<U>(b)); }}\n"
+            hppCode += f"inline {T} operator&({T} a, {T} b) {{ using U = std::underlying_type_t<{T}>; return static_cast<{T}>(static_cast<U>(a) & static_cast<U>(b)); }}\n"
+            hppCode += f"inline {T}& operator|=({T}& a, {T} b) {{ a = a | b; return a; }}\n"
+            hppCode += f"inline {T}& operator&=({T}& a, {T} b) {{ a = a & b; return a; }}\n"
+
     return hppCode, cppCode
 
 #codegen: output file
@@ -1154,7 +1165,8 @@ def CodeGen(filePath : str) :
     # Collect all HLSL nodes and process them in dependency order so nested
     # user-struct members are always generated before the structs that use them.
     hlslNodes = [(key, TLS().NodeList[key]) for key in TLS().NodeList
-                 if ENode.Hlsl in TLS().NodeList[key] and TLS().NodeList[key][ENode.Hlsl]]
+                 if ENode.Hlsl in TLS().NodeList[key] and TLS().NodeList[key][ENode.Hlsl]
+                 and TLS().NodeList[key][ENode.Kind] != EKind.Enum]
 
     generatedStructs = {}   # name -> (hlsl_definition_block, total_size_bytes)
     pending = list(hlslNodes)
@@ -1189,6 +1201,11 @@ def CodeGen(filePath : str) :
                 hlslCode = CodeGenHlslNode(hlslCode, node, generatedStructs)
             break
         pending = nextPending
+
+    hlslEnumNodes = [(k, v) for k, v in TLS().NodeList.items()
+                     if v[ENode.Kind] == EKind.Enum and v.get(ENode.Hlsl, False)]
+    for _, node in hlslEnumNodes :
+        hlslCode = CodeGenHlslEnumNode(hlslCode, node)
 
     hppCode += "namespace pycppgen_globals {\n"
     for _, func in TLS().NodeList.items() :
