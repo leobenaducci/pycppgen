@@ -607,6 +607,12 @@ def CodeGenOutputMetaHeader(code, node) :
         f"\tusing pycppgen_t = pycppgen<{node[ENode.FullName]}>;\n",
         "\tstatic constexpr bool is_valid() { return true; }\n",
         "\tstatic constexpr const char* name() { return \"" + node[ENode.Name] + "\"; }\n",
+        #fully qualified name; stable across compilers (unlike __FUNCSIG__/__PRETTY_FUNCTION__
+        #derived names), so it is safe to hash into a persistable type id
+        "\tstatic constexpr const char* full_name() { return \"" + node[ENode.FullName] + "\"; }\n",
+        #hashed from full_name() in C++ rather than precomputed here, so there is exactly one
+        #definition of the algorithm and no chance of the python and c++ sides drifting apart
+        "\tstatic constexpr pycppgen_type_hash_t type_hash() { return pycppgen_hash_name(full_name()); }\n",
     ])
 
     code += "".join(lines)
@@ -1232,6 +1238,20 @@ def CodeGenGlobalAddForEachTypeCall(code, node) :
         code += f"\t\tvisitor.template operator()<{node[ENode.FullName]}>();\n"
     return code
 
+#only direct bases are parsed (ParseStruct/CXX_BASE_SPECIFIER), so walk them to get the full
+#ancestor set. unreflected bases are already dropped at parse time and simply end the chain.
+def CollectAllParents(fullName, result = None) :
+    if result is None :
+        result = []
+    node = TLS().NodeList.get(fullName)
+    if node is None or not ENode.Parents in node :
+        return result
+    for p in node[ENode.Parents] :
+        if p not in result : #also guards against a malformed cache looping forever
+            result.append(p)
+            CollectAllParents(p, result)
+    return result
+
 #codegen: output global file
 def CodeGenGlobalHeader(path : str) :
     
@@ -1241,6 +1261,7 @@ def CodeGenGlobalHeader(path : str) :
 #ifndef _PYCPPGEN_HEADER_
 #define _PYCPPGEN_HEADER_
 
+#include <cstdint>
 #include <string>
 #include <string_view>
 #include <array>
@@ -1254,6 +1275,24 @@ def CodeGenGlobalHeader(path : str) :
 #include <any>
 
 using attribute_map_t = std::unordered_map<std::string_view, std::string_view>;
+
+// uint64_t rather than size_t: the FNV constants below are 64 bit, so a 32 bit size_t would
+// silently truncate them and yield different values on a 32 bit target.
+using pycppgen_type_hash_t = uint64_t;
+
+// FNV-1a (64 bit) over the fully qualified type name. Unlike typeid().hash_code(), which varies
+// between builds and processes, this is stable everywhere the name is, so it is safe to persist
+// to disk and to use as a cross-process type id.
+constexpr pycppgen_type_hash_t pycppgen_hash_name(std::string_view name)
+{
+	pycppgen_type_hash_t hash = 14695981039346656037ull;
+	for (const char c : name)
+	{
+		hash ^= static_cast<pycppgen_type_hash_t>(static_cast<unsigned char>(c));
+		hash *= 1099511628211ull;
+	}
+	return hash;
+}
 
 struct function_parameter_info {
 	std::string_view Name;
@@ -1354,6 +1393,41 @@ def CodeGenGlobal(path : str) :
     for _, node in TLS().NodeList.items() :
         if ENode.Cpp in node and node[ENode.Cpp]:
             code = CodeGenGlobalAddForEachTypeCall(code, node)
+    code += "\t}\n\n"
+
+    #type_hash -> transitive ancestor hashes. keyed by pycppgen_hash_name(full_name()) so the table
+    #can be queried from a hash read back off disk, which typeid()-based ids cannot support.
+    code += "\tinline const std::map<pycppgen_type_hash_t, std::vector<pycppgen_type_hash_t>>& type_ancestors()\n"
+    code += "\t{\n"
+    code += "\t\tstatic const std::map<pycppgen_type_hash_t, std::vector<pycppgen_type_hash_t>> table = {\n"
+    for _, node in TLS().NodeList.items() :
+        if ENode.Cpp in node and node[ENode.Cpp] and (node[ENode.Kind] == EKind.Class or node[ENode.Kind] == EKind.Struct) :
+            parents = CollectAllParents(node[ENode.FullName])
+            entries = ", ".join([f"pycppgen<{p}>::type_hash()" for p in parents])
+            code += "\t\t\t{ pycppgen<" + node[ENode.FullName] + ">::type_hash(), { " + entries + " } },\n"
+    code += "\t\t};\n"
+    code += "\t\treturn table;\n"
+    code += "\t}\n\n"
+
+    code += "\tinline bool is_child_of(pycppgen_type_hash_t base, pycppgen_type_hash_t derived)\n"
+    code += "\t{\n"
+    code += "\t\tif (base == derived) return true;\n"
+    code += "\t\tconst auto& table = type_ancestors();\n"
+    code += "\t\tconst auto it = table.find(derived);\n"
+    code += "\t\tif (it == table.end()) return false;\n"
+    code += "\t\treturn std::find(it->second.begin(), it->second.end(), base) != it->second.end();\n"
+    code += "\t}\n\n"
+
+    #reverse lookup for diagnostics: a hash off disk has no name attached to it otherwise
+    code += "\tinline std::string_view type_name_from_hash(pycppgen_type_hash_t hash)\n"
+    code += "\t{\n"
+    code += "\t\tstatic const std::map<pycppgen_type_hash_t, std::string_view> table = {\n"
+    for _, node in TLS().NodeList.items() :
+        if ENode.Cpp in node and node[ENode.Cpp] and (node[ENode.Kind] == EKind.Class or node[ENode.Kind] == EKind.Struct) :
+            code += "\t\t\t{ pycppgen<" + node[ENode.FullName] + ">::type_hash(), \"" + node[ENode.FullName] + "\" },\n"
+    code += "\t\t};\n"
+    code += "\t\tconst auto it = table.find(hash);\n"
+    code += "\t\treturn it != table.end() ? it->second : std::string_view{};\n"
     code += "\t}\n\n"
 
     code += "\tstatic void for_each_enum(auto visitor)\n"
