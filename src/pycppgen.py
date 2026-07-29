@@ -1129,12 +1129,22 @@ def CodeGenOutputNode(node) :
 
         hppCode = CodeGenOutputMetaFooter(hppCode, node)
 
-        if "bitmask" in node.get(ENode.Attributes, {}) :
+        # "flags" is the spelling to use; "bitmask" is kept so existing annotations keep working.
+        attributes = node.get(ENode.Attributes, {})
+        if "flags" in attributes or "bitmask" in attributes :
             T = node[ENode.FullName]
-            hppCode += f"inline {T} operator|({T} a, {T} b) {{ using U = std::underlying_type_t<{T}>; return static_cast<{T}>(static_cast<U>(a) | static_cast<U>(b)); }}\n"
-            hppCode += f"inline {T} operator&({T} a, {T} b) {{ using U = std::underlying_type_t<{T}>; return static_cast<{T}>(static_cast<U>(a) & static_cast<U>(b)); }}\n"
-            hppCode += f"inline {T}& operator|=({T}& a, {T} b) {{ a = a | b; return a; }}\n"
-            hppCode += f"inline {T}& operator&=({T}& a, {T} b) {{ a = a & b; return a; }}\n"
+            U = f"std::underlying_type_t<{T}>"
+
+            # | and & yield pycppgen_flags_result rather than the enum, so the result converts to
+            # bool as well as back to the enum -- `if (a & Mask)` does not compile otherwise, since
+            # a scoped enum has no bool conversion. Everything else returns the enum directly.
+            hppCode += f"constexpr inline pycppgen_flags_result<{T}> operator|({T} a, {T} b) {{ return static_cast<{T}>(static_cast<{U}>(a) | static_cast<{U}>(b)); }}\n"
+            hppCode += f"constexpr inline pycppgen_flags_result<{T}> operator&({T} a, {T} b) {{ return static_cast<{T}>(static_cast<{U}>(a) & static_cast<{U}>(b)); }}\n"
+            hppCode += f"constexpr inline pycppgen_flags_result<{T}> operator^({T} a, {T} b) {{ return static_cast<{T}>(static_cast<{U}>(a) ^ static_cast<{U}>(b)); }}\n"
+            hppCode += f"constexpr inline {T} operator~({T} a) {{ return static_cast<{T}>(~static_cast<{U}>(a)); }}\n"
+            hppCode += f"constexpr inline {T}& operator|=({T}& a, {T} b) {{ a = static_cast<{T}>(static_cast<{U}>(a) | static_cast<{U}>(b)); return a; }}\n"
+            hppCode += f"constexpr inline {T}& operator&=({T}& a, {T} b) {{ a = static_cast<{T}>(static_cast<{U}>(a) & static_cast<{U}>(b)); return a; }}\n"
+            hppCode += f"constexpr inline {T}& operator^=({T}& a, {T} b) {{ a = static_cast<{T}>(static_cast<{U}>(a) ^ static_cast<{U}>(b)); return a; }}\n"
 
     return hppCode, cppCode
 
@@ -1293,6 +1303,25 @@ constexpr pycppgen_type_hash_t pycppgen_hash_name(std::string_view name)
 	}
 	return hash;
 }
+
+// Result of | and & on a flags enum.
+//
+// Returning the enum itself would be enough to combine values, but not to test them: a scoped
+// enum has no conversion to bool, so `if (flags & Mask)` does not compile. Converting to either
+// bool or the enum makes both `if (a & b)` and `E c = a | b;` work, which is the whole point of a
+// flags enum. Named rather than anonymous so it can appear in a header without surprising anyone.
+template<typename E>
+struct pycppgen_flags_result
+{
+	E Value;
+
+	constexpr pycppgen_flags_result(E value) : Value(value) {}
+	constexpr operator E() const { return Value; }
+	constexpr operator bool() const { return static_cast<std::underlying_type_t<E>>(Value) != 0; }
+
+	constexpr bool operator==(const pycppgen_flags_result& other) const = default;
+	constexpr bool operator==(E other) const { return Value == other; }
+};
 
 struct function_parameter_info {
 	std::string_view Name;
