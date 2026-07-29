@@ -819,7 +819,7 @@ def CodeGenOutputNode(node) :
 
         #declare the attribute map
         hppCode += "\tstatic attribute_map_t attributes() {\n"
-        hppCode += "\t\treturn {" + CodeGenOutputAttributes(node, 2) + "};\n" 
+        hppCode += "\t\treturn " + CodeGenOutputAttributes(node, 2) + ";\n" 
         hppCode += "\t};\n\n"
         
         #variables
@@ -1077,7 +1077,7 @@ def CodeGenOutputNode(node) :
 
         #append enum attributes
         hppCode += "\tattribute_map_t attributes() {\n"
-        hppCode += "\t\treturn {" + CodeGenOutputAttributes(node, 2) + "};\n" 
+        hppCode += "\t\treturn " + CodeGenOutputAttributes(node, 2) + ";\n" 
         hppCode += "};\n\n"
 
         if ENode.EnumValues in node :
