@@ -29,19 +29,30 @@ def ParseComments(cursor, kind : str = EParseComments.BeforeDecl):
         if len(cursorTokens) == 0 :
             return {}
         
-        firstToken = cursorTokens[0]
-        firstTokenIndex = tokens.index(next(x for x in tokens if x.location.line == firstToken.location.line))
+        #locate the cursor's own tokens inside the parent's token list by source offset, a line
+        #number isn't enough to tell two declarations sharing a line apart
+        def IndexOfToken(token) :
+            offset = token.extent.start.offset
+            return next(i for i, x in enumerate(tokens) if x.extent.start.offset == offset)
 
         if preDeclComments:
+            firstTokenIndex = IndexOfToken(cursorTokens[0])
             lastTokenIndex = firstTokenIndex
             while firstTokenIndex > 0 and tokens[firstTokenIndex - 1].kind == clang.cindex.TokenKind.COMMENT:
                 firstTokenIndex -= 1
         else:
-            lastTokenIndex = len(tokens)
-            while firstTokenIndex < lastTokenIndex and tokens[firstTokenIndex].kind != clang.cindex.TokenKind.COMMENT:
+            #only a comment trailing this declaration on its own last line belongs to it, otherwise
+            #every declaration would pick up the next tagged one further down the parent
+            lastCursorToken = cursorTokens[-1]
+            trailingLine = lastCursorToken.location.line
+            firstTokenIndex = IndexOfToken(lastCursorToken) + 1
+
+            #step over the separator that closes the declaration (, or ;) before the comment
+            while firstTokenIndex < len(tokens) and tokens[firstTokenIndex].location.line == trailingLine and tokens[firstTokenIndex].spelling in [",", ";"]:
                 firstTokenIndex += 1
+
             lastTokenIndex = firstTokenIndex
-            while lastTokenIndex < len(tokens) and tokens[lastTokenIndex].kind == clang.cindex.TokenKind.COMMENT:
+            while lastTokenIndex < len(tokens) and tokens[lastTokenIndex].kind == clang.cindex.TokenKind.COMMENT and tokens[lastTokenIndex].location.line == trailingLine:
                 lastTokenIndex += 1
 
     except StopIteration as e:
