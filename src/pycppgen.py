@@ -1365,10 +1365,23 @@ auto pycppgen_of(const T&)
 	return pycppgen<std::decay_t<T>>(); 
 }
 
+// The reflection of what a pointer points at. A type that nothing can derive from -- one that is not
+// polymorphic, or is final -- has its static type for its dynamic type, so it is reflected directly.
+// Anything else can point at a more derived object, and is dispatched on typeid at run time.
+//
+// The distinction is not only an optimisation. pycppgen<void> has a branch for every reflected type, and
+// a visitor passed to its for_each_var is instantiated for all of them; one that instantiates more
+// reflected code in turn (a property drawer, a serializer) multiplies that across every type it is
+// used on, which compiled to minutes per translation unit. A type that is reflected statically
+// instantiates the visitor once.
 template<typename T> requires (std::is_pointer_v<T>)
 auto pycppgen_of(const T t) 
 {
-	return pycppgen<void>(typeid(*t));
+	using object_t = std::remove_cv_t<std::remove_pointer_t<T>>;
+	if constexpr (pycppgen<object_t>::is_valid() && (!std::is_polymorphic_v<object_t> || std::is_final_v<object_t>))
+		return pycppgen<object_t>();
+	else
+		return pycppgen<void>(typeid(*t));
 }
 
 namespace pycppgen_detail
