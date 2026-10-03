@@ -29,19 +29,30 @@ def ParseComments(cursor, kind : str = EParseComments.BeforeDecl):
         if len(cursorTokens) == 0 :
             return {}
         
-        firstToken = cursorTokens[0]
-        firstTokenIndex = tokens.index(next(x for x in tokens if x.location.line == firstToken.location.line))
+        #locate the cursor's own tokens inside the parent's token list by source offset, a line
+        #number isn't enough to tell two declarations sharing a line apart
+        def IndexOfToken(token) :
+            offset = token.extent.start.offset
+            return next(i for i, x in enumerate(tokens) if x.extent.start.offset == offset)
 
         if preDeclComments:
+            firstTokenIndex = IndexOfToken(cursorTokens[0])
             lastTokenIndex = firstTokenIndex
             while firstTokenIndex > 0 and tokens[firstTokenIndex - 1].kind == clang.cindex.TokenKind.COMMENT:
                 firstTokenIndex -= 1
         else:
-            lastTokenIndex = len(tokens)
-            while firstTokenIndex < lastTokenIndex and tokens[firstTokenIndex].kind != clang.cindex.TokenKind.COMMENT:
+            #only a comment trailing this declaration on its own last line belongs to it, otherwise
+            #every declaration would pick up the next tagged one further down the parent
+            lastCursorToken = cursorTokens[-1]
+            trailingLine = lastCursorToken.location.line
+            firstTokenIndex = IndexOfToken(lastCursorToken) + 1
+
+            #step over the separator that closes the declaration (, or ;) before the comment
+            while firstTokenIndex < len(tokens) and tokens[firstTokenIndex].location.line == trailingLine and tokens[firstTokenIndex].spelling in [",", ";"]:
                 firstTokenIndex += 1
+
             lastTokenIndex = firstTokenIndex
-            while lastTokenIndex < len(tokens) and tokens[lastTokenIndex].kind == clang.cindex.TokenKind.COMMENT:
+            while lastTokenIndex < len(tokens) and tokens[lastTokenIndex].kind == clang.cindex.TokenKind.COMMENT and tokens[lastTokenIndex].location.line == trailingLine:
                 lastTokenIndex += 1
 
     except StopIteration as e:
@@ -478,7 +489,11 @@ def ParseCursor(cursor, forceInclude : bool = False)  -> None:
     
     if cursor.kind == CursorKind.ENUM_DECL :
         if cursor.is_definition() :
-            node = ParseEnum(cursor, True)
+            ParseEnum(cursor, True)
+            if fullName in TLS().NodeList :
+                enumNode = TLS().NodeList[fullName]
+                if "hlsl" in enumNode.get(ENode.Attributes, {}) :
+                    enumNode[ENode.Hlsl] = True
         return
 
     if cursor.kind == CursorKind.VAR_DECL :
@@ -603,6 +618,12 @@ def CodeGenOutputMetaHeader(code, node) :
         f"\tusing pycppgen_t = pycppgen<{node[ENode.FullName]}>;\n",
         "\tstatic constexpr bool is_valid() { return true; }\n",
         "\tstatic constexpr const char* name() { return \"" + node[ENode.Name] + "\"; }\n",
+        #fully qualified name; stable across compilers (unlike __FUNCSIG__/__PRETTY_FUNCTION__
+        #derived names), so it is safe to hash into a persistable type id
+        "\tstatic constexpr const char* full_name() { return \"" + node[ENode.FullName] + "\"; }\n",
+        #hashed from full_name() in C++ rather than precomputed here, so there is exactly one
+        #definition of the algorithm and no chance of the python and c++ sides drifting apart
+        "\tstatic constexpr pycppgen_type_hash_t type_hash() { return pycppgen_hash_name(full_name()); }\n",
     ])
 
     code += "".join(lines)
@@ -809,7 +830,7 @@ def CodeGenOutputNode(node) :
 
         #declare the attribute map
         hppCode += "\tstatic attribute_map_t attributes() {\n"
-        hppCode += "\t\treturn {" + CodeGenOutputAttributes(node, 2) + "};\n" 
+        hppCode += "\t\treturn " + CodeGenOutputAttributes(node, 2) + ";\n" 
         hppCode += "\t};\n\n"
         
         #variables
@@ -1067,7 +1088,7 @@ def CodeGenOutputNode(node) :
 
         #append enum attributes
         hppCode += "\tattribute_map_t attributes() {\n"
-        hppCode += "\t\treturn {" + CodeGenOutputAttributes(node, 2) + "};\n" 
+        hppCode += "\t\treturn " + CodeGenOutputAttributes(node, 2) + ";\n" 
         hppCode += "};\n\n"
 
         if ENode.EnumValues in node :
@@ -1119,6 +1140,23 @@ def CodeGenOutputNode(node) :
 
         hppCode = CodeGenOutputMetaFooter(hppCode, node)
 
+        # "flags" is the spelling to use; "bitmask" is kept so existing annotations keep working.
+        attributes = node.get(ENode.Attributes, {})
+        if "flags" in attributes or "bitmask" in attributes :
+            T = node[ENode.FullName]
+            U = f"std::underlying_type_t<{T}>"
+
+            # | and & yield pycppgen_flags_result rather than the enum, so the result converts to
+            # bool as well as back to the enum -- `if (a & Mask)` does not compile otherwise, since
+            # a scoped enum has no bool conversion. Everything else returns the enum directly.
+            hppCode += f"constexpr inline pycppgen_flags_result<{T}> operator|({T} a, {T} b) {{ return static_cast<{T}>(static_cast<{U}>(a) | static_cast<{U}>(b)); }}\n"
+            hppCode += f"constexpr inline pycppgen_flags_result<{T}> operator&({T} a, {T} b) {{ return static_cast<{T}>(static_cast<{U}>(a) & static_cast<{U}>(b)); }}\n"
+            hppCode += f"constexpr inline pycppgen_flags_result<{T}> operator^({T} a, {T} b) {{ return static_cast<{T}>(static_cast<{U}>(a) ^ static_cast<{U}>(b)); }}\n"
+            hppCode += f"constexpr inline {T} operator~({T} a) {{ return static_cast<{T}>(~static_cast<{U}>(a)); }}\n"
+            hppCode += f"constexpr inline {T}& operator|=({T}& a, {T} b) {{ a = static_cast<{T}>(static_cast<{U}>(a) | static_cast<{U}>(b)); return a; }}\n"
+            hppCode += f"constexpr inline {T}& operator&=({T}& a, {T} b) {{ a = static_cast<{T}>(static_cast<{U}>(a) & static_cast<{U}>(b)); return a; }}\n"
+            hppCode += f"constexpr inline {T}& operator^=({T}& a, {T} b) {{ a = static_cast<{T}>(static_cast<{U}>(a) ^ static_cast<{U}>(b)); return a; }}\n"
+
     return hppCode, cppCode
 
 #codegen: output file
@@ -1151,8 +1189,50 @@ def CodeGen(filePath : str) :
             hppCode += newHppCode
             cppCode += newCppCode
 
-        if ENode.Hlsl in node and node[ENode.Hlsl]:
-            hlslCode = CodeGenHlslNode(hlslCode, node)
+    # Collect all HLSL nodes and process them in dependency order so nested
+    # user-struct members are always generated before the structs that use them.
+    hlslNodes = [(key, TLS().NodeList[key]) for key in TLS().NodeList
+                 if ENode.Hlsl in TLS().NodeList[key] and TLS().NodeList[key][ENode.Hlsl]
+                 and TLS().NodeList[key][ENode.Kind] != EKind.Enum]
+
+    generatedStructs = {}   # name -> (hlsl_definition_block, total_size_bytes)
+    pending = list(hlslNodes)
+
+    while pending :
+        progress = False
+        nextPending = []
+        for key, node in pending :
+            # Check whether all user-struct member types are already resolved
+            allResolved = True
+            if ENode.Variables in node :
+                for _, var in node[ENode.Variables].items() :
+                    size, baseType, _, _, _ = PreParseHlsl(var[ENode.Type], node[ENode.HlslLayout], generatedStructs)
+                    if size == 0 :
+                        # size==0 means truly unknown type (not a user struct in generatedStructs)
+                        # Check if it's a potential user struct that just hasn't been generated yet
+                        userMatch = re.fullmatch(r'(\w+)\s*(?:\[(\w+)\])?', var[ENode.Type])
+                        if userMatch :
+                            baseName = RemoveHlsl(userMatch.group(1))
+                            # If this name is a known HLSL node that is still pending, defer
+                            if any(n[ENode.Name] == baseName for _, n in pending if (_, n) != (key, node)) :
+                                allResolved = False
+                                break
+            if allResolved :
+                hlslCode = CodeGenHlslNode(hlslCode, node, generatedStructs)
+                progress = True
+            else :
+                nextPending.append((key, node))
+        if not progress :
+            # No progress possible — cycle or missing dep; process remaining as-is
+            for key, node in nextPending :
+                hlslCode = CodeGenHlslNode(hlslCode, node, generatedStructs)
+            break
+        pending = nextPending
+
+    hlslEnumNodes = [(k, v) for k, v in TLS().NodeList.items()
+                     if v[ENode.Kind] == EKind.Enum and v.get(ENode.Hlsl, False)]
+    for _, node in hlslEnumNodes :
+        hlslCode = CodeGenHlslEnumNode(hlslCode, node)
 
     hppCode += "namespace pycppgen_globals {\n"
     for _, func in TLS().NodeList.items() :
@@ -1169,50 +1249,29 @@ def CodeGen(filePath : str) :
     cppFile = GetOutputFilePath(filePath, "cpp")
     hlslFile = GetOutputFilePath(filePath, kHlslExtension)
     
-    if hppCode == "" :
-        if os.path.exists(hppFile) :
-            os.remove(hppFile)
-    else :
-        atomic_print("generating code for: " + hppFile)
-        with open(hppFile, mode="wt") as output :
-            output.write(hppCode)
-
-    if cppCode == "" :
-        if os.path.exists(cppFile) :
-            os.remove(cppFile)
-    else :
-        atomic_print("generating code for: " + cppFile)
-        cppCode = f"#include \"{hppFile}\"\n\n" + cppCode
-        with open(cppFile, mode="wt") as output :
-            output.write(cppCode)
-
-    if hlslCode == "" :
-        if os.path.exists(hlslFile) :
-            os.remove(hlslFile)
-    else :
-        atomic_print("generating code for: " + hlslFile)
-        if not os.path.exists(pathlib.Path(hlslFile).parent) :
-            os.makedirs(pathlib.Path(hlslFile).parent)
-            
-        with open(hlslFile, mode="wt") as output :
-            hlslCode = f"""
-////////////////////////////////
-//{pathlib.Path(hlslFile).name}
-
-#pragma once
-
-{hlslCode}
-
-//{pathlib.Path(hlslFile).name}
-////////////////////////////////
-"""
-            output.write(hlslCode)            
+    write_file_if_different(hppFile, hppCode if hppCode != "" else None)
+    write_file_if_different(cppFile, f"#include \"{hppFile}\"\n\n{cppCode}" if cppCode != "" else None)
+    write_file_if_different(hlslFile, get_final_hlsl_conent(hlslCode, hlslFile) if hlslCode != "" else None)
 
 #codegen: emit for each type call
 def CodeGenGlobalAddForEachTypeCall(code, node) :
     if node[ENode.Kind] == EKind.Class or node[ENode.Kind] == EKind.Struct : #or node[ENode.Kind] == EKind.ClassTemplate:
         code += f"\t\tvisitor.template operator()<{node[ENode.FullName]}>();\n"
     return code
+
+#only direct bases are parsed (ParseStruct/CXX_BASE_SPECIFIER), so walk them to get the full
+#ancestor set. unreflected bases are already dropped at parse time and simply end the chain.
+def CollectAllParents(fullName, result = None) :
+    if result is None :
+        result = []
+    node = TLS().NodeList.get(fullName)
+    if node is None or not ENode.Parents in node :
+        return result
+    for p in node[ENode.Parents] :
+        if p not in result : #also guards against a malformed cache looping forever
+            result.append(p)
+            CollectAllParents(p, result)
+    return result
 
 #codegen: output global file
 def CodeGenGlobalHeader(path : str) :
@@ -1223,6 +1282,7 @@ def CodeGenGlobalHeader(path : str) :
 #ifndef _PYCPPGEN_HEADER_
 #define _PYCPPGEN_HEADER_
 
+#include <cstdint>
 #include <string>
 #include <string_view>
 #include <array>
@@ -1236,6 +1296,43 @@ def CodeGenGlobalHeader(path : str) :
 #include <any>
 
 using attribute_map_t = std::unordered_map<std::string_view, std::string_view>;
+
+// uint64_t rather than size_t: the FNV constants below are 64 bit, so a 32 bit size_t would
+// silently truncate them and yield different values on a 32 bit target.
+using pycppgen_type_hash_t = uint64_t;
+
+// FNV-1a (64 bit) over the fully qualified type name. Unlike typeid().hash_code(), which varies
+// between builds and processes, this is stable everywhere the name is, so it is safe to persist
+// to disk and to use as a cross-process type id.
+constexpr pycppgen_type_hash_t pycppgen_hash_name(std::string_view name)
+{
+	pycppgen_type_hash_t hash = 14695981039346656037ull;
+	for (const char c : name)
+	{
+		hash ^= static_cast<pycppgen_type_hash_t>(static_cast<unsigned char>(c));
+		hash *= 1099511628211ull;
+	}
+	return hash;
+}
+
+// Result of | and & on a flags enum.
+//
+// Returning the enum itself would be enough to combine values, but not to test them: a scoped
+// enum has no conversion to bool, so `if (flags & Mask)` does not compile. Converting to either
+// bool or the enum makes both `if (a & b)` and `E c = a | b;` work, which is the whole point of a
+// flags enum. Named rather than anonymous so it can appear in a header without surprising anyone.
+template<typename E>
+struct pycppgen_flags_result
+{
+	E Value;
+
+	constexpr pycppgen_flags_result(E value) : Value(value) {}
+	constexpr operator E() const { return Value; }
+	constexpr operator bool() const { return static_cast<std::underlying_type_t<E>>(Value) != 0; }
+
+	constexpr bool operator==(const pycppgen_flags_result& other) const = default;
+	constexpr bool operator==(E other) const { return Value == other; }
+};
 
 struct function_parameter_info {
 	std::string_view Name;
@@ -1268,10 +1365,23 @@ auto pycppgen_of(const T&)
 	return pycppgen<std::decay_t<T>>(); 
 }
 
+// The reflection of what a pointer points at. A type that nothing can derive from -- one that is not
+// polymorphic, or is final -- has its static type for its dynamic type, so it is reflected directly.
+// Anything else can point at a more derived object, and is dispatched on typeid at run time.
+//
+// The distinction is not only an optimisation. pycppgen<void> has a branch for every reflected type, and
+// a visitor passed to its for_each_var is instantiated for all of them; one that instantiates more
+// reflected code in turn (a property drawer, a serializer) multiplies that across every type it is
+// used on, which compiled to minutes per translation unit. A type that is reflected statically
+// instantiates the visitor once.
 template<typename T> requires (std::is_pointer_v<T>)
 auto pycppgen_of(const T t) 
 {
-	return pycppgen<void>(typeid(*t));
+	using object_t = std::remove_cv_t<std::remove_pointer_t<T>>;
+	if constexpr (pycppgen<object_t>::is_valid() && (!std::is_polymorphic_v<object_t> || std::is_final_v<object_t>))
+		return pycppgen<object_t>();
+	else
+		return pycppgen<void>(typeid(*t));
 }
 
 namespace pycppgen_detail
@@ -1336,6 +1446,41 @@ def CodeGenGlobal(path : str) :
     for _, node in TLS().NodeList.items() :
         if ENode.Cpp in node and node[ENode.Cpp]:
             code = CodeGenGlobalAddForEachTypeCall(code, node)
+    code += "\t}\n\n"
+
+    #type_hash -> transitive ancestor hashes. keyed by pycppgen_hash_name(full_name()) so the table
+    #can be queried from a hash read back off disk, which typeid()-based ids cannot support.
+    code += "\tinline const std::map<pycppgen_type_hash_t, std::vector<pycppgen_type_hash_t>>& type_ancestors()\n"
+    code += "\t{\n"
+    code += "\t\tstatic const std::map<pycppgen_type_hash_t, std::vector<pycppgen_type_hash_t>> table = {\n"
+    for _, node in TLS().NodeList.items() :
+        if ENode.Cpp in node and node[ENode.Cpp] and (node[ENode.Kind] == EKind.Class or node[ENode.Kind] == EKind.Struct) :
+            parents = CollectAllParents(node[ENode.FullName])
+            entries = ", ".join([f"pycppgen<{p}>::type_hash()" for p in parents])
+            code += "\t\t\t{ pycppgen<" + node[ENode.FullName] + ">::type_hash(), { " + entries + " } },\n"
+    code += "\t\t};\n"
+    code += "\t\treturn table;\n"
+    code += "\t}\n\n"
+
+    code += "\tinline bool is_child_of(pycppgen_type_hash_t base, pycppgen_type_hash_t derived)\n"
+    code += "\t{\n"
+    code += "\t\tif (base == derived) return true;\n"
+    code += "\t\tconst auto& table = type_ancestors();\n"
+    code += "\t\tconst auto it = table.find(derived);\n"
+    code += "\t\tif (it == table.end()) return false;\n"
+    code += "\t\treturn std::find(it->second.begin(), it->second.end(), base) != it->second.end();\n"
+    code += "\t}\n\n"
+
+    #reverse lookup for diagnostics: a hash off disk has no name attached to it otherwise
+    code += "\tinline std::string_view type_name_from_hash(pycppgen_type_hash_t hash)\n"
+    code += "\t{\n"
+    code += "\t\tstatic const std::map<pycppgen_type_hash_t, std::string_view> table = {\n"
+    for _, node in TLS().NodeList.items() :
+        if ENode.Cpp in node and node[ENode.Cpp] and (node[ENode.Kind] == EKind.Class or node[ENode.Kind] == EKind.Struct) :
+            code += "\t\t\t{ pycppgen<" + node[ENode.FullName] + ">::type_hash(), \"" + node[ENode.FullName] + "\" },\n"
+    code += "\t\t};\n"
+    code += "\t\tconst auto it = table.find(hash);\n"
+    code += "\t\treturn it != table.end() ? it->second : std::string_view{};\n"
     code += "\t}\n\n"
 
     code += "\tstatic void for_each_enum(auto visitor)\n"
@@ -1491,7 +1636,7 @@ def IsFileDifferent(file, content) :
     
     return fileContent != content
 
-def ProcessFile(file : str, compilerOptions) :
+def ProcessFile(file : str, compilerOptions, cacheFileTime: float) :
     global OutdatedFiles, FilesToCodeGen, PerFileData
 
     file = ResolvePath(file)
@@ -1504,11 +1649,7 @@ def ProcessFile(file : str, compilerOptions) :
     if not "IncludedFiles" in PerFileData[file] :
         PerFileData[file]["IncludedFiles"] = []
 
-    fileTime = 0
-    if os.path.exists(GetOutputFilePath(file)) :
-        fileTime = os.path.getmtime(GetOutputFilePath(file))
-
-    isOutdated = file in OutdatedFiles
+    isOutdated = file in OutdatedFiles or not os.path.exists(GetOutputFilePath(file))
     needsCodeGen = isOutdated
     needsParseTU = False
 
@@ -1516,7 +1657,12 @@ def ProcessFile(file : str, compilerOptions) :
     if not IsFileUpToDate(file, CacheFile) or not IsFileUpToDate(GetOutputFilePath(file), CacheFile) :
         needsParseTU = True
         if not isOutdated :
-            atomic_print(f"outdated cache entry for {file}") 
+            atomic_print(f"outdated cache entry for {file}")
+
+    # if the file is outdated but has no cached NodeList (e.g. script was updated and
+    # the old cache file still exists on disk), we must re-parse to rebuild the NodeList
+    if isOutdated and "NodeList" not in PerFileData[file] :
+        needsParseTU = True
 
     tu = None
     tmpFilePath = None
@@ -1529,7 +1675,7 @@ def ProcessFile(file : str, compilerOptions) :
         PerFileData[file]["IncludedFiles"] = list(set(includedFiles))
 
     for f in PerFileData[file]["IncludedFiles"] :
-        if not f.endswith("pycppgen.h") and os.path.getmtime(f) > fileTime :
+        if not f.endswith("pycppgen.h") and (os.path.getmtime(f) > cacheFileTime) if os.path.exists(f) else True :
             needsCodeGen = True
             if not f in FilesToParse and FileContainsPyCppGenTag(f) :
                 FilesToParse.append(f)
@@ -1617,7 +1763,7 @@ def main(args : list) :
                 filePath = os.path.join(root, file)
                 if FileContainsPyCppGenTag(filePath) :
                     FilesToParse.append(os.path.join(root, file))
-            if file != "pycppgen.gen.h" and re.match(r".*\.gen.h$", file) :
+            if file != "pycppgen.gen.h" and (re.match(r".*\.gen.h$", file) or re.match(fr".*\.gen.{kHlslExtension}$", file)) :
                 OldGenFiles += [os.path.join(root, file)]
     
     compilerOptions = []
@@ -1625,16 +1771,15 @@ def main(args : list) :
         compilerOptions = args[1:]
 
     GenFiles = list(map(lambda x : GetOutputFilePath(x), FilesToParse))
+    GenFiles += list(map(lambda x : GetOutputFilePath(x, kHlslExtension), FilesToParse))
     OldGenFiles = list(map(lambda x : ResolvePath(x), OldGenFiles))
 
     #if the script is newer than the cache, remove all files as we need to rebuild everything
+    outdatedCache = False
     if not IsFileUpToDate(inspect.getsourcefile(sys.modules[__name__]), CacheFile) :
         atomic_print("Outdated file cache")
-        for file in OldGenFiles :
-            if os.path.exists(file) :
-                os.remove(file)
-        OldGenFiles = []
         OutdatedFiles = set(FilesToParse)
+        outdatedCache = True
     else :
         #mark the outdated files
         for file in FilesToParse :
@@ -1643,26 +1788,28 @@ def main(args : list) :
                 OutdatedFiles.add(file)
 
     FilesToRemove = list(set(OldGenFiles).difference(GenFiles))
-    FilesToAdd = list(set(GenFiles).difference(OldGenFiles))
      
     #load cache
     CachedPerFileData = {}
-    if os.path.exists(CacheFile) :
+    cacheFileTime = 0
+    if os.path.exists(CacheFile) and not outdatedCache:
         with open(CacheFile, "rt") as file :
             try :
                 CachedPerFileData = json.loads(file.read())
+                cacheFileTime = os.path.getmtime(CacheFile)
             except :
                 CachedPerFileData = {}
+                cacheFileTime = 0
 
     PerFileData = {}
 
     if DebugMode :
         for file in FilesToParse :
-            ProcessFile(file, compilerOptions)
+            ProcessFile(file, compilerOptions, cacheFileTime)
     else :
         with ThreadPoolExecutor() as pool :
             for file in FilesToParse :
-                pool.submit(ProcessFile, file, compilerOptions)
+                pool.submit(ProcessFile, file, compilerOptions, cacheFileTime)
 
     if DebugMode :
         for file in FilesToCodeGen :

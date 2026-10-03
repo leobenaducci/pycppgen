@@ -3,7 +3,7 @@
 #include <array>
 #include <vector>
 
-//$[[pycppgen bitmask]]
+//$[[pycppgen bitmask;hlsl]]
 enum class EEnum : unsigned
 {
     None = 0,

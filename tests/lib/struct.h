@@ -75,6 +75,22 @@ struct SStructBase
     float x;
 };
 
+// Nested user-struct member test: SInner is used as a field type inside SOuter
+struct SInner_pyhlslgen
+{
+    float x;
+    float y;
+    float z;
+    float w;
+};
+
+struct SOuter_pyhlslgen
+{
+    SInner_pyhlslgen A;
+    uint3 B;
+    SInner_pyhlslgen C[2];
+};
+
 namespace vkfw
 {
     //$[[pycppgen visible]]

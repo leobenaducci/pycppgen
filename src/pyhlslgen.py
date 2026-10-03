@@ -1,8 +1,8 @@
 from common import *
 
 kHlslExtension : Final[str] = "hlsli"
-kHlslTypes: Final[list]= ["int", "uint", "float", "bool", "double", "int64_t", "uint64_t", "float16_t", "int16_t", "uint16_t", "int8_t", "uint8_t"]
-kPyHlslVectorTypes: Final[list]= ["int", "uint", "float", "bool", "double", "int64_t", "uint64_t", "int16_t", "uint16_t", "int8_t", "uint8_t"]
+kHlslTypes: Final[list]= ["int", "uint", "float", "half", "bool",  "double", "int64_t", "uint64_t", "float16_t", "int16_t", "uint16_t", "int8_t", "uint8_t"]
+kPyHlslVectorTypes: Final[list]= ["int", "uint", "float", "half", "bool", "double", "int64_t", "uint64_t", "int16_t", "uint16_t", "int8_t", "uint8_t"]
 kPyHlslMatrixTypes: Final[list]= ["int", "uint", "float", "double", "int64_t", "uint64_t"]
 
 def GenHlslDeclarations() :
@@ -28,6 +28,7 @@ def GenVkToHlslMappings() :
         vkToHlsl[f"ivec{r}"] = f"int{r}"
         vkToHlsl[f"uvec{r}"] = f"uint{r}"
         vkToHlsl[f"vec{r}"] = f"float{r}"
+        vkToHlsl[f"hvec{r}"] = f"half{r}"
         vkToHlsl[f"bvec{r}"] = f"bool{r}"
         vkToHlsl[f"dvec{r}"] = f"double{r}"
         vkToHlsl[f"u64vec{r}"] = f"uint64_t{r}"        
@@ -41,6 +42,7 @@ def GenVkToHlslMappings() :
         vkToHlsl[f"mat{r}"] = f"float{r}x{r}"
         vkToHlsl[f"imat{r}"] = f"int{r}x{r}"
         vkToHlsl[f"umat{r}"] = f"uint{r}x{r}"
+        vkToHlsl[f"hmat{r}"] = f"half{r}x{r}"
         vkToHlsl[f"bmat{r}"] = f"bool{r}x{r}"
         vkToHlsl[f"dmat{r}"] = f"double{r}x{r}"
         vkToHlsl[f"u64mat{r}"] = f"uint64_t{r}x{r}"
@@ -51,6 +53,7 @@ def GenVkToHlslMappings() :
         vkToHlsl[f"u8mat{r}"] = f"uint8_t{r}x{r}"
         for c in range(2, 5) :
             vkToHlsl[f"mat{r}x{c}"] = f"float{r}x{c}"
+            vkToHlsl[f"hmat{r}x{c}"] = f"half{r}x{c}"
             vkToHlsl[f"dmat{r}x{c}"] = f"double{r}x{c}"
             vkToHlsl[f"imat{r}x{c}"] = f"int{r}x{c}"
             vkToHlsl[f"umat{r}x{c}"] = f"uint{r}x{c}"
@@ -68,18 +71,21 @@ kHlslDeclarations : Final[str] = GenHlslDeclarations()
 kVkToHlsl : Final[dict] = GenVkToHlslMappings()
 
 kPyhlslgenHeader = """
-template<typename T = void> struct pyhlslgen 
+template<typename T = void> struct pyhlslgen
 {
-    using type_t = T; 
+    using type_t = T;
     static constexpr bool is_valid = false;
     static constexpr bool is_primitive = false;
+    static constexpr bool is_enum = false;
+    static constexpr bool is_bitmask = false;
     static constexpr bool uniform_alignment = false;
     static constexpr bool relaxed_alignment = false;
     static constexpr bool scalar_alignment = false;
-    static constexpr char type_name[] = ""; 
-    static constexpr char full_decl[] = ""; 
-    static constexpr char struct_decl[] = ""; 
+    static constexpr char type_name[] = "";
+    static constexpr char full_decl[] = "";
+    static constexpr char struct_decl[] = "";
     static constexpr char cbuffer_decl[] = "";
+    static constexpr char enum_decl[] = "";
 };
 
 #ifdef _HLSL_TYPES_DECLARED_
@@ -87,7 +93,7 @@ template<typename T = void> struct pyhlslgen
 
 for v in kPyHlslVectorTypes :
     kPyhlslgenHeader += f"""template<> struct pyhlslgen<{v}> {{ using type_t = {v}; static constexpr bool is_valid = true; static constexpr bool is_primitive = true; static constexpr bool scalar_alignment = true; static constexpr char type_name[] = "{v}";  }};\n"""
-    for i in range(2, 5) :
+    for i in range(1, 5) :
         kPyhlslgenHeader += f"""template<> struct pyhlslgen<{v}{i}> {{ using type_t = {v}{i}; static constexpr bool is_valid = true; static constexpr bool is_primitive = true; static constexpr bool scalar_alignment = true; static constexpr char type_name[] = "{v}{i}";  }};\n"""
 
 for v in kPyHlslMatrixTypes :
@@ -113,7 +119,7 @@ def GetHlslAlignment(var : str) :
     
     return "NONE"
 
-def PreParseHlsl(varType : str, layout : str) -> tuple[int, str, int, int, int]:
+def PreParseHlsl(varType : str, layout : str, knownStructs : dict = {}) -> tuple[int, str, int, int, int]:
 
     #match type<n>x<m>[s] patterns
     match = re.fullmatch(rf'({"|".join(kHlslTypes)})(\d)?(?:x(\d))?(?:\[(\w+)\])?', varType)
@@ -183,52 +189,82 @@ def PreParseHlsl(varType : str, layout : str) -> tuple[int, str, int, int, int]:
 
         return int(size), baseType, int(arraySize), int(rows), int(cols)
     
+    # Check if it's a known user-defined struct (with optional array suffix).
+    # Strip any _pyhlslgen* suffix from the type name before lookup, since the
+    # type spelling from libclang preserves the original C++ name (e.g.
+    # "SInner_pyhlslgen") while generatedStructs keys are the cleaned names.
+    # libclang may spell array types with a space before the bracket, e.g.
+    # "SInner_pyhlslgen [2]", so we allow an optional space.
+    userMatch = re.fullmatch(r'(\w+)\s*(?:\[(\w+)\])?', varType)
+    if userMatch:
+        baseName, arraySize = userMatch.groups()
+        cleanName = RemoveHlsl(baseName)
+        if cleanName in knownStructs:
+            structSize = knownStructs[cleanName][1]  # total size in bytes
+            arraySize = int(arraySize) if arraySize else 1
+            return structSize * arraySize, cleanName, arraySize, 1, 1
+
     return 0, "", 1, 1, 1
     
 #codegen: emit a hlsl node
-def CodeGenHlslNode(hlslCode, node) -> str:
+def CodeGenHlslNode(hlslCode, node, generatedStructs : dict = {}) -> str:
     
     vksdk = os.getenv("VULKAN_SDK")
     if vksdk == "":
         return ""
 
     hlslLayout = node[ENode.HlslLayout]
-    hlslTemp = f"struct {node[ENode.Name]}\n{{\n"
 
     nameSizeMap = {}
     member = ""
 
+    # Collect nested user-struct dependencies to prepend to the synthetic shader
+    nestedDefs = ""
+    alreadyPrepended = set()
+
+    structFields = ""
     if ENode.Variables in node :
         for _, var in node[ENode.Variables].items() :
             
-            size, baseType, arraySize, rows, cols = PreParseHlsl(var[ENode.Type], hlslLayout)
+            size, baseType, arraySize, rows, cols = PreParseHlsl(var[ENode.Type], hlslLayout, generatedStructs)
             
             nameSizeMap[var[ENode.Name]] = size
 
-            newDecl = f"\t{baseType}"
-            if rows > 1:
-                newDecl += f"{rows}"
-            if cols > 1:
-                newDecl += f"x{cols}"
+            # Build the field declaration for the synthetic HLSL shader
+            isUserStruct = size > 0 and baseType in generatedStructs
+            if isUserStruct :
+                # User-defined struct member: emit as "StructName varName[N];"
+                newDecl = f"\t{baseType}\t"
             else :
-                newDecl += f"\t"
+                newDecl = f"\t{baseType}"
+                if rows > 1:
+                    newDecl += f"{rows}"
+                if cols > 1:
+                    newDecl += f"x{cols}"
+                else :
+                    newDecl += f"\t"
 
             newDecl += f"\t{var[ENode.Name]}"
             if arraySize and int(arraySize) > 1:
                 newDecl += f"[{arraySize}]"
 
             if size == 0 :
-                print(f"HLSL Error: Unsupported type {newDecl.replace("\t", " ")} in {node[ENode.Name]}")
+                print(f"HLSL Error: Unsupported type {newDecl.replace(chr(9), ' ')} in {node[ENode.Name]}")
                 continue
+
+            # Prepend the nested struct's HLSL definition if not already done
+            if isUserStruct and baseType not in alreadyPrepended:
+                nestedDefs += generatedStructs[baseType][0]
+                alreadyPrepended.add(baseType)
 
             if member == "" :
                 member = var[ENode.Name]
                 if arraySize > 1 :
                     member += "[0]"
 
-            hlslTemp += newDecl + ";\n"
+            structFields += newDecl + ";\n"
 
-    hlslTemp += "};\n"
+    hlslTemp = nestedDefs + f"struct {node[ENode.Name]}\n{{\n" + structFields + "};\n"
 
     if hlslLayout == "uniform" :
         hlslTemp += f"ConstantBuffer<{node[ENode.Name]}> inBuffer;\n"
@@ -315,10 +351,17 @@ def CodeGenHlslNode(hlslCode, node) -> str:
 
         newDecl = "\t"
 
-        if member["type"] in kVkToHlsl :
-            newDecl += kVkToHlsl[member["type"]]
+        memberTypeName = member["type"]
+        if memberTypeName in kVkToHlsl :
+            newDecl += kVkToHlsl[memberTypeName]
         else :
-            newDecl += member["type"]
+            # Resolve spirv-cross type ID to actual name (e.g. "_7" -> "SInner")
+            if memberTypeName in parsed["types"] :
+                resolvedName = parsed["types"][memberTypeName]["name"]
+                cleanName = RemoveHlsl(resolvedName)
+                if cleanName in generatedStructs :
+                    memberTypeName = cleanName
+            newDecl += memberTypeName
 
         newDecl += f" {member["name"]}"
 
@@ -389,4 +432,73 @@ template<> struct pyhlslgen<{cppNodeName}>
 #endif //__{cppNodeName.upper()}_DECL__
 """
 
+    # Register this struct so subsequent structs can use it as a member type
+    generatedStructs[node[ENode.Name]] = (hlslResult, offset)
+
     return hlslCode + result
+
+def _GetHlslEnumType(underlyingType : str) -> str:
+    signed = {"int", "signed", "signed int"}
+    if any(underlyingType == s for s in signed):
+        return "int"
+    return "uint"
+
+def CodeGenHlslEnumNode(hlslCode : str, node) -> str:
+    enumName  = node[ENode.Name]
+    fullName  = node[ENode.FullName]
+    namespace = node[ENode.Namespace]
+    isBitmask = "bitmask" in node.get(ENode.Attributes, {})
+    hlslType  = _GetHlslEnumType(node.get(ENode.UnderlyingType, "unsigned"))
+
+    cppNodeName : str = fullName[len(namespace):].lstrip('::').replace("::", "_")
+    guardMacro = f"__{cppNodeName.upper()}_ENUM_DECL__"
+
+    constantsBlock = ""
+    if ENode.EnumValues in node:
+        for valueName, valueData in node[ENode.EnumValues].items():
+            constantsBlock += f"static const {hlslType} {enumName}_{valueName} = {valueData['value']};\n"
+
+    openNamespaces = ""
+    closeNamespaces = ""
+    if namespace:
+        for ns in namespace.split('::'):
+            openNamespaces  += f"namespace {ns} {{\n"
+            closeNamespaces += "}\n"
+
+    result = f"""
+#ifndef {guardMacro}
+#define {guardMacro}
+
+#ifdef __cplusplus
+{openNamespaces}
+template<> struct pyhlslgen<{fullName}>
+{{
+    using type_t = {fullName};
+    static constexpr bool is_valid     = true;
+    static constexpr bool is_primitive = false;
+    static constexpr bool is_enum      = true;
+    static constexpr bool is_bitmask   = {"true" if isBitmask else "false"};
+    static constexpr char type_name[]  = "{enumName}";
+    static constexpr char enum_decl[]  = R"-({constantsBlock})-";
+}};
+{closeNamespaces}
+#else
+{constantsBlock}
+#endif //__cplusplus
+#endif //{guardMacro}
+"""
+    return hlslCode + result
+
+def get_final_hlsl_conent(hlslCode : str, hlslFile : str) :
+
+    return f"""
+////////////////////////////////
+//{pathlib.Path(hlslFile).name}
+
+#pragma once
+
+{hlslCode}
+
+//{pathlib.Path(hlslFile).name}
+////////////////////////////////
+"""
