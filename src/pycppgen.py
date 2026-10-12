@@ -1259,6 +1259,12 @@ def CodeGenGlobalAddForEachTypeCall(code, node) :
         code += f"\t\tvisitor.template operator()<{node[ENode.FullName]}>();\n"
     return code
 
+#whether a cached file belongs to the project being generated rather than to a --P dependency whose
+#cache was merged in. keys are absolute header paths; the merged-list key ("pycppgen.gen.h") is not.
+def IsModuleFile(file) :
+    path = pathlib.Path(file)
+    return path.is_absolute() and path.is_relative_to(ProjectPath)
+
 #only direct bases are parsed (ParseStruct/CXX_BASE_SPECIFIER), so walk them to get the full
 #ancestor set. unreflected bases are already dropped at parse time and simply end the chain.
 def CollectAllParents(fullName, result = None) :
@@ -1445,6 +1451,20 @@ def CodeGenGlobal(path : str) :
     code += "\tstatic void for_each_type(auto visitor) {\n"
     for _, node in TLS().NodeList.items() :
         if ENode.Cpp in node and node[ENode.Cpp]:
+            code = CodeGenGlobalAddForEachTypeCall(code, node)
+    code += "\t}\n\n"
+
+    #the same, restricted to the types this project defines itself. for_each_type also lists every
+    #type merged in from the --P dependencies, so per-type work driven by it (registration, say) is
+    #redone by every dependent; driven by this, each module does its own types once, in its own build.
+    moduleTypes = set()
+    for file, data in PerFileData.items() :
+        if "NodeList" in data and IsModuleFile(file) :
+            moduleTypes.update(data["NodeList"].keys())
+
+    code += "\tstatic void for_each_module_type(auto visitor) {\n"
+    for name, node in TLS().NodeList.items() :
+        if name in moduleTypes and ENode.Cpp in node and node[ENode.Cpp]:
             code = CodeGenGlobalAddForEachTypeCall(code, node)
     code += "\t}\n\n"
 
