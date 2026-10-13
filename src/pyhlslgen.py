@@ -206,12 +206,30 @@ def PreParseHlsl(varType : str, layout : str, knownStructs : dict = {}) -> tuple
 
     return 0, "", 1, 1, 1
     
+#the shader tools the HLSL layout check runs: PYCPPGEN_DXC / PYCPPGEN_SPIRV_CROSS when set, otherwise
+#the Vulkan SDK's copies. On Linux there is usually no SDK, and the build passes both explicitly.
+def FindShaderTool(envName : str, sdkName : str) -> str | None :
+    explicit = os.getenv(envName)
+    if explicit :
+        return explicit
+    vksdk = os.getenv("VULKAN_SDK")
+    if not vksdk :
+        return None
+    exe = sdkName + (".exe" if os.name == "nt" else "")
+    for binDir in ("Bin", "bin") :
+        candidate = os.path.join(vksdk, binDir, exe)
+        if os.path.exists(candidate) :
+            return candidate
+    return None
+
 #codegen: emit a hlsl node
 def CodeGenHlslNode(hlslCode, node, generatedStructs : dict = {}) -> str:
     
-    vksdk = os.getenv("VULKAN_SDK")
-    if vksdk == "":
-        return ""
+    dxc = FindShaderTool("PYCPPGEN_DXC", "dxc")
+    spirvCross = FindShaderTool("PYCPPGEN_SPIRV_CROSS", "spirv-cross")
+    if dxc is None or spirvCross is None :
+        #used to test VULKAN_SDK against "", which getenv never returns, and then fail on "None\\bin\\dxc.exe"
+        raise RuntimeError("pycppgen: dxc and spirv-cross are needed to lay out HLSL structs; set VULKAN_SDK, or PYCPPGEN_DXC and PYCPPGEN_SPIRV_CROSS")
 
     hlslLayout = node[ENode.HlslLayout]
 
@@ -290,7 +308,9 @@ def CodeGenHlslNode(hlslCode, node, generatedStructs : dict = {}) -> str:
         vk_layout = "-fvk-use-scalar-layout"
     else :
         vk_layout = "-fvk-use-dx-layout"
-    result = subprocess.run([f"{vksdk}\\bin\\dxc.exe", "-spirv", "-fspv-target-env=vulkan1.3", "-fspv-reflect", vk_layout, "-enable-16bit-types", "-T cs_6_2", "-E main", f"-Fo {fileName}.spv", fileName], capture_output=True)
+    #one list element per argument: Windows joins the list back into a command line, so "-T cs_6_2" used
+    #to work there, but elsewhere it reaches dxc as a single argument with the profile " cs_6_2"
+    result = subprocess.run([dxc, "-spirv", "-fspv-target-env=vulkan1.3", "-fspv-reflect", vk_layout, "-enable-16bit-types", "-T", "cs_6_2", "-E", "main", "-Fo", f"{fileName}.spv", fileName], capture_output=True)
     if os.path.exists(f"{fileName}"):
         os.remove(f"{fileName}")
 
@@ -298,7 +318,7 @@ def CodeGenHlslNode(hlslCode, node, generatedStructs : dict = {}) -> str:
         atomic_print(result.stderr.decode())
         return hlslCode
 
-    result = subprocess.run([f"{vksdk}\\bin\\spirv-cross", f"{fileName}.spv", "--reflect", "--hlsl", "--hlsl-enable-16bit-types"], capture_output=True)
+    result = subprocess.run([spirvCross, f"{fileName}.spv", "--reflect", "--hlsl", "--hlsl-enable-16bit-types"], capture_output=True)
     if os.path.exists(f"{fileName}.spv"):
         os.remove(f"{fileName}.spv")
 
@@ -406,6 +426,10 @@ struct {cppNodeName}
         for ns in node[ENode.Namespace].split('::') :
             openNamespaces += f"namespace {ns} {{\n"
             closeNamespaces += '}\n'
+    #the struct lives in its namespace, but the pyhlslgen specialization must not: an explicit
+    #specialization belongs to a namespace enclosing the template's, which is the global one. MSVC
+    #accepted it inside, GCC and Clang do not -- so the namespace is closed first, and the type qualified
+    qualifiedName = f"{node[ENode.Namespace]}::{cppNodeName}" if node[ENode.Namespace] != "" else cppNodeName
     result = f"""
 #ifndef __{cppNodeName.upper()}_DECL__
 #define __{cppNodeName.upper()}_DECL__
@@ -413,9 +437,10 @@ struct {cppNodeName}
 #ifdef __cplusplus
 {openNamespaces}
 {hlslResult}
-template<> struct pyhlslgen<{cppNodeName}>
+{closeNamespaces}
+template<> struct pyhlslgen<{qualifiedName}>
 {{
-    using type_t = {cppNodeName};
+    using type_t = {qualifiedName};
     static constexpr bool is_valid = true;
     static constexpr bool is_primitive = false;
     static constexpr bool uniform_alignment = {"true" if uniform_alignment else "false"};
@@ -425,7 +450,6 @@ template<> struct pyhlslgen<{cppNodeName}>
     static constexpr char struct_decl[] = R"-({hlslDecl})-"; 
     static constexpr char uniform_decl[] = R"-({hlslResult.replace(f"struct {cppNodeName}", f"cbuffer {cppNodeName}_")})-";
 }};
-{closeNamespaces}
 #else
 {hlslResult}
 #endif //__cplusplus
@@ -470,7 +494,6 @@ def CodeGenHlslEnumNode(hlslCode : str, node) -> str:
 #define {guardMacro}
 
 #ifdef __cplusplus
-{openNamespaces}
 template<> struct pyhlslgen<{fullName}>
 {{
     using type_t = {fullName};
@@ -481,7 +504,6 @@ template<> struct pyhlslgen<{fullName}>
     static constexpr char type_name[]  = "{enumName}";
     static constexpr char enum_decl[]  = R"-({constantsBlock})-";
 }};
-{closeNamespaces}
 #else
 {constantsBlock}
 #endif //__cplusplus
