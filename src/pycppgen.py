@@ -1,4 +1,5 @@
 import clang.cindex
+import traceback
 from clang.cindex import CursorKind
 from clang.cindex import AccessSpecifier
 from pyhlslgen import *
@@ -750,13 +751,16 @@ def GenerateMemberVariableStructDefinition(node : dict, var : dict, infoName : s
     result += "\t" * tabs + "static constexpr const char* name() { return \"" + var[ENode.Name] + "\"; }\n"
     result += "\t" * tabs + "static constexpr const char* full_name() { return \"" + fullVarName + "\"; }\n"
     result += "\t" * tabs + "static constexpr const char* type_name() { return \"" + var[ENode.Type] + "\"; }\n"
-    result += "\t" * tabs + "static const type_info& type_id() { return typeid(type_t); }\n"
+    #std::type_info: MSVC also declares it at global scope, nothing else has to
+    result += "\t" * tabs + "static const std::type_info& type_id() { return typeid(type_t); }\n"
     if isStatic :
         result += "\t" * tabs + f"static type_t* variable_ptr() " + "{ return " + f"&{infoName}::{varName}; " + "}\n"
         result += "\t" * tabs + "static constexpr size_t offset() { return 0; }\n"
     else :
         result += "\t" * tabs + f"static type_t {node[ENode.Name]}::* variable_ptr() " + "{ return " + f"&{infoName}::{varName}; " + "}\n"
-        result += "\t" * tabs + "static constexpr size_t offset() { " + f"return std::integral_constant<size_t, (size_t)(&(static_cast<{infoName}*>(nullptr)->{varName}))>::value; " + "}\n"
+        #offsetof rather than the address of a member of a null pointer: MSVC folds the latter to a
+        #constant, GCC and Clang refuse it as one ("dereferencing a null pointer")
+        result += "\t" * tabs + "static constexpr size_t offset() { " + f"return offsetof({infoName}, {varName}); " + "}\n"
     result += "\t" * tabs + "static constexpr size_t element_size() { return sizeof(std::remove_all_extents_t<type_t>); }\n"
     result += "\t" * tabs + "static constexpr size_t total_size() { return sizeof(type_t); }\n"
     result += "\t" * tabs + "static constexpr size_t array_rank() { return pycppgen_detail::get_rank<type_t>(); }\n"
@@ -840,7 +844,10 @@ def CodeGenOutputNode(node) :
                     varName = f"{node[ENode.FullName]}::{var[ENode.Name]}"
 
                     hppCode += f"\t//{var[ENode.Type]} {var[ENode.Name]}\n"
-                    hppCode += f"\tusing {var[ENode.Name]}_type = decltype({varName});\n"
+                    #named through pycppgen_t, the derived class, not the owner: a protected non-static member
+                    #named through its own class with no object expression is not accessible here (GCC and
+                    #Clang say so, MSVC does not check), while the using-declarations above make it a member of ours
+                    hppCode += f"\tusing {var[ENode.Name]}_type = decltype(pycppgen_t::{var[ENode.Name]});\n"
                     if not var[ENode.Const] :
                         hppCode += f"\tvoid set_{var[ENode.Name]}(const {var[ENode.Name]}_type& value)"
                         hppCode += "{ if constexpr (!std::is_array<" + var[ENode.Name] + "_type>::value ) { " + varName + " = value; } }\n"
@@ -1288,7 +1295,10 @@ def CodeGenGlobalHeader(path : str) :
 #ifndef _PYCPPGEN_HEADER_
 #define _PYCPPGEN_HEADER_
 
+#include <climits>
+#include <cstddef>
 #include <cstdint>
+#include <typeinfo>
 #include <string>
 #include <string_view>
 #include <array>
@@ -1600,8 +1610,9 @@ def CodeGenGlobal(path : str) :
             code += f"\t\tpycppgen<{node[ENode.FullName]}>::for_each_var(visitor, maxDepth - 1);\n"
     code += "}\n\n"
 
-    if IsFileDifferent(path + "\\pycppgen.gen.h", code) :
-        with open(path + "\\pycppgen.gen.h", mode="wt") as file :
+    genPath = os.path.join(path, "pycppgen.gen.h")
+    if IsFileDifferent(genPath, code) :
+        with open(genPath, mode="wt") as file :
             file.write(code)
 
 def IsFileUpToDate(src : str | None, dst : str | None) :
@@ -1709,6 +1720,21 @@ def ProcessFile(file : str, compilerOptions, cacheFileTime: float) :
     if needsParseTU or needsCodeGen :
         FilesToCodeGen.add(file)
 
+#A worker's exception is kept on its future until something asks for it, and nothing used to: a file
+#that failed to parse or generate was simply missing afterwards, the run still exited 0, and the build
+#failed later on an include that did not exist. Every failure is printed with its traceback, then the
+#run fails, so the build stops here.
+def ReportFailedFutures(futures : dict, what : str) :
+    failed = 0
+    for future, file in futures.items() :
+        error = future.exception()
+        if error is not None :
+            failed += 1
+            atomic_print(f"error {what} {file}:\n" + "".join(traceback.format_exception(error)))
+    if failed > 0 :
+        atomic_print(f"{failed} file(s) failed")
+        sys.exit(1)
+
 def show_usage() :
         print("usage pycppgen.py <project-path> <options>")
         print("options:")
@@ -1768,8 +1794,8 @@ def main(args : list) :
 
     atomic_print("parsing path: " + ProjectPath)
 
-    if os.path.exists(ProjectPath + "\\pycppgen.gen.cpp"):
-        os.remove(ProjectPath + "\\pycppgen.gen.cpp")
+    if os.path.exists(os.path.join(ProjectPath, "pycppgen.gen.cpp")):
+        os.remove(os.path.join(ProjectPath, "pycppgen.gen.cpp"))
 
     #find headers with the pycppgen tag and the previously generated files
     FilesToParse = []
@@ -1777,7 +1803,7 @@ def main(args : list) :
     for root, _, files in os.walk(ProjectPath):
         for file in files:
             if file.endswith(".pycppgentmp") or file.find("__pycppgen_tmp") != -1:
-                os.remove(root + "\\" + file)
+                os.remove(os.path.join(root, file))
                 continue
             if re.match(r".*\.h$", file) and not re.match(r".*\.gen.h$", file) :
                 filePath = os.path.join(root, file)
@@ -1828,16 +1854,16 @@ def main(args : list) :
             ProcessFile(file, compilerOptions, cacheFileTime)
     else :
         with ThreadPoolExecutor() as pool :
-            for file in FilesToParse :
-                pool.submit(ProcessFile, file, compilerOptions, cacheFileTime)
+            futures = { pool.submit(ProcessFile, file, compilerOptions, cacheFileTime) : file for file in FilesToParse }
+        ReportFailedFutures(futures, "parsing")
 
     if DebugMode :
         for file in FilesToCodeGen :
             CodeGen(file)
     else :
         with ThreadPoolExecutor() as pool :
-            for file in FilesToCodeGen :
-                pool.submit(CodeGen, file)
+            futures = { pool.submit(CodeGen, file) : file for file in FilesToCodeGen }
+        ReportFailedFutures(futures, "generating code for")
 
     for dep in Dependencies :
         depPath = ResolvePath(os.path.join(dep, "pycppgen.cache"))
@@ -1858,7 +1884,7 @@ def main(args : list) :
 
     if len(OutdatedFiles) > 0 or not "pycppgen.gen.h" in CachedPerFileData or CachedPerFileData["pycppgen.gen.h"] != TLS().NodeList :
         atomic_print(f"global code gen step, outdated files -> {OutdatedFiles}")
-        FilesToParse.append(os.path.join(ProjectPath, "\\pycppgen.h"))
+        FilesToParse.append(os.path.join(ProjectPath, "pycppgen.h"))
         CodeGenGlobal(ProjectPath)
     PerFileData["pycppgen.gen.h"] = TLS().NodeList
 
