@@ -1529,12 +1529,13 @@ def CodeGenGlobal(path : str) :
     code += "\t}\n"
     code += "}\n\n"
 
+    # The dispatches below are flat `if (...) return` lines, not an else-if chain: every `else if` is one more level of
+    # nesting to MSVC, which stops at 128 (C1061) -- a module with that many types failed to compile.
     code += "const char* pycppgen<void>::name() const\n"
     code += "{\n"
-    code += "\tif (false) {}\n"
     for _, node in TLS().NodeList.items() :
         if ENode.Cpp in node and node[ENode.Cpp] and (node[ENode.Kind] == EKind.Class or node[ENode.Kind] == EKind.Struct) :
-            code += f"\telse if (HashCode == typeid({node[ENode.FullName]}).hash_code())\n"
+            code += f"\tif (HashCode == typeid({node[ENode.FullName]}).hash_code())\n"
             code += f"\t\treturn pycppgen<{node[ENode.FullName]}>::name();\n"
     code += "\treturn \"\";\n"
     code += "}\n\n"
@@ -1542,30 +1543,27 @@ def CodeGenGlobal(path : str) :
     code += "template<typename T> void pycppgen<void>::for_each_var(const T* obj, auto visitor, uint32_t maxDepth)\n"
     code += "{\n"
     code += f"\tconst auto hashCode = obj ? typeid(*obj).hash_code() : 0;\n"
-    code += "\tif (false) {}\n"
     for _, node in TLS().NodeList.items() :
         if ENode.Cpp in node and node[ENode.Cpp] and (node[ENode.Kind] == EKind.Class or node[ENode.Kind] == EKind.Struct) :
-            code += f"\telse if (hashCode == typeid({node[ENode.FullName]}).hash_code())\n"
-            code += f"\t\tpycppgen<{node[ENode.FullName]}>::for_each_var((const {node[ENode.FullName]}*)obj, visitor, maxDepth - 1);\n"
+            code += f"\tif (hashCode == typeid({node[ENode.FullName]}).hash_code())\n"
+            code += f"\t\treturn pycppgen<{node[ENode.FullName]}>::for_each_var((const {node[ENode.FullName]}*)obj, visitor, maxDepth - 1);\n"
     code += "}\n\n"
 
     code += "template<typename T> void pycppgen<void>::for_each_var(T* obj, auto visitor, uint32_t maxDepth)\n"
     code += "{\n"
     code += f"\tconst auto hashCode = obj ? typeid(*obj).hash_code() : 0;\n"
-    code += "\tif (false) {}\n"
     for _, node in TLS().NodeList.items() :
         if ENode.Cpp in node and node[ENode.Cpp] and (node[ENode.Kind] == EKind.Class or node[ENode.Kind] == EKind.Struct) :
-            code += f"\telse if (hashCode == typeid({node[ENode.FullName]}).hash_code())\n"
-            code += f"\t\tpycppgen<{node[ENode.FullName]}>::for_each_var(({node[ENode.FullName]}*)obj, visitor, maxDepth - 1);\n"
+            code += f"\tif (hashCode == typeid({node[ENode.FullName]}).hash_code())\n"
+            code += f"\t\treturn pycppgen<{node[ENode.FullName]}>::for_each_var(({node[ENode.FullName]}*)obj, visitor, maxDepth - 1);\n"
     code += "}\n\n"
 
     code += "template<typename T, typename R> bool pycppgen<void>::dump(T& result, const R* obj)\n"
     code += "{\n"
     code += f"\tconst auto hashCode = obj ? typeid(*obj).hash_code() : 0;\n"
-    code += "\tif (false) {}\n"
     for _, node in TLS().NodeList.items() :
         if ENode.Cpp in node and node[ENode.Cpp] and (node[ENode.Kind] == EKind.Class or node[ENode.Kind] == EKind.Struct) and EGlobals.kSerialize in node[ENode.Attributes] :
-            code += f"\telse if (hashCode == typeid({node[ENode.FullName]}).hash_code())\n"
+            code += f"\tif (hashCode == typeid({node[ENode.FullName]}).hash_code())\n"
             code += f"\t\treturn pycppgen<{node[ENode.FullName]}>::dump(result, (const {node[ENode.FullName]}*)obj);\n"
     code += "\treturn false;\n"
     code += "}\n\n"
@@ -1573,10 +1571,9 @@ def CodeGenGlobal(path : str) :
     code += "template<typename T, typename R> bool pycppgen<void>::parse(const T& data, R* obj)\n"
     code += "{\n"
     code += f"\tconst auto hashCode = obj ? typeid(*obj).hash_code() : 0;\n"
-    code += "\tif (false) {}\n"
     for _, node in TLS().NodeList.items() :
         if ENode.Cpp in node and node[ENode.Cpp] and (node[ENode.Kind] == EKind.Class or node[ENode.Kind] == EKind.Struct) and EGlobals.kSerialize in node[ENode.Attributes] :
-            code += f"\telse if (hashCode == typeid({node[ENode.FullName]}).hash_code())\n"
+            code += f"\tif (hashCode == typeid({node[ENode.FullName]}).hash_code())\n"
             code += f"\t\treturn pycppgen<{node[ENode.FullName]}>::parse(data, (const {node[ENode.FullName]}*)obj);\n"
     code += "\treturn false;\n"
     code += "}\n\n"
@@ -1586,18 +1583,15 @@ def CodeGenGlobal(path : str) :
     code += "{\n"
     for _, node in TLS().NodeList.items() :
         if ENode.Cpp in node and node[ENode.Cpp] and (node[ENode.Kind] == EKind.Class or node[ENode.Kind] == EKind.Struct) :
-            if code.endswith("{\n") : code += "\t"
-            else : code += f"\telse "
-            code += f"if (name == \"{node[ENode.FullName]}\" || name == \"{node[ENode.Name]}\")\n"
-            code += f"\t\tHashCode = typeid({node[ENode.FullName]}).hash_code();\n"
+            code += f"\tif (name == \"{node[ENode.FullName]}\" || name == \"{node[ENode.Name]}\")\n"
+            code += f"\t{{\n\t\tHashCode = typeid({node[ENode.FullName]}).hash_code();\n\t\treturn;\n\t}}\n"
     code += "}\n\n"
     
     code += "inline attribute_map_t pycppgen<void>::get_var_attributes(std::string_view name) const\n"
     code += "{\n"
-    code += "\tif (false) {}\n"
     for _, node in TLS().NodeList.items() :
         if ENode.Cpp in node and node[ENode.Cpp] and (node[ENode.Kind] == EKind.Class or node[ENode.Kind] == EKind.Struct) :
-            code += f"\telse if (HashCode == typeid({node[ENode.FullName]}).hash_code())\n"
+            code += f"\tif (HashCode == typeid({node[ENode.FullName]}).hash_code())\n"
             code += f"\t\treturn pycppgen<{node[ENode.FullName]}>::get_var_attributes(name);\n"
     code += "\treturn {};\n"
     code += "}\n\n"
