@@ -74,22 +74,41 @@ def SplitAttributes(text : str) -> list :
 def CppStringEscape(text) -> str :
     return str(text).replace("\\", "\\\\").replace("\"", "\\\"")
 
+#the tokens of a declaration's parent, and the index of each by its source offset. ParseComments runs
+#several times for every declaration, and used to re-read the parent's tokens and scan them linearly
+#each time: quadratic in the size of a struct or file, and Python-bound, so the worker threads could
+#not overlap it. a 400-member struct took seconds; the whole engine took minutes.
+def GetParentTokens(parent) :
+    start = parent.extent.start
+    end = parent.extent.end
+    key = (str(start.file), start.offset, end.offset)
+    cache = TLS().TokenCache
+    if key not in cache :
+        tokens = list(parent.get_tokens())
+        indexByOffset = {}
+        for i, t in enumerate(tokens) :
+            indexByOffset.setdefault(t.extent.start.offset, i)
+        cache[key] = (tokens, indexByOffset)
+    return cache[key]
+
 #try to parse the comments before or after the cursor (hacky but, cursor.raw_comments isn't working as expected)
 def ParseComments(cursor, kind : str = EParseComments.BeforeDecl):
     try:
         preDeclComments = not kind in ParseCommentsMode or ParseCommentsMode[kind] == EParseComments.BeforeDecl
         parent = cursor.semantic_parent
 
-        tokens = list(parent.get_tokens())
+        tokens, tokenIndexByOffset = GetParentTokens(parent)
         cursorTokens = list(cursor.get_tokens())
         if len(cursorTokens) == 0 :
             return {}
-        
+
         #locate the cursor's own tokens inside the parent's token list by source offset, a line
         #number isn't enough to tell two declarations sharing a line apart
         def IndexOfToken(token) :
             offset = token.extent.start.offset
-            return next(i for i, x in enumerate(tokens) if x.extent.start.offset == offset)
+            if offset not in tokenIndexByOffset :
+                raise StopIteration
+            return tokenIndexByOffset[offset]
 
         if preDeclComments:
             firstTokenIndex = IndexOfToken(cursorTokens[0])
@@ -581,6 +600,7 @@ def ParseTranslationUnit(tu, file) :
     TLS().NodeList = {}
     TLS().NodeTree = {}
     TLS().NodeStack = [TLS().NodeTree] 
+    TLS().TokenCache = {}
     
     currentFile = str(pathlib.Path(file).resolve())
     #first = next(x for x in tu.cursor.get_children() if x.location.file and x.location.file.name in FilesToParse)
@@ -588,6 +608,9 @@ def ParseTranslationUnit(tu, file) :
     filteredChildren = list(filter(lambda x: x.location.file and str(pathlib.Path(x.location.file.name).resolve()) == file, tu.cursor.get_children()))
     for cursor in  filteredChildren :
         ParseCursor(cursor)
+
+    #the cached tokens keep the translation unit alive
+    TLS().TokenCache = {}
 
     return TLS().NodeList
 

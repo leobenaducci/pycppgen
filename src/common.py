@@ -112,6 +112,7 @@ class TLS_Data:
         self.NodeTree: dict[str, Any] = {}
         self.NodeStack: list[dict[str, Any]] = [self.NodeTree]
         self.pycppdefine: str = ""
+        self.TokenCache: dict = {}
     
 PrintLock = threading.Lock()
 
