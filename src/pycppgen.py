@@ -1639,13 +1639,16 @@ def CodeGenGlobal(path : str) :
     code += "\treturn \"\";\n"
     code += "}\n\n"
 
+    # The dispatch to the dynamic type is not a level of the hierarchy, so maxDepth passes through unchanged. It used
+    # to be decremented: 0 wrapped to UINT_MAX (every ancestor), and any other depth reached one level less than
+    # pycppgen<T> called directly, which is what pycppgen_of does for a type nothing can derive from.
     code += "template<typename T> void pycppgen<void>::for_each_var(const T* obj, auto visitor, uint32_t maxDepth)\n"
     code += "{\n"
     code += f"\tconst auto hashCode = obj ? typeid(*obj).hash_code() : 0;\n"
     for _, node in TLS().NodeList.items() :
         if ENode.Cpp in node and node[ENode.Cpp] and (node[ENode.Kind] == EKind.Class or node[ENode.Kind] == EKind.Struct) :
             code += f"\tif (hashCode == typeid({node[ENode.FullName]}).hash_code())\n"
-            code += f"\t\treturn pycppgen<{node[ENode.FullName]}>::for_each_var((const {node[ENode.FullName]}*)obj, visitor, maxDepth - 1);\n"
+            code += f"\t\treturn pycppgen<{node[ENode.FullName]}>::for_each_var((const {node[ENode.FullName]}*)obj, visitor, maxDepth);\n"
     code += "}\n\n"
 
     code += "template<typename T> void pycppgen<void>::for_each_var(T* obj, auto visitor, uint32_t maxDepth)\n"
@@ -1654,7 +1657,7 @@ def CodeGenGlobal(path : str) :
     for _, node in TLS().NodeList.items() :
         if ENode.Cpp in node and node[ENode.Cpp] and (node[ENode.Kind] == EKind.Class or node[ENode.Kind] == EKind.Struct) :
             code += f"\tif (hashCode == typeid({node[ENode.FullName]}).hash_code())\n"
-            code += f"\t\treturn pycppgen<{node[ENode.FullName]}>::for_each_var(({node[ENode.FullName]}*)obj, visitor, maxDepth - 1);\n"
+            code += f"\t\treturn pycppgen<{node[ENode.FullName]}>::for_each_var(({node[ENode.FullName]}*)obj, visitor, maxDepth);\n"
     code += "}\n\n"
 
     code += "template<typename T, typename R> bool pycppgen<void>::dump(T& result, const R* obj)\n"
@@ -1701,7 +1704,7 @@ def CodeGenGlobal(path : str) :
     for _, node in TLS().NodeList.items() :
         if ENode.Cpp in node and node[ENode.Cpp] and (node[ENode.Kind] == EKind.Class or node[ENode.Kind] == EKind.Struct) :
             code += f"\tif (HashCode == typeid({node[ENode.FullName]}).hash_code())\n"
-            code += f"\t\tpycppgen<{node[ENode.FullName]}>::for_each_var(visitor, maxDepth - 1);\n"
+            code += f"\t\treturn pycppgen<{node[ENode.FullName]}>::for_each_var(visitor, maxDepth);\n"
     code += "}\n\n"
 
     genPath = os.path.join(path, "pycppgen.gen.h")
