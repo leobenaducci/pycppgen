@@ -1470,7 +1470,7 @@ template<> struct pycppgen<void>
     template<typename T, typename R> static bool parse(const T& data, R* obj); 
 
 protected:
-    decltype(std::declval<std::type_info>().hash_code()) HashCode;
+    decltype(std::declval<std::type_info>().hash_code()) HashCode = 0;
 };
 
 template<typename T> requires (!std::is_pointer_v<T>)
@@ -1682,12 +1682,17 @@ def CodeGenGlobal(path : str) :
     code += "}\n\n"
 
 
+    # Every full name first, then the short names: a type matched on its short name used to hide a later type whose
+    # full name is exactly that (ns::Foo before ::Foo made "Foo" ns::Foo). A name nothing matches leaves HashCode 0.
     code += "inline pycppgen<void>::pycppgen(std::string_view name)\n"
     code += "{\n"
-    for _, node in TLS().NodeList.items() :
-        if ENode.Cpp in node and node[ENode.Cpp] and (node[ENode.Kind] == EKind.Class or node[ENode.Kind] == EKind.Struct) :
-            code += f"\tif (name == \"{node[ENode.FullName]}\" || name == \"{node[ENode.Name]}\")\n"
-            code += f"\t{{\n\t\tHashCode = typeid({node[ENode.FullName]}).hash_code();\n\t\treturn;\n\t}}\n"
+    for nameKey in (ENode.FullName, ENode.Name) :
+        for _, node in TLS().NodeList.items() :
+            if ENode.Cpp in node and node[ENode.Cpp] and (node[ENode.Kind] == EKind.Class or node[ENode.Kind] == EKind.Struct) :
+                if nameKey == ENode.Name and node[ENode.Name] == node[ENode.FullName] :
+                    continue
+                code += f"\tif (name == \"{node[nameKey]}\")\n"
+                code += f"\t{{\n\t\tHashCode = typeid({node[ENode.FullName]}).hash_code();\n\t\treturn;\n\t}}\n"
     code += "}\n\n"
     
     code += "inline attribute_map_t pycppgen<void>::get_var_attributes(std::string_view name) const\n"

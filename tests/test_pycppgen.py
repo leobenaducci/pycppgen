@@ -340,6 +340,26 @@ class TestGlobalFiles(TestCase) :
             self.project.run()
             self.assertTrue(self.project.exists(name), name)
 
+class TestByName(TestCase) :
+    def test_a_full_name_wins_over_an_earlier_short_name(self) :
+        self.project.write("A.h", """
+            namespace ns {
+            //$[[pycppgen]]
+            struct Foo { int A; };
+            }
+            """)
+        self.project.write("B.h", """
+            //$[[pycppgen]]
+            struct Foo { int B; };
+            """)
+        self.project.run()
+        gen = self.project.read("pycppgen.gen.h")
+        ctor = gen[gen.index("pycppgen<void>::pycppgen(std::string_view name)") :]
+        exact = ctor.index('if (name == "Foo")\n\t{\n\t\tHashCode = typeid(Foo)')
+        short = ctor.index('if (name == "Foo")\n\t{\n\t\tHashCode = typeid(ns::Foo)')
+        self.assertLess(exact, short)
+        self.assertHas("HashCode = 0;", self.project.read("pycppgen.h"))
+
 class TestGeneratedCpp(TestCase) :
     def compile(self, source : str) :
         path = self.project.write("check.cpp", source)
