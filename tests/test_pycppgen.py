@@ -297,5 +297,33 @@ class TestHlslOutputs(TestCase) :
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("Same.gen.hlsli", result.stdout)
 
+class TestGlobalFiles(TestCase) :
+    def test_pycppgen_h_is_not_rewritten_when_it_does_not_change(self) :
+        self.project.write("A.h", """
+            //$[[pycppgen]]
+            struct SA { int A; };
+            """)
+        self.project.run()
+        header = os.path.join(self.project.path, "pycppgen.h")
+        os.utime(header, (1000, 1000))
+        self.project.write("B.h", """
+            //$[[pycppgen]]
+            struct SB { int B; };
+            """)
+        self.project.run()
+        self.assertHas("SB", self.project.read("pycppgen.gen.h"))
+        self.assertEqual(os.path.getmtime(header), 1000)
+
+    def test_a_deleted_global_file_comes_back(self) :
+        self.project.write("A.h", """
+            //$[[pycppgen]]
+            struct SA { int A; };
+            """)
+        self.project.run()
+        for name in ("pycppgen.gen.h", "pycppgen.h") :
+            self.project.remove(name)
+            self.project.run()
+            self.assertTrue(self.project.exists(name), name)
+
 if __name__ == "__main__" :
     unittest.main()

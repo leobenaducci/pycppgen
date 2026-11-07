@@ -123,7 +123,10 @@ def atomic_print(text : str) :
 def normalize_cr(text: str) -> str:
     return text.replace("\r\n", "\n").replace("\r", "\n")
 
-def write_file_if_different(file : str, content : str | None) :
+#touch: an unchanged per-header output is still touched, because a header newer than its output is how
+#the next run tells it is outdated. the project-wide files are not, so that a run which changes nothing in
+#them does not make everything that includes them recompile
+def write_file_if_different(file : str, content : str | None, touch : bool = True) :
     inputContent : str = ""
 
     if content == None :
@@ -138,9 +141,10 @@ def write_file_if_different(file : str, content : str | None) :
     except:
         inputContent = ""
 
-    if normalize_cr(content) == normalize_cr(inputContent) :
+    if os.path.exists(file) and normalize_cr(content) == normalize_cr(inputContent) :
         atomic_print(f"skipping {file} as it didn't change")
-        os.utime(file, None)
+        if touch :
+            os.utime(file, None)
         return
 
     #exist_ok: the worker threads race to create the folder (shaders/Types on a fresh tree), and the

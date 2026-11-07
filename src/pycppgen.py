@@ -1533,8 +1533,9 @@ namespace pycppgen_detail
 #endif //_PYCPPGEN_HEADER_
     """
 
-    with open(path + "/pycppgen.h", mode="wt") as output :
-        output.write(code)
+    #rewritten only when it changes: every reflected header includes it, and writing it on every global
+    #step recompiled the whole project each time a reflected type was added, removed or renamed
+    write_file_if_different(os.path.join(path, "pycppgen.h"), code, touch=False)
 
 def CodeGenGlobal(path : str) :
     global PerFileData
@@ -2032,7 +2033,8 @@ def main(args : list) :
         if "NodeList" in v :
             TLS().NodeList.update(v["NodeList"])
 
-    if len(OutdatedFiles) > 0 or not "pycppgen.gen.h" in CachedPerFileData or CachedPerFileData["pycppgen.gen.h"] != TLS().NodeList :
+    globalFilesMissing = not os.path.exists(os.path.join(ProjectPath, "pycppgen.gen.h")) or not os.path.exists(os.path.join(ProjectPath, "pycppgen.h"))
+    if globalFilesMissing or len(OutdatedFiles) > 0 or not "pycppgen.gen.h" in CachedPerFileData or CachedPerFileData["pycppgen.gen.h"] != TLS().NodeList :
         atomic_print(f"global code gen step, outdated files -> {OutdatedFiles}")
         FilesToParse.append(os.path.join(ProjectPath, "pycppgen.h"))
         CodeGenGlobal(ProjectPath)
