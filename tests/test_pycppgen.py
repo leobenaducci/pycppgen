@@ -143,6 +143,10 @@ class TestHlslEnum(TestCase) :
             enum class EPlain : unsigned int { A = 0, B = 1 };
             //$[[pycppgen hlsl]]
             enum class ESigned : int { Neg = -1, Zero = 0 };
+            //$[[pycppgen hlsl]]
+            enum class EShort : short { Neg = -2 };
+            //$[[pycppgen hlsl]]
+            enum class EUnsignedShort : unsigned short { A = 2 };
             """)
         self.project.run()
         with open(self.project.hlsli("Enums.gen.hlsli"), encoding="utf-8") as f :
@@ -153,6 +157,8 @@ class TestHlslEnum(TestCase) :
         self.assertHas("is_bitmask   = true", block("EBitmask"))
         self.assertHas("is_bitmask   = false", block("EPlain"))
         self.assertHas("static const int ESigned_Neg = -1;", hlsl)
+        self.assertHas("static const int EShort_Neg = -2;", hlsl)
+        self.assertHas("static const uint EUnsignedShort_A = 2;", hlsl)
 
 if __name__ == "__main__" :
     unittest.main()

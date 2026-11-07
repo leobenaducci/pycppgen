@@ -461,11 +461,13 @@ template<> struct pyhlslgen<{qualifiedName}>
 
     return hlslCode + result
 
+#int for a signed underlying type, uint otherwise. only "int", "signed" and "signed int" used to count as
+#signed, so an int32_t, short or int8_t enum wrote its negative values into uint constants
 def _GetHlslEnumType(underlyingType : str) -> str:
-    signed = {"int", "signed", "signed int"}
-    if any(underlyingType == s for s in signed):
-        return "int"
-    return "uint"
+    t = underlyingType.replace("std::", "").strip()
+    if t.startswith("unsigned") or t.startswith("uint") or t in ("bool", "char8_t", "char16_t", "char32_t", "wchar_t") :
+        return "uint"
+    return "int"
 
 def CodeGenHlslEnumNode(hlslCode : str, node) -> str:
     enumName  = node[ENode.Name]
