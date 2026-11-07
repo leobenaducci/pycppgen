@@ -63,13 +63,15 @@ And function wrappers
    ```
 2. Run the Python script on your C++ files:
    ```bash
-   python main.py <project-path> <options>
+   python src/pycppgen.py <project-path> <options>
    options:
       -I<include_dir>
       -D<definition>
       --I<include_dirs_separated_by_semicolons>
-      --D<dependencies>
+      --D<definitions_separated_by_semicolons>
+      --P<dependency_dirs_separated_by_semicolons>
    ```
+   Any other option is passed to libclang as is.
 3. Add `$[[pycppgen]]` or `$[[pycppgen <attributes>]]` tags in your C++ code where you want templates to be generated.
 
    Example struct decl: 
@@ -84,7 +86,7 @@ And function wrappers
    
    Example enum decl: 
       ```
-      //$[[pycppgen bitflags]]
+      //$[[pycppgen flags]]
       enum class E : int {
          None = 0,
          Something = 1, //$[[pycppgen hidden]]
