@@ -134,6 +134,19 @@ class TestCommentPlacement(TestCase) :
         self.assertHas("get_C_member_variable_info", gen)
         self.assertHas('if (value == E::X) {\n\t\t\treturn {\n\t\t\t\t{ "hidden", "" }', gen)
 
+class TestPycppgenInclude(TestCase) :
+    def test_an_included_type_is_reflected_without_a_tag(self) :
+        self.project.write("a.h", """
+            //$[[pycppgen-include ns::SPlain]]
+            namespace ns { struct SPlain { int A; }; struct SOther { int B; }; }
+            //$[[pycppgen]]
+            struct STagged { int C; };
+            """)
+        self.project.run()
+        gen = self.project.read("a.gen.h")
+        self.assertHas("struct pycppgen<ns::SPlain>", gen)
+        self.assertHasNot("SOther", gen)
+
 class TestAttributeGrammar(unittest.TestCase) :
     def split(self, text) :
         from pycppgen import SplitAttributes

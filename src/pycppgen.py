@@ -624,11 +624,11 @@ def GetOutputFileName(filePath : str, ext  : str = "h") :
 def ParseTranslationUnit(tu, file) :
     global FilesToParse
 
-    #initialize data
-    TLS().NodesToInclude = []
+    #initialize data. not NodesToInclude: ParseFile fills it from the header's pycppgen-include comments,
+    #and clearing it here made pycppgen-include do nothing
     TLS().NodeList = {}
     TLS().NodeTree = {}
-    TLS().NodeStack = [TLS().NodeTree] 
+    TLS().NodeStack = [TLS().NodeTree]
     TLS().TokenCache = {}
     
     currentFile = str(pathlib.Path(file).resolve())
@@ -651,6 +651,7 @@ def ParseFile(filePath : str, options : list) :
     tmpPath = filePath[:extStart] + "__pycppgen_tmp" + filePath[extStart:]
 
     tu = None
+    TLS().NodesToInclude = []
 
     try:
         contents = kHlslDeclarations
