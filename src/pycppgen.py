@@ -136,6 +136,13 @@ def ParseComments(cursor, kind : str = EParseComments.BeforeDecl):
             firstTokenIndex = IndexOfToken(cursorTokens[0])
             lastTokenIndex = firstTokenIndex
             while firstTokenIndex > 0 and tokens[firstTokenIndex - 1].kind == clang.cindex.TokenKind.COMMENT:
+                #a comment that trails the previous declaration on its line is that one's (`int A; //$[[...]]`):
+                #it used to be read as the annotation of the next declaration, which got A's tag
+                comment = tokens[firstTokenIndex - 1]
+                if firstTokenIndex >= 2 :
+                    before = tokens[firstTokenIndex - 2]
+                    if before.kind != clang.cindex.TokenKind.COMMENT and before.extent.end.line == comment.location.line :
+                        break
                 firstTokenIndex -= 1
         else:
             #only a comment trailing this declaration on its own last line belongs to it, otherwise

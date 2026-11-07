@@ -111,6 +111,29 @@ class TestExclude(TestCase) :
         self.assertHasNot("SDropped", gen)
         self.assertHas("struct pycppgen<SNotDropped>", gen)
 
+class TestCommentPlacement(TestCase) :
+    def test_a_trailing_tag_does_not_tag_the_next_member(self) :
+        self.project.write("a.h", """
+            //$[[pycppgen]]
+            struct S
+            {
+                int A; //$[[pycppgen serialize]]
+                int B;
+                //$[[pycppgen serialize]]
+                int C; // a plain comment
+                int D;
+            };
+            //$[[pycppgen]]
+            enum class E { X, //$[[pycppgen hidden]]
+                Y };
+            """)
+        self.project.run()
+        gen = self.project.read("a.gen.h")
+        self.assertHasNot("get_B_member_variable_info", gen)
+        self.assertHasNot("get_D_member_variable_info", gen)
+        self.assertHas("get_C_member_variable_info", gen)
+        self.assertHas('if (value == E::X) {\n\t\t\treturn {\n\t\t\t\t{ "hidden", "" }', gen)
+
 class TestAttributeGrammar(unittest.TestCase) :
     def split(self, text) :
         from pycppgen import SplitAttributes
