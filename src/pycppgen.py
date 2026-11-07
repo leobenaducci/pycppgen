@@ -1799,6 +1799,13 @@ def ReportFailedFutures(futures : dict, what : str) :
         atomic_print(f"{failed} file(s) failed")
         sys.exit(1)
 
+#the generator's own source file changed last. the cache used to be checked against pycppgen.py alone, so
+#an update that changed only pyhlslgen.py or common.py kept every output it should have regenerated
+def NewestScriptFile() -> str :
+    scriptDir = os.path.dirname(os.path.abspath(inspect.getsourcefile(sys.modules[__name__])))
+    scripts = [os.path.join(scriptDir, f) for f in ("pycppgen.py", "pyhlslgen.py", "common.py")]
+    return max((f for f in scripts if os.path.exists(f)), key=os.path.getmtime)
+
 def show_usage() :
         print("usage pycppgen.py <project-path> <options>")
         print("options:")
@@ -1886,7 +1893,7 @@ def main(args : list) :
 
     #if the script is newer than the cache, remove all files as we need to rebuild everything
     outdatedCache = False
-    if not IsFileUpToDate(inspect.getsourcefile(sys.modules[__name__]), CacheFile) :
+    if not IsFileUpToDate(NewestScriptFile(), CacheFile) :
         atomic_print("Outdated file cache")
         OutdatedFiles = set(FilesToParse)
         outdatedCache = True

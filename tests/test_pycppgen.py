@@ -48,9 +48,9 @@ class Project :
     def hlsli(self, name : str) -> str :
         return os.path.join(self.root, "shaders", "Types", name)
 
-    def run(self, *extra, check : bool = True) -> subprocess.CompletedProcess :
+    def run(self, *extra, check : bool = True, script : str = SCRIPT) -> subprocess.CompletedProcess :
         #a separate process per run, as a build does: pycppgen keeps its state in module globals
-        result = subprocess.run([sys.executable, SCRIPT, self.path, *extra], capture_output=True, text=True, cwd=self.root)
+        result = subprocess.run([sys.executable, script, self.path, *extra], capture_output=True, text=True, cwd=self.root)
         if check and result.returncode != 0 :
             raise AssertionError(f"pycppgen failed ({result.returncode}):\n{result.stdout}\n{result.stderr}")
         return result
@@ -159,6 +159,23 @@ class TestHlslEnum(TestCase) :
         self.assertHas("static const int ESigned_Neg = -1;", hlsl)
         self.assertHas("static const int EShort_Neg = -2;", hlsl)
         self.assertHas("static const uint EUnsignedShort_A = 2;", hlsl)
+
+class TestCache(TestCase) :
+    def test_a_change_to_any_script_regenerates_everything(self) :
+        self.project.write("a.h", """
+            //$[[pycppgen]]
+            struct SA { int A; };
+            """)
+        scripts = os.path.join(self.tmp, "src")
+        shutil.copytree(SRC, scripts, ignore=shutil.ignore_patterns("__pycache__"))
+        script = os.path.join(scripts, "pycppgen.py")
+        self.project.run(script=script)
+        self.assertNotIn("Outdated file cache", self.project.run(script=script).stdout)
+        for name in ("pyhlslgen.py", "common.py") :
+            future = os.path.getmtime(self.project.path + "/pycppgen.cache") + 10
+            os.utime(os.path.join(scripts, name), (future, future))
+            self.assertIn("Outdated file cache", self.project.run(script=script).stdout, name)
+            os.utime(os.path.join(scripts, name), (0, 0))
 
 if __name__ == "__main__" :
     unittest.main()
