@@ -1200,8 +1200,8 @@ def CodeGenOutputNode(node) :
         hppCode = CodeGenOutputHeaderDefines(hppCode, node)
         hppCode = CodeGenOutputMetaHeader(hppCode, node)
 
-        #append enum attributes
-        hppCode += "\tattribute_map_t attributes() {\n"
+        #append enum attributes. static, as a type's are: an enum's could only be read through an instance
+        hppCode += "\tstatic attribute_map_t attributes() {\n"
         hppCode += "\t\treturn " + CodeGenOutputAttributes(node, 2) + ";\n" 
         hppCode += "};\n\n"
 

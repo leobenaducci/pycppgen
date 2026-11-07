@@ -400,6 +400,18 @@ class TestGeneratedCpp(TestCase) :
         if errors :
             self.fail("\n".join(errors[:10]))
 
+    def test_enum_attributes_are_static(self) :
+        self.project.write("E.h", """
+            #pragma once
+            //$[[pycppgen display=Thing]]
+            enum class EThing : int { A, B };
+            """)
+        self.project.run()
+        self.compile("""
+            #include "pycppgen.gen.h"
+            attribute_map_t Check() { return pycppgen<EThing>::attributes(); }
+            """)
+
     def test_the_by_type_dispatches_compile(self) :
         self.project.write("Types.h", """
             #pragma once
