@@ -188,6 +188,22 @@ class TestAttributes(TestCase) :
         self.assertHas('result["visible"] = "false";', gen)
         self.assertHasNot('result["include"]', gen)
 
+    def test_non_ascii_text_is_read_and_written_as_utf8(self) :
+        #Ł is C5 81 in UTF-8, and 0x81 is not a cp1252 character: decoding it in the locale's encoding failed
+        self.project.write("a.h", """
+            //Łódź
+            //$[[pycppgen]]
+            struct SUnits
+            {
+                //$[[pycppgen tooltip=in °C → shown in °F]]
+                float Temperature;
+            };
+            """)
+        self.project.run()
+        with open(os.path.join(self.project.path, "a.gen.h"), "rb") as f :
+            gen = f.read()
+        self.assertIn("in °C → shown in °F".encode("utf-8"), gen)
+
 class TestHlslEnum(TestCase) :
     def test_flags_and_bitmask_set_is_bitmask(self) :
         self.project.write("Enums.h", """

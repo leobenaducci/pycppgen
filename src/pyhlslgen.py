@@ -324,7 +324,7 @@ def CodeGenHlslNode(hlslCode, node, generatedStructs : dict = {}) -> str:
     #each other's shader
     with tempfile.TemporaryDirectory(prefix="pycppgen_hlsl_") as tmpDir :
         fileName = os.path.join(tmpDir, f"{node[ENode.Name]}.hlsl")
-        with open(fileName, "wt") as file:
+        with open(fileName, "wt", encoding="utf-8") as file:
             file.write(hlslTemp)
 
         #one list element per argument: Windows joins the list back into a command line, so "-T cs_6_2" used

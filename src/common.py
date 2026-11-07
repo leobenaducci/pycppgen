@@ -138,7 +138,7 @@ def write_file_if_different(file : str, content : str | None, touch : bool = Tru
         return
 
     try:
-        with open(file, mode="rt") as inputFile :
+        with open(file, mode="rt", encoding="utf-8", errors="surrogateescape") as inputFile :
             inputContent = inputFile.read()
     except:
         inputContent = ""
@@ -153,6 +153,6 @@ def write_file_if_different(file : str, content : str | None, touch : bool = Tru
     #loser of an exists-then-create check failed its whole file with FileExistsError
     os.makedirs(pathlib.Path(file).parent, exist_ok=True)
 
-    with open(file, mode="wt") as outputFile :
+    with open(file, mode="wt", encoding="utf-8", errors="surrogateescape") as outputFile :
         atomic_print(f"writing {file}")
         outputFile.write(content)

@@ -655,7 +655,10 @@ def ParseFile(filePath : str, options : list) :
     try:
         contents = kHlslDeclarations
 
-        with open(filePath) as file:
+        #utf-8 with surrogateescape, both ways: the copy libclang parses is byte for byte the header. the
+        #locale's encoding (cp1252 on Windows) failed outright on some UTF-8 text, and the generated
+        #files were written in it, so a non-ASCII attribute value came out in cp1252 or failed to encode
+        with open(filePath, encoding="utf-8", errors="surrogateescape") as file:
             for line in file.readlines() :
                 contents += line
                 m = re.match(r"\s*\/\/\s*\$\[\[pycppgen-include\s+((?>\w|\W)*)\]\]", line, flags=re.MULTILINE|re.IGNORECASE)
@@ -663,7 +666,7 @@ def ParseFile(filePath : str, options : list) :
                 for g in m.groups() :
                     TLS().NodesToInclude += g.replace(" ", ";").replace(",", ";").split(";")
 
-        with open(tmpPath, "wt") as tmpFile:
+        with open(tmpPath, "wt", encoding="utf-8", errors="surrogateescape") as tmpFile:
             tmpFile.write(contents)
 
         args = ['-x', 'c++', '-std=c++20', "-DPYCPPGEN", "-D__clang_major__=19", "-Wmacro-redefined", "-D_PYCPPGEN_=1"] + options
@@ -1739,7 +1742,7 @@ def CodeGenGlobal(path : str) :
 
     genPath = os.path.join(path, "pycppgen.gen.h")
     if IsFileDifferent(genPath, code) :
-        with open(genPath, mode="wt") as file :
+        with open(genPath, mode="wt", encoding="utf-8") as file :
             file.write(code)
 
 def IsFileUpToDate(src : str | None, dst : str | None) :
@@ -1799,13 +1802,13 @@ def FileContainsPyCppGenTag(file : str) :
         return FilesWithPyHlslGenTag[file]
 
     if os.path.exists(file) :
-        with open(file) as f :
+        with open(file, "rb") as f :
             data = f.read()
-            if data.find("_pyhlslgen") != -1 :
+            if data.find(b"_pyhlslgen") != -1 :
                 FilesWithPyCppGenTag[file] = True
                 FilesWithPyHlslGenTag[file] = True
                 return True
-            elif data.find("[[pycppgen") != -1 :
+            elif data.find(b"[[pycppgen") != -1 :
                 FilesWithPyCppGenTag[file] = True
                 return True
 
@@ -1817,7 +1820,7 @@ def IsFileDifferent(file, content) :
         return content != ""
 
     fileContent = ""
-    with open(file, "rt") as f :
+    with open(file, "rt", encoding="utf-8", errors="surrogateescape") as f :
         fileContent = f.read()
     
     return fileContent != content
