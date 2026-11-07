@@ -678,7 +678,10 @@ def ParseFile(filePath : str, options : list) :
             for diag in tu.diagnostics:
                 atomic_print(str(diag))
     except:
+        #raised again: it used to be swallowed here, and the caller then failed on the missing translation
+        #unit with an AttributeError that hid the actual cause
         atomic_print(f"error parsing {filePath}")
+        raise
     finally:
         if os.path.exists(tmpPath):
             os.remove(tmpPath)
