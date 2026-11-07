@@ -84,6 +84,12 @@ And function wrappers
       };
       ```
    
+   Attributes are `key` or `key=value`, separated by `;`. A value that needs a `;` is quoted, and inside the
+   quotes `\"` is a quote and `\\` a backslash:
+      ```
+      //$[[pycppgen editable;tooltip="0 turns it off; higher values blur more"]]
+      ```
+
    Example enum decl: 
       ```
       //$[[pycppgen flags]]

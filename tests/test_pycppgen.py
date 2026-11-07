@@ -96,5 +96,41 @@ class TestExclude(TestCase) :
         self.assertHasNot("SDropped", gen)
         self.assertHas("struct pycppgen<SNotDropped>", gen)
 
+class TestAttributeGrammar(unittest.TestCase) :
+    def split(self, text) :
+        from pycppgen import SplitAttributes
+        return SplitAttributes(text)
+
+    def test_unquoted_values_parse_as_before(self) :
+        self.assertEqual(self.split("serialize;editable;category=Transform;step=0.1f"),
+                         [("serialize", ""), ("editable", ""), ("category", "Transform"), ("step", "0.1f")])
+        self.assertEqual(self.split(" a = b c ; d ;"), [("a", "b c"), ("d", "")])
+        self.assertEqual(self.split("requires=Other:Value;options=a|b|c"), [("requires", "Other:Value"), ("options", "a|b|c")])
+
+    def test_quoted_value_keeps_semicolons_and_equals(self) :
+        self.assertEqual(self.split('tooltip="0 is off; 1 is on, a=b";label=X'), [("tooltip", "0 is off; 1 is on, a=b"), ("label", "X")])
+        self.assertEqual(self.split('tooltip = "say \\"hi\\" \\\\ bye" ;x'), [("tooltip", 'say "hi" \\ bye'), ("x", "")])
+
+    def test_second_equals_is_part_of_the_value(self) :
+        self.assertEqual(self.split("expr=a=b"), [("expr", "a=b")])
+
+    def test_empty_attributes_are_skipped(self) :
+        self.assertEqual(self.split(";;a;; ;"), [("a", "")])
+
+class TestAttributes(TestCase) :
+    def test_quoted_tooltip_reaches_the_generated_code_whole(self) :
+        self.project.write("a.h", """
+            //$[[pycppgen]]
+            struct SConfig
+            {
+                //$[[pycppgen tooltip="0 is off; higher is \\"more\\"";clamp_min=0]]
+                int Level;
+            };
+            """)
+        self.project.run()
+        gen = self.project.read("a.gen.h")
+        self.assertHas('{ "tooltip", "0 is off; higher is \\"more\\"" }', gen)
+        self.assertHas('{ "clamp_min", "0" }', gen)
+
 if __name__ == "__main__" :
     unittest.main()

@@ -19,6 +19,61 @@ FilesWithPyCppGenTag = dict()
 FilesWithPyHlslGenTag = dict()
 TLS_Dict = {}
 
+#split the text of an annotation into (key, value) pairs.
+#
+#   key;key=value;key="value"
+#
+#attributes are separated by `;`, and a key ends at the first `=`. an unquoted value runs to the next `;`
+#and is stripped, so it cannot contain one. a value that starts with `"` runs to the closing `"` and may
+#contain `;` and `=`; inside it `\"` is a quote and `\\` a backslash. a key with no `=` has the value "".
+#
+#every annotation that parsed before parses the same: an unquoted value is read as it was, except that a
+#second `=` is now part of the value instead of cutting it there, and empty attributes (`;;`) are skipped.
+def SplitAttributes(text : str) -> list :
+    result = []
+    i = 0
+    n = len(text)
+    while i < n :
+        j = i
+        while j < n and text[j] not in ";=" :
+            j += 1
+        key = text[i:j].strip()
+        value = ""
+
+        if j < n and text[j] == "=" :
+            j += 1
+            k = j
+            while k < n and text[k] in " \t" :
+                k += 1
+
+            if k < n and text[k] == '"' :
+                k += 1
+                chars = []
+                while k < n and text[k] != '"' :
+                    if text[k] == "\\" and k + 1 < n and text[k + 1] in "\"\\" :
+                        k += 1
+                    chars.append(text[k])
+                    k += 1
+                value = "".join(chars)
+                #anything between the closing quote and the next `;` is ignored
+                while k < n and text[k] != ";" :
+                    k += 1
+            else :
+                while k < n and text[k] != ";" :
+                    k += 1
+                value = text[j:k].strip()
+            j = k
+
+        if key != "" :
+            result.append((key, value))
+        i = j + 1
+
+    return result
+
+#a key or value as the inside of a C++ string literal
+def CppStringEscape(text) -> str :
+    return str(text).replace("\\", "\\\\").replace("\"", "\\\"")
+
 #try to parse the comments before or after the cursor (hacky but, cursor.raw_comments isn't working as expected)
 def ParseComments(cursor, kind : str = EParseComments.BeforeDecl):
     try:
@@ -88,18 +143,7 @@ def ParseComments(cursor, kind : str = EParseComments.BeforeDecl):
 
         if len(comments) == 0 : continue
 
-        comments = comments.split(";")
-        for g in comments :
-            if len(g) == 0 : continue
-
-            key = ""
-            value = ""
-
-            kv = g.split("=")
-            if len(kv) == 0 : continue
-            if len(kv) > 0 : key = kv[0].strip()
-            if len(kv) > 1 : value = kv[1].strip()
-
+        for key, value in SplitAttributes(comments) :
             #`exclude` and `exclude=<anything but false or 0>` leave the declaration out. it used to be stored
             #as include="False" and then overwritten with include=True below, so it never excluded anything
             if key.lower() == EGlobals.kExclude : excluded = value.lower() not in ("false", "0")
@@ -659,9 +703,9 @@ def CodeGenOutputAttributes(node, depth : int = 0) -> str:
         for k, v in attribs.items() :
             if k == EGlobals.kInclude : continue
             result += "\t" * depth
-            result += "{ \"" + k + "\", "
+            result += "{ \"" + CppStringEscape(k) + "\", "
             if len(str(v)) > 0 :
-                result += "\"" + v + "\" "
+                result += "\"" + CppStringEscape(v) + "\" "
             else :
                 result += "\"\" "
             result += "},\n"
@@ -996,7 +1040,7 @@ def CodeGenOutputNode(node) :
                 hppCode += f"\t\tif (name == \"{o}\")\n"
                 hppCode += "\t\t{\n"
                 for r in overrides[o]:
-                    hppCode += f"\t\t\tresult[\"{r}\"] = \"{overrides[o][r]}\";\n"
+                    hppCode += f"\t\t\tresult[\"{CppStringEscape(r)}\"] = \"{CppStringEscape(overrides[o][r])}\";\n"
                 hppCode += "\t\t}\n"
 
         hppCode += "\t\treturn result;\n"
