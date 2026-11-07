@@ -887,7 +887,9 @@ def GenerateMemberFunctionInfo(node, func, infoName) :
     result += "\t\t\tstatic constexpr const char* return_type_name() { return \"" + func[ENode.ReturnType] + "\"; }\n"
     result += "\t\t\tstatic constexpr const char* parameters_string() { return \"" + paramsString + "\"; }\n"
     result += "\t\t\tstatic type_t function_ptr() { return &" + infoName + "::" + func[ENode.Name] + "; }\n"
-    result += "\t\t\tstatic constexpr attribute_map_t attributes() { return " + CodeGenOutputAttributes(func, 4) + "; }\n"
+    #not constexpr: attribute_map_t is not a literal type, so a constexpr function returning it is ill-formed
+    #in C++20 (Clang refuses it; MSVC and GCC let it pass inside the function template)
+    result += "\t\t\tstatic attribute_map_t attributes() { return " + CodeGenOutputAttributes(func, 4) + "; }\n"
     result += "\t\t\tstatic std::vector<function_parameter_info> parameters() {\n"
     result += "\t\t\t\tstd::vector<function_parameter_info> result;\n"
     for _, pv in func[ENode.Parameters].items() :
