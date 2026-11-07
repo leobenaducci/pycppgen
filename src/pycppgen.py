@@ -1350,7 +1350,11 @@ def CodeGen(filePath : str) :
     
     write_file_if_different(hppFile, hppCode if hppCode != "" else None)
     write_file_if_different(cppFile, f"#include \"{hppFile}\"\n\n{cppCode}" if cppCode != "" else None)
-    write_file_if_different(hlslFile, get_final_hlsl_conent(hlslCode, hlslFile) if hlslCode != "" else None)
+    if hlslCode != "" :
+        write_file_if_different(hlslFile, get_final_hlsl_conent(hlslCode, hlslFile))
+    elif not HlslOwners.get(hlslFile) :
+        #no other header writes a file of that name: this one's is stale
+        write_file_if_different(hlslFile, None)
 
 #codegen: emit for each type call
 def CodeGenGlobalAddForEachTypeCall(code, node) :
@@ -1714,11 +1718,39 @@ def IsFileUpToDate(src : str | None, dst : str | None) :
     return srcTime < dstTime  
 
 def IsOutputUpToDate(file : str) :
-    if file in FilesWithPyHlslGenTag :
+    #a header that only mentions _pyhlslgen writes no .gen.hlsli, so it is not missing one; the cache
+    #knows which headers do write one
+    cached = CachedPerFileData.get(ResolvePath(file))
+    writesHlsl = HasHlslNodes(cached) if cached is not None else file in FilesWithPyHlslGenTag
+    if writesHlsl :
         if not IsFileUpToDate(file, GetOutputFilePath(file, kHlslExtension)) :
             return False
 
     return IsFileUpToDate(file, GetOutputFilePath(file))
+
+#whether a header's cached data has anything that goes into its .gen.hlsli
+def HasHlslNodes(data) -> bool :
+    if not isinstance(data, dict) or not "NodeList" in data :
+        return False
+    return any(isinstance(n, dict) and n.get(ENode.Hlsl, False) for n in data["NodeList"].values())
+
+#.gen.hlsli path -> the headers that write it: this project's and its dependencies'. the files go to one
+#folder shared by every project and are named by the header's base name alone, so two headers called
+#Foo.h wrote the same Foo.gen.hlsli, the last one to run winning; and a Foo.h with no HLSL in it removed
+#the other's file as its own stale output.
+def CollectHlslOwners(dependencyCaches : dict) -> dict :
+    owners = {}
+    def add(file, data) :
+        if HasHlslNodes(data) :
+            owners.setdefault(GetOutputFilePath(file, kHlslExtension), set()).add(file)
+    for file, data in PerFileData.items() :
+        add(file, data)
+    for dep, cache in dependencyCaches.items() :
+        for file, data in cache.items() :
+            path = pathlib.Path(file)
+            if path.is_absolute() and path.is_relative_to(dep) :
+                add(file, data)
+    return owners
 
 def FileContainsPyCppGenTag(file : str) :
     global FilesWithPyCppGenTag, FilesWithPyHlslGenTag
@@ -1845,7 +1877,7 @@ def show_usage() :
         print("    --P<dependency_dirs_separated_by_semicolons>")
 
 def main(args : list) :
-    global FilesToParse, PerFileData, ProjectPath, CacheFile, OutdatedFiles, CachedPerFileData, FilesToCodeGen
+    global FilesToParse, PerFileData, ProjectPath, CacheFile, OutdatedFiles, CachedPerFileData, FilesToCodeGen, HlslOwners
 
     if len(args) < 1 :
         show_usage()
@@ -1920,6 +1952,20 @@ def main(args : list) :
     GenFiles += list(map(lambda x : GetOutputFilePath(x, kHlslExtension), FilesToParse))
     OldGenFiles = list(map(lambda x : ResolvePath(x), OldGenFiles))
 
+    #load cache. PreviousCache is kept even when it is outdated: it is the only record of which
+    #.gen.hlsli this project wrote, and they live outside the project folder, where the walk above
+    #does not find them
+    PreviousCache = {}
+    if os.path.exists(CacheFile) :
+        with open(CacheFile, "rt") as file :
+            try :
+                PreviousCache = json.loads(file.read())
+            except :
+                PreviousCache = {}
+    PreviousHlslFiles = { GetOutputFilePath(f, kHlslExtension) for f, d in PreviousCache.items() if IsModuleFile(f) and HasHlslNodes(d) }
+    CachedPerFileData = PreviousCache
+    cacheFileTime = os.path.getmtime(CacheFile) if PreviousCache else 0
+
     #if the script is newer than the cache, remove all files as we need to rebuild everything
     outdatedCache = False
     if not IsFileUpToDate(NewestScriptFile(), CacheFile) :
@@ -1935,17 +1981,10 @@ def main(args : list) :
 
     FilesToRemove = list(set(OldGenFiles).difference(GenFiles))
      
-    #load cache
-    CachedPerFileData = {}
-    cacheFileTime = 0
-    if os.path.exists(CacheFile) and not outdatedCache:
-        with open(CacheFile, "rt") as file :
-            try :
-                CachedPerFileData = json.loads(file.read())
-                cacheFileTime = os.path.getmtime(CacheFile)
-            except :
-                CachedPerFileData = {}
-                cacheFileTime = 0
+    #an outdated cache is used for nothing but the stale-output cleanup at the end
+    if outdatedCache :
+        CachedPerFileData = {}
+        cacheFileTime = 0
 
     PerFileData = {}
 
@@ -1957,6 +1996,23 @@ def main(args : list) :
             futures = { pool.submit(ProcessFile, file, compilerOptions, cacheFileTime) : file for file in FilesToParse }
         ReportFailedFutures(futures, "parsing")
 
+    DependencyCaches = {}
+    for dep in Dependencies :
+        depPath = ResolvePath(os.path.join(dep, "pycppgen.cache"))
+        if os.path.exists(depPath) :
+            with open(depPath, "rt") as file :
+                try :
+                    DependencyCaches[dep] = json.loads(file.read())
+                except :
+                    atomic_print("failed to load dependency data: " + dep)
+
+    HlslOwners = CollectHlslOwners(DependencyCaches)
+    collisions = { path : files for path, files in HlslOwners.items() if len(files) > 1 }
+    for path, files in sorted(collisions.items()) :
+        atomic_print(f"error: {', '.join(sorted(files))} all write {path}; rename one of them")
+    if collisions :
+        sys.exit(1)
+
     if DebugMode :
         for file in FilesToCodeGen :
             CodeGen(file)
@@ -1966,14 +2022,8 @@ def main(args : list) :
         ReportFailedFutures(futures, "generating code for")
 
     for dep in Dependencies :
-        depPath = ResolvePath(os.path.join(dep, "pycppgen.cache"))
-        if os.path.exists(depPath) :
-            with open(depPath, "rt") as file :
-                try :
-                    depCachedData = json.loads(file.read())
-                    PerFileData.update(depCachedData)
-                except :
-                    atomic_print("failed to load dependency data: " + dep)
+        if dep in DependencyCaches :
+            PerFileData.update(DependencyCaches[dep])
 
     #clear data
     TLS().NodeList = {}
@@ -1999,6 +2049,12 @@ def main(args : list) :
     for file in FilesToRemove :
         if os.path.exists(file) :
             os.remove(file)
+
+    #and the .gen.hlsli of headers that were renamed, deleted or lost their HLSL structs
+    for hlslFile in sorted(PreviousHlslFiles) :
+        if hlslFile not in HlslOwners and os.path.exists(hlslFile) :
+            atomic_print(f"removing {hlslFile}")
+            os.remove(hlslFile)
 
 if __name__ == "__main__":
     main(sys.argv[1:])

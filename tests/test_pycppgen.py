@@ -233,5 +233,61 @@ class TestIncremental(TestCase) :
         self.assertHasNot("pycppgen<ns::SBase>", self.project.read("Derived.gen.h"))
         self.assertHasNot("ns::SBase", self.project.read("pycppgen.gen.h"))
 
+class TestHlslOutputs(TestCase) :
+    #an `hlsl` enum is enough to give a header a .gen.hlsli, and needs no shader compiler
+    HLSL_ENUM = """
+        #pragma once
+        //$[[pycppgen hlsl]]
+        enum class E{0} : unsigned int {{ A = 0 }};
+        """
+
+    def test_a_renamed_header_takes_its_hlsli_along(self) :
+        self.project.write("Old.h", self.HLSL_ENUM.format("Old"))
+        self.project.run()
+        self.assertTrue(os.path.exists(self.project.hlsli("Old.gen.hlsli")))
+
+        self.project.remove("Old.h")
+        self.project.write("New.h", self.HLSL_ENUM.format("New"))
+        self.project.run()
+        self.assertFalse(os.path.exists(self.project.hlsli("Old.gen.hlsli")))
+        self.assertTrue(os.path.exists(self.project.hlsli("New.gen.hlsli")))
+
+    def test_a_header_that_loses_its_hlsl_loses_its_hlsli(self) :
+        self.project.write("A.h", self.HLSL_ENUM.format("A"))
+        self.project.run()
+        self.project.write("A.h", """
+            //$[[pycppgen]]
+            enum class EA : unsigned int { A = 0 };
+            """)
+        self.project.run()
+        self.assertFalse(os.path.exists(self.project.hlsli("A.gen.hlsli")))
+
+    def test_two_headers_writing_the_same_hlsli_fail_the_run(self) :
+        self.project.write("a/Same.h", self.HLSL_ENUM.format("One"))
+        self.project.write("b/Same.h", self.HLSL_ENUM.format("Two"))
+        result = self.project.run(check=False)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("Same.gen.hlsli", result.stdout)
+
+    def test_a_namesake_without_hlsl_leaves_the_hlsli_alone(self) :
+        self.project.write("a/Same.h", self.HLSL_ENUM.format("One"))
+        self.project.write("b/Same.h", """
+            //uses a _pyhlslgen struct from elsewhere
+            //$[[pycppgen]]
+            struct SUser { int A; };
+            """)
+        for _ in range(2) :
+            self.project.run()
+            self.assertTrue(os.path.exists(self.project.hlsli("Same.gen.hlsli")))
+
+    def test_a_dependency_writing_the_same_hlsli_fails_the_run(self) :
+        lib = Project(self.tmp, "lib")
+        lib.write("Same.h", self.HLSL_ENUM.format("One"))
+        lib.run()
+        self.project.write("Same.h", self.HLSL_ENUM.format("Two"))
+        result = self.project.run("--P../lib", check=False)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("Same.gen.hlsli", result.stdout)
+
 if __name__ == "__main__" :
     unittest.main()
