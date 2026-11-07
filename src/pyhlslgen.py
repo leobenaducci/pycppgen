@@ -471,7 +471,9 @@ def CodeGenHlslEnumNode(hlslCode : str, node) -> str:
     enumName  = node[ENode.Name]
     fullName  = node[ENode.FullName]
     namespace = node[ENode.Namespace]
-    isBitmask = "bitmask" in node.get(ENode.Attributes, {})
+    #"flags" is the spelling pycppgen.py generates the operators for; "bitmask" is the older one
+    attributes = node.get(ENode.Attributes, {})
+    isBitmask = "flags" in attributes or "bitmask" in attributes
     hlslType  = _GetHlslEnumType(node.get(ENode.UnderlyingType, "unsigned"))
 
     cppNodeName : str = fullName[len(namespace):].lstrip('::').replace("::", "_")

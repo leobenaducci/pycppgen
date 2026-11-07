@@ -132,5 +132,27 @@ class TestAttributes(TestCase) :
         self.assertHas('{ "tooltip", "0 is off; higher is \\"more\\"" }', gen)
         self.assertHas('{ "clamp_min", "0" }', gen)
 
+class TestHlslEnum(TestCase) :
+    def test_flags_and_bitmask_set_is_bitmask(self) :
+        self.project.write("Enums.h", """
+            //$[[pycppgen hlsl;flags]]
+            enum class EFlags : unsigned int { A = 1, B = 2 };
+            //$[[pycppgen hlsl;bitmask]]
+            enum class EBitmask : unsigned int { A = 1, B = 2 };
+            //$[[pycppgen hlsl]]
+            enum class EPlain : unsigned int { A = 0, B = 1 };
+            //$[[pycppgen hlsl]]
+            enum class ESigned : int { Neg = -1, Zero = 0 };
+            """)
+        self.project.run()
+        with open(self.project.hlsli("Enums.gen.hlsli"), encoding="utf-8") as f :
+            hlsl = f.read()
+        def block(name) :
+            return hlsl[hlsl.index(f"struct pyhlslgen<{name}>") :][:400]
+        self.assertHas("is_bitmask   = true", block("EFlags"))
+        self.assertHas("is_bitmask   = true", block("EBitmask"))
+        self.assertHas("is_bitmask   = false", block("EPlain"))
+        self.assertHas("static const int ESigned_Neg = -1;", hlsl)
+
 if __name__ == "__main__" :
     unittest.main()
