@@ -55,6 +55,21 @@ class Project :
             raise AssertionError(f"pycppgen failed ({result.returncode}):\n{result.stdout}\n{result.stderr}")
         return result
 
+#errors libclang finds in a C++ file: a compile check of generated code, with template instantiation, and
+#no compiler needed beyond the libclang the generator already uses
+def CompileErrors(path : str, includeDirs : list) -> list :
+    import clang.cindex
+    #-Wno-invalid-constexpr: the generated offset() is offsetof in a constexpr function, which Clang
+    #refuses as a constant expression (MSVC and GCC, the compilers the engine is built with, accept it)
+    args = ["-x", "c++", "-std=c++20", "-fsyntax-only", "-Wno-invalid-constexpr"] + [f"-I{d}" for d in includeDirs]
+    tu = clang.cindex.Index.create().parse(path, args=args)
+    #only errors in the scratch project count: a libclang older than the installed standard library
+    #reports a few errors inside it (MSVC's STL asks for a newer Clang), which say nothing about our code
+    root = os.path.dirname(os.path.dirname(includeDirs[0]))
+    def ours(d) :
+        return d.location.file is not None and os.path.abspath(d.location.file.name).startswith(os.path.abspath(root))
+    return [str(d) for d in tu.diagnostics if d.severity >= clang.cindex.Diagnostic.Error and ours(d)]
+
 class TestCase(unittest.TestCase) :
     #assertIn would print the whole generated file on a failure
     def assertHas(self, needle : str, text : str) :
@@ -182,7 +197,7 @@ class TestParents(TestCase) :
         self.project.write("Base.h", """
             #pragma once
             //$[[pycppgen]]
-            struct SBase { int A; };
+            struct SBase { virtual ~SBase() = default; int A; };
             struct SUnreflected { int C; };
             """)
         self.project.write("Derived.h", """
@@ -205,7 +220,7 @@ class TestIncremental(TestCase) :
             #pragma once
             namespace ns {
             //$[[pycppgen]]
-            struct SBase { int A; };
+            struct SBase { virtual ~SBase() = default; int A; };
             }
             """)
         self.project.write("Derived.h", """
@@ -225,7 +240,7 @@ class TestIncremental(TestCase) :
             #pragma once
             namespace ns {
             //$[[pycppgen-include SOther]]
-            struct SBase { int A; };
+            struct SBase { virtual ~SBase() = default; int A; };
             }
             """)
         self.touch_after_cache("Base.h")
@@ -324,6 +339,50 @@ class TestGlobalFiles(TestCase) :
             self.project.remove(name)
             self.project.run()
             self.assertTrue(self.project.exists(name), name)
+
+class TestGeneratedCpp(TestCase) :
+    def compile(self, source : str) :
+        path = self.project.write("check.cpp", source)
+        errors = CompileErrors(path, [self.project.path])
+        if errors :
+            self.fail("\n".join(errors[:10]))
+
+    def test_the_by_type_dispatches_compile(self) :
+        self.project.write("Types.h", """
+            #pragma once
+            namespace ns {
+            //$[[pycppgen serialize]]
+            struct SBase { virtual ~SBase() = default;
+                //$[[pycppgen serialize]]
+                int A = 1;
+            };
+            //$[[pycppgen serialize]]
+            struct SDerived : SBase {
+                //$[[pycppgen serialize]]
+                float B = 2;
+            };
+            }
+            """)
+        self.project.run()
+        self.compile("""
+            #include "pycppgen.gen.h"
+
+            struct SJson {
+                bool contains(const char*) const { return true; }
+                SJson operator[](const char*) const { return {}; }
+                template<typename T> operator T() const { return T{}; }
+                template<typename T> SJson& operator=(const T&) { return *this; }
+            };
+
+            void Check(ns::SBase* object, const ns::SBase* constObject) {
+                SJson json;
+                pycppgen<void>::parse(json, object);
+                pycppgen<void>::dump(json, constObject);
+                pycppgen<void>::for_each_var(object, []<typename V>(auto&) {});
+                pycppgen<void>::for_each_var(constObject, []<typename V>(const auto&) {});
+                pycppgen<void>("SDerived").for_each_var([]<typename V>() {});
+            }
+            """)
 
 if __name__ == "__main__" :
     unittest.main()

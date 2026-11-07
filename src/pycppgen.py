@@ -1108,7 +1108,9 @@ def CodeGenOutputNode(node) :
         hppCode += "\ttemplate<typename T, typename R> static bool parse(const T& data, R* obj) {\n"
         if ENode.Parents in node :
             for parent in node[ENode.Parents] :
-                hppCode += f"\t\tpycppgen<{parent}>::parse(data, obj);\n"
+                #as the parent type: the parent's parse casts obj to its own pycppgen<>, which a pointer to
+                #the derived type is not related to, so a derived type's parse did not compile
+                hppCode += f"\t\tpycppgen<{parent}>::parse(data, static_cast<{parent}*>(obj));\n"
         if ENode.Variables in node and len(node[ENode.Variables]) > 0 :
             for _, var in node[ENode.Variables].items() :
                 if EGlobals.kSerialize in var[ENode.Attributes] and (var[ENode.Access] == str(AccessSpecifier.PUBLIC) or var[ENode.Access] == str(AccessSpecifier.PROTECTED)) :
