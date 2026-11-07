@@ -330,6 +330,87 @@ class TestHlslOutputs(TestCase) :
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("Same.gen.hlsli", result.stdout)
 
+@unittest.skipUnless(HAVE_SHADER_TOOLS, "needs dxc and spirv-cross")
+class TestHlslLayout(TestCase) :
+    def generate(self, header : str, text : str, check : bool = True) :
+        self.project.write(header, text)
+        result = self.project.run(check=check)
+        path = self.project.hlsli(header.replace(".h", ".gen.hlsli"))
+        hlsl = open(path, encoding="utf-8").read() if os.path.exists(path) else ""
+        return result, hlsl
+
+    def struct(self, hlsl : str, name : str) -> str :
+        start = hlsl.index(f"struct {name}\n")
+        return hlsl[start : hlsl.index("};", start)]
+
+    def test_a_nested_struct_named_like_its_owner_is_not_taken_for_it(self) :
+        _, hlsl = self.generate("Light.h", """
+            struct SLightData_pyhlslgen { float3 A; float B; };
+            struct SLight_pyhlslgen
+            {
+                SLightData_pyhlslgen D;
+                float C[4];
+                float2 E;
+            };
+            """)
+        light = self.struct(hlsl, "SLight")
+        self.assertHas("SLightData D;", light)
+        self.assertHas("float C[4];", light)
+        self.assertHasNot("float3 A;", light)
+
+    def test_int64_is_eight_bytes(self) :
+        _, hlsl = self.generate("Wide.h", """
+            using int64_t = long long;
+            struct SWide_pyhlslgen_scalar { int64_t A; uint B; };
+            """)
+        wide = self.struct(hlsl, "SWide")
+        self.assertHas("// Offset: 0 - Size: 8", wide)
+        self.assertHas("// Offset: 8 - Size: 4", wide)
+
+    def test_a_uniform_double_array_is_laid_out(self) :
+        _, hlsl = self.generate("Doubles.h", """
+            struct SDoubles_pyhlslgen_uniform { double2 D[2]; float F; };
+            """)
+        doubles = self.struct(hlsl, "SDoubles")
+        #a 16-byte element: double2 as declared. (1 + 2) / 2 * 2 made it double3, 32 bytes on the GPU, 24 in C++
+        self.assertHas("double2 D[2];", doubles)
+        self.assertHas("// Offset: 0 - Size: 32", doubles)
+
+    def test_a_uniform_struct_starting_with_a_nested_struct(self) :
+        _, hlsl = self.generate("Nested.h", """
+            struct SInner_pyhlslgen_uniform { float4 A; };
+            struct SOuter_pyhlslgen_uniform { SInner_pyhlslgen_uniform Inner; float4 B; };
+            """)
+        self.assertHas("SInner Inner;", self.struct(hlsl, "SOuter"))
+
+    def test_an_array_whose_gpu_stride_cpp_cannot_match_fails_the_run(self) :
+        #a 12-byte uniform struct: 16-byte array elements in a constant buffer, 12 in C++
+        result, _ = self.generate("Stride.h", """
+            struct SInner_pyhlslgen_uniform { float3 A; };
+            struct SOuter_pyhlslgen_uniform { SInner_pyhlslgen_uniform Inner[2]; float4 B; };
+            """, check=False)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("array stride of 16", result.stdout)
+
+    def test_an_unsupported_member_fails_the_run(self) :
+        result, _ = self.generate("Bad.h", """
+            struct SBad_pyhlslgen { float A; bool B; };
+            """, check=False)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("Unsupported type", result.stdout)
+
+    def test_structs_of_the_same_name_in_two_headers(self) :
+        #laid out in parallel, each in its own scratch folder: they shared tmp__SPush.tmp_hlsl
+        for i in range(8) :
+            fields = "".join(f"float F{j}; " for j in range(i + 1))
+            self.project.write(f"P{i}.h", f"namespace n{i} {{ struct SPush_pyhlslgen {{ {fields}}}; }}\n")
+        self.project.run()
+        for i in range(8) :
+            with open(self.project.hlsli(f"P{i}.gen.hlsli"), encoding="utf-8") as f :
+                push = self.struct(f.read(), "SPush")
+            self.assertHas(f"float F{i};", push)
+            self.assertHasNot(f"float F{i + 1};", push)
+
 class TestGlobalFiles(TestCase) :
     def test_pycppgen_h_is_not_rewritten_when_it_does_not_change(self) :
         self.project.write("A.h", """

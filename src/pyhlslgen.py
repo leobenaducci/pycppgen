@@ -243,6 +243,7 @@ def CodeGenHlslNode(hlslCode, node, generatedStructs : dict = {}) -> str:
 
     nameSizeMap = {}
     member = ""
+    memberIsStruct = False
 
     # Collect nested user-struct dependencies to prepend to the synthetic shader
     nestedDefs = ""
@@ -275,16 +276,21 @@ def CodeGenHlslNode(hlslCode, node, generatedStructs : dict = {}) -> str:
                 newDecl += f"[{arraySize}]"
 
             if size == 0 :
-                print(f"HLSL Error: Unsupported type {newDecl.replace(chr(9), ' ')} in {node[ENode.Name]}")
-                continue
+                #an error, not a warning: the member used to be dropped from both the HLSL and the C++ struct,
+                #which still agreed with each other, so nothing failed until code used the missing field
+                hint = " (bool is 4 bytes in HLSL and 1 in C++: use uint)" if baseType == "bool" else ""
+                raise RuntimeError(f"HLSL Error: Unsupported type {var[ENode.Type]} of {var[ENode.Name]} in {node[ENode.Name]}{hint}")
 
             # Prepend the nested struct's HLSL definition if not already done
             if isUserStruct and baseType not in alreadyPrepended:
                 nestedDefs += generatedStructs[baseType][0]
                 alreadyPrepended.add(baseType)
 
-            if member == "" :
+            #the member the synthetic shader copies, so that the buffer is used: a plain one when there is
+            #one, since DXC emits invalid SPIR-V copying a nested struct out of a ConstantBuffer
+            if member == "" or (memberIsStruct and not isUserStruct) :
                 member = var[ENode.Name]
+                memberIsStruct = isUserStruct
                 if arraySize > 1 :
                     member += "[0]"
 
@@ -325,14 +331,18 @@ def CodeGenHlslNode(hlslCode, node, generatedStructs : dict = {}) -> str:
         #to work there, but elsewhere it reaches dxc as a single argument with the profile " cs_6_2"
         result = subprocess.run([dxc, "-spirv", "-fspv-target-env=vulkan1.3", "-fspv-reflect", vk_layout, "-enable-16bit-types", "-T", "cs_6_2", "-E", "main", "-Fo", f"{fileName}.spv", fileName], capture_output=True)
 
-        if result.stderr and len(result.stderr) > 0:
-            atomic_print(result.stderr.decode())
-            return hlslCode
+        #a failure fails the run. it used to drop the struct from the .gen.hlsli and carry on, so the build
+        #broke later, or not at all if nothing used the struct yet; and any warning on stderr dropped it too
+        if result.returncode != 0 :
+            raise RuntimeError(f"dxc failed laying out {node[ENode.Name]}:\n{result.stderr.decode(errors='replace')}\n{hlslTemp}")
+        if result.stderr :
+            atomic_print(f"dxc, laying out {node[ENode.Name]}: {result.stderr.decode(errors='replace')}")
 
         result = subprocess.run([spirvCross, f"{fileName}.spv", "--reflect", "--hlsl", "--hlsl-enable-16bit-types"], capture_output=True)
-        if result.stderr and len(result.stderr) > 0:
-            atomic_print(result.stderr.decode())
-            return hlslCode
+        if result.returncode != 0 :
+            raise RuntimeError(f"spirv-cross failed reflecting {node[ENode.Name]}:\n{result.stderr.decode(errors='replace')}")
+        if result.stderr :
+            atomic_print(f"spirv-cross, reflecting {node[ENode.Name]}: {result.stderr.decode(errors='replace')}")
 
     parsed = json.loads(result.stdout.decode())
 
@@ -342,7 +352,7 @@ def CodeGenHlslNode(hlslCode, node, generatedStructs : dict = {}) -> str:
     expectedType = next((t for t in parsed["types"].values() if t["name"] == expectedName), None)
 
     if expectedType == None :
-        return hlslCode
+        raise RuntimeError(f"spirv-cross did not reflect {expectedName}, laying out {node[ENode.Name]}")
 
     offset = 0
     padNum = 0
@@ -369,8 +379,23 @@ def CodeGenHlslNode(hlslCode, node, generatedStructs : dict = {}) -> str:
 
     for member in expectedType["members"]:
 
+        #a member the GPU puts before the end of the previous one cannot be mirrored in C++, whose members do
+        #not overlap. this used to pad by the absolute difference, which shifted every later member of the
+        #C++ struct away from where the GPU reads it
+        if int(member["offset"]) < offset :
+            raise RuntimeError(f"HLSL layout of {node[ENode.Name]}: {member['name']} is at offset {member['offset']} on the GPU but "
+                               f"{offset} in C++; the C++ struct cannot match ({hlslLayout} layout)")
+
         if offset != member["offset"] and hlslLayout != "scalar":
-            applyPad(abs(int(member["offset"]) - offset))
+            applyPad(int(member["offset"]) - offset)
+
+        #an array whose GPU stride is not its C++ element size reads every element but the first from the
+        #wrong place: a uniform buffer's 16-byte array elements, say, which the declaration did not widen
+        if "array_stride" in member :
+            elementSize = int(nameSizeMap[member["name"]]) // math.prod(member["array"])
+            if int(member["array_stride"]) != elementSize :
+                raise RuntimeError(f"HLSL layout of {node[ENode.Name]}: {member['name']} has an array stride of {member['array_stride']} bytes "
+                                   f"on the GPU but {elementSize} in C++ ({hlslLayout} layout); use an element of the stride's size")
 
         newDecl = "\t"
 
