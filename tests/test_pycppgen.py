@@ -360,6 +360,21 @@ class TestByName(TestCase) :
         self.assertLess(exact, short)
         self.assertHas("HashCode = 0;", self.project.read("pycppgen.h"))
 
+class TestStaticByName(TestCase) :
+    def test_each_type_is_called_once(self) :
+        self.project.write("A.h", """
+            //$[[pycppgen]]
+            struct SA {
+                //$[[pycppgen]]
+                static void Init() {}
+                //$[[pycppgen]]
+                static void Shutdown() {}
+            };
+            """)
+        self.project.run()
+        gen = self.project.read("pycppgen.gen.h")
+        self.assertEqual(gen.count("pycppgen<SA>::call_function(funcName);"), 1)
+
 class TestGeneratedCpp(TestCase) :
     def compile(self, source : str) :
         path = self.project.write("check.cpp", source)

@@ -1635,7 +1635,10 @@ def CodeGenGlobal(path : str) :
                 if func[ENode.Access] == str(AccessSpecifier.PRIVATE) :
                     continue
                 if (not ENode.Parameters in func or len(func[ENode.Parameters]) == 0) and (not ENode.ReturnType in func or func[ENode.ReturnType] == "void"):
+                    #once per type: call_function dispatches on the name itself, so a line per static void()
+                    #function called the matching one as many times as the type had such functions
                     code += f"\t\tpycppgen<{node[ENode.FullName]}>::call_function(funcName);\n"
+                    break
     code += "\t}\n"
     code += "}\n\n"
 
