@@ -1671,7 +1671,8 @@ def CodeGenGlobal(path : str) :
     for _, node in TLS().NodeList.items() :
         if ENode.Cpp in node and node[ENode.Cpp] and (node[ENode.Kind] == EKind.Class or node[ENode.Kind] == EKind.Struct) and EGlobals.kSerialize in node[ENode.Attributes] :
             code += f"\tif (hashCode == typeid({node[ENode.FullName]}).hash_code())\n"
-            code += f"\t\treturn pycppgen<{node[ENode.FullName]}>::parse(data, (const {node[ENode.FullName]}*)obj);\n"
+            #not const: parse writes through it, and given a const pointer the per-type parse does not compile
+            code += f"\t\treturn pycppgen<{node[ENode.FullName]}>::parse(data, ({node[ENode.FullName]}*)obj);\n"
     code += "\treturn false;\n"
     code += "}\n\n"
 
