@@ -147,6 +147,24 @@ class TestAttributes(TestCase) :
         self.assertHas('{ "tooltip", "0 is off; higher is \\"more\\"" }', gen)
         self.assertHas('{ "clamp_min", "0" }', gen)
 
+    def test_a_using_declaration_overrides_attributes_without_the_include_flag(self) :
+        self.project.write("a.h", """
+            //$[[pycppgen]]
+            struct SBase {
+                //$[[pycppgen editable]]
+                int Scale;
+            };
+            //$[[pycppgen]]
+            struct SDerived : SBase {
+                //$[[pycppgen visible=false]]
+                using SBase::Scale;
+            };
+            """)
+        self.project.run()
+        gen = self.project.read("a.gen.h")
+        self.assertHas('result["visible"] = "false";', gen)
+        self.assertHasNot('result["include"]', gen)
+
 class TestHlslEnum(TestCase) :
     def test_flags_and_bitmask_set_is_bitmask(self) :
         self.project.write("Enums.h", """

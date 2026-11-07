@@ -1094,6 +1094,10 @@ def CodeGenOutputNode(node) :
                 hppCode += f"\t\tif (name == \"{o}\")\n"
                 hppCode += "\t\t{\n"
                 for r in overrides[o]:
+                    #the internal include flag is not an attribute: every other attribute list skips it, and
+                    #here it came out as result["include"] = "True"
+                    if r == EGlobals.kInclude :
+                        continue
                     hppCode += f"\t\t\tresult[\"{CppStringEscape(r)}\"] = \"{CppStringEscape(overrides[o][r])}\";\n"
                 hppCode += "\t\t}\n"
 
