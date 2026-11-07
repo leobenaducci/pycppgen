@@ -308,47 +308,42 @@ def CodeGenHlslNode(hlslCode, node, generatedStructs : dict = {}) -> str:
         hlslTemp += "[0]"
     hlslTemp += f".{member};\n}}\n"
     
-    fileName = os.path.abspath(f"tmp__{node[ENode.Name]}.tmp_hlsl")
-    with open(fileName, "wt") as file:
-        file.write(hlslTemp)
-
     if hlslLayout == "scalar" :
         vk_layout = "-fvk-use-scalar-layout"
     else :
         vk_layout = "-fvk-use-dx-layout"
-    #one list element per argument: Windows joins the list back into a command line, so "-T cs_6_2" used
-    #to work there, but elsewhere it reaches dxc as a single argument with the profile " cs_6_2"
-    result = subprocess.run([dxc, "-spirv", "-fspv-target-env=vulkan1.3", "-fspv-reflect", vk_layout, "-enable-16bit-types", "-T", "cs_6_2", "-E", "main", "-Fo", f"{fileName}.spv", fileName], capture_output=True)
-    if os.path.exists(f"{fileName}"):
-        os.remove(f"{fileName}")
 
-    if result.stderr and len(result.stderr) > 0:
-        atomic_print(result.stderr.decode())
-        return hlslCode
+    #a folder of its own: the files used to be tmp__<struct>.tmp_hlsl in the working directory, where the
+    #worker threads laying out two structs of the same name (in different namespaces or headers) overwrote
+    #each other's shader
+    with tempfile.TemporaryDirectory(prefix="pycppgen_hlsl_") as tmpDir :
+        fileName = os.path.join(tmpDir, f"{node[ENode.Name]}.hlsl")
+        with open(fileName, "wt") as file:
+            file.write(hlslTemp)
 
-    result = subprocess.run([spirvCross, f"{fileName}.spv", "--reflect", "--hlsl", "--hlsl-enable-16bit-types"], capture_output=True)
-    if os.path.exists(f"{fileName}.spv"):
-        os.remove(f"{fileName}.spv")
+        #one list element per argument: Windows joins the list back into a command line, so "-T cs_6_2" used
+        #to work there, but elsewhere it reaches dxc as a single argument with the profile " cs_6_2"
+        result = subprocess.run([dxc, "-spirv", "-fspv-target-env=vulkan1.3", "-fspv-reflect", vk_layout, "-enable-16bit-types", "-T", "cs_6_2", "-E", "main", "-Fo", f"{fileName}.spv", fileName], capture_output=True)
 
-    if result.stderr and len(result.stderr) > 0:
-        atomic_print(result.stderr.decode())
-        return hlslCode
+        if result.stderr and len(result.stderr) > 0:
+            atomic_print(result.stderr.decode())
+            return hlslCode
+
+        result = subprocess.run([spirvCross, f"{fileName}.spv", "--reflect", "--hlsl", "--hlsl-enable-16bit-types"], capture_output=True)
+        if result.stderr and len(result.stderr) > 0:
+            atomic_print(result.stderr.decode())
+            return hlslCode
 
     parsed = json.loads(result.stdout.decode())
 
-    typePrefix = ""
-    if hlslLayout == "uniform" :
-        typePrefix = "ConstantBuffer."
-
-    expectedType = None
-    for t in parsed["types"] :
-        if parsed["types"][t]["name"].find(f"{typePrefix}{node[ENode.Name]}") != -1 :
-            expectedType = parsed["types"][t]
-            break
+    #the exact name: this used to be a substring match, which could pick a nested struct whose name starts
+    #with this one's (SLightData for SLight) and lay this struct out as that one
+    expectedName = f"type.ConstantBuffer.{node[ENode.Name]}" if hlslLayout == "uniform" else node[ENode.Name]
+    expectedType = next((t for t in parsed["types"].values() if t["name"] == expectedName), None)
 
     if expectedType == None :
         return hlslCode
-    
+
     offset = 0
     padNum = 0
     size = 0
