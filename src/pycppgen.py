@@ -783,7 +783,9 @@ def CodeGenOutputAttributes(node, depth : int = 0) -> str:
 def CodeGenOutputAddFunctionDeclaration(declarations, node, funcNode, isStatic : bool) :
     decl = f"static_{isStatic}_{funcNode[ENode.Type]}"
     numParams = len(funcNode[ENode.Parameters])
-    isConst = decl.endswith("const")
+    #const after the parameter list, wherever it ends: "void () const noexcept" does not end with const, and its
+    #call_function took a non-const object, which a const one cannot be passed as
+    isConst = re.search(r"\)\s*const\b", funcNode[ENode.Type]) is not None
       
     #if call_function with the current return value and parameters doesn't exists, create it
     if not decl in declarations :

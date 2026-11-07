@@ -556,6 +556,22 @@ class TestGeneratedCpp(TestCase) :
             }
             """)
 
+    def test_a_const_noexcept_function_is_called_on_a_const_object(self) :
+        self.project.write("Fn.h", """
+            #pragma once
+            //$[[pycppgen]]
+            struct SFn
+            {
+                //$[[pycppgen]]
+                int Get() const noexcept { return 1; }
+            };
+            """)
+        self.project.run()
+        self.compile("""
+            #include "pycppgen.gen.h"
+            bool Check(const SFn* object) { int result = 0; return pycppgen<SFn>::call_function("Get", object, result); }
+            """)
+
     def test_enum_attributes_are_static(self) :
         self.project.write("E.h", """
             #pragma once
