@@ -71,6 +71,7 @@ def ParseComments(cursor, kind : str = EParseComments.BeforeDecl):
 
     result = {}
     oneMatch = False
+    excluded = False
 
     COMMENT_REGEX = re.compile(r".*\$\[\[pycppgen(?>(?>\s+((?>\s|\w|\W)*)\]\])|(?>\]\]))", flags=re.IGNORECASE | re.MULTILINE)    
     for line in attribs.splitlines() :
@@ -99,11 +100,13 @@ def ParseComments(cursor, kind : str = EParseComments.BeforeDecl):
             if len(kv) > 0 : key = kv[0].strip()
             if len(kv) > 1 : value = kv[1].strip()
 
-            if key.lower() == EGlobals.kExclude : result[EGlobals.kInclude] = str(bool(value != None and value == True))
+            #`exclude` and `exclude=<anything but false or 0>` leave the declaration out. it used to be stored
+            #as include="False" and then overwritten with include=True below, so it never excluded anything
+            if key.lower() == EGlobals.kExclude : excluded = value.lower() not in ("false", "0")
             else : result[key] = value
 
-    if oneMatch and not EGlobals.kExclude.casefold() in result :
-        result[EGlobals.kInclude] = True
+    if oneMatch :
+        result[EGlobals.kInclude] = not excluded
 
     return result
     
