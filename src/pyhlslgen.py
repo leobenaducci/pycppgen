@@ -122,7 +122,8 @@ def GetHlslAlignment(var : str) :
 def PreParseHlsl(varType : str, layout : str, knownStructs : dict = {}) -> tuple[int, str, int, int, int]:
 
     #match type<n>x<m>[s] patterns
-    match = re.fullmatch(rf'({"|".join(kHlslTypes)})(\d)?(?:x(\d))?(?:\[(\w+)\])?', varType)
+    #libclang may spell an array with a space before the bracket ("float [4]"), as the struct case below allows
+    match = re.fullmatch(rf'({"|".join(kHlslTypes)})(\d)?(?:x(\d))?\s*(?:\[(\w+)\])?', varType)
     if match:
         baseType, rows, cols, arraySize = match.groups()
 
@@ -133,9 +134,15 @@ def PreParseHlsl(varType : str, layout : str, knownStructs : dict = {}) -> tuple
         if arraySize : arraySize = int(arraySize)
         else: arraySize = 1
 
-        if baseType.startswith('uint64_t') | baseType.startswith('double'):
+        #bool is 4 bytes in HLSL and 1 in C++ (bool2 is glm::bvec2), so the mirror cannot match: unsupported
+        if baseType == "bool" :
+            return 0, baseType, int(arraySize), int(rows), int(cols)
+
+        #int64_t used to fall through to 4 bytes, and half (16 bit under -enable-16bit-types, vkfw::float16_t
+        #in C++) as well
+        if baseType in ("uint64_t", "int64_t", "double") :
             size = 8
-        elif baseType.find('16_t') != -1 :
+        elif baseType.find('16_t') != -1 or baseType == "half" :
             size = 2
         else :
             size = 4
@@ -169,7 +176,8 @@ def PreParseHlsl(varType : str, layout : str, knownStructs : dict = {}) -> tuple
         if layout == "uniform" :
             if arraySize > 1:
                 if size == 8 :
-                    rows = ((rows + 1) / 2) * 2
+                    #integer division: (2 + 1) / 2 * 2 made a double2 array double3 (32 bytes on the GPU, 24 in C++)
+                    rows = ((rows + 1) // 2) * 2
                 elif size == 2 :
                     return 0, baseType, int(arraySize), int(rows), int(cols)
                 else :
