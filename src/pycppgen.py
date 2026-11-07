@@ -1767,7 +1767,7 @@ def ProcessFile(file : str, compilerOptions, cacheFileTime: float) :
         includedFiles = []
         for f in tu.get_includes() :
             includedFiles.append(ResolvePath(f.include.name))
-        PerFileData[file]["IncludedFiles"] = list(set(includedFiles))
+        PerFileData[file]["IncludedFiles"] = sorted(set(includedFiles))
 
     for f in PerFileData[file]["IncludedFiles"] :
         if not f.endswith("pycppgen.h") and (os.path.getmtime(f) > cacheFileTime) if os.path.exists(f) else True :
@@ -1954,7 +1954,10 @@ def main(args : list) :
 
     #save cache
     with open(CacheFile, "wt") as file :
-        file.write(json.dumps(PerFileData))
+        #in path order: PerFileData fills in whichever order the worker threads finish, and the include
+        #lists were sets, so the same input wrote a different cache every run. the node lists keep their
+        #declaration order, which the generated code follows
+        file.write(json.dumps({k : PerFileData[k] for k in sorted(PerFileData)}))
 
     #remove old files
     for file in FilesToRemove :
