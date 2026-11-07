@@ -241,6 +241,14 @@ class TestHlslOutputs(TestCase) :
         enum class E{0} : unsigned int {{ A = 0 }};
         """
 
+    def test_a_fresh_tree_with_many_hlsl_headers(self) :
+        #the workers used to race to create shaders/Types, and the losers failed
+        for i in range(16) :
+            self.project.write(f"H{i}.h", self.HLSL_ENUM.format(f"H{i}"))
+        self.project.run()
+        for i in range(16) :
+            self.assertTrue(os.path.exists(self.project.hlsli(f"H{i}.gen.hlsli")))
+
     def test_a_renamed_header_takes_its_hlsli_along(self) :
         self.project.write("Old.h", self.HLSL_ENUM.format("Old"))
         self.project.run()

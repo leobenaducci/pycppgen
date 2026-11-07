@@ -143,8 +143,9 @@ def write_file_if_different(file : str, content : str | None) :
         os.utime(file, None)
         return
 
-    if not os.path.exists(pathlib.Path(file).parent) :
-        os.makedirs(pathlib.Path(file).parent)
+    #exist_ok: the worker threads race to create the folder (shaders/Types on a fresh tree), and the
+    #loser of an exists-then-create check failed its whole file with FileExistsError
+    os.makedirs(pathlib.Path(file).parent, exist_ok=True)
 
     with open(file, mode="wt") as outputFile :
         atomic_print(f"writing {file}")
