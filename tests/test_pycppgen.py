@@ -177,5 +177,23 @@ class TestCache(TestCase) :
             self.assertIn("Outdated file cache", self.project.run(script=script).stdout, name)
             os.utime(os.path.join(scripts, name), (0, 0))
 
+class TestParents(TestCase) :
+    def test_a_reflected_global_base_from_another_header_is_a_parent(self) :
+        self.project.write("Base.h", """
+            #pragma once
+            //$[[pycppgen]]
+            struct SBase { int A; };
+            struct SUnreflected { int C; };
+            """)
+        self.project.write("Derived.h", """
+            #pragma once
+            #include "Base.h"
+            //$[[pycppgen]]
+            struct SDerived : SBase, SUnreflected { int B; };
+            """)
+        self.project.run()
+        gen = self.project.read("Derived.gen.h")
+        self.assertHas("struct pycppgen<SDerived> : SDerived, virtual pycppgen<SBase>{", gen)
+
 if __name__ == "__main__" :
     unittest.main()

@@ -78,13 +78,35 @@ def CppStringEscape(text) -> str :
 #several times for every declaration, and used to re-read the parent's tokens and scan them linearly
 #each time: quadratic in the size of a struct or file, and Python-bound, so the worker threads could
 #not overlap it. a 400-member struct took seconds; the whole engine took minutes.
-def GetParentTokens(parent) :
-    start = parent.extent.start
-    end = parent.extent.end
-    key = (str(start.file), start.offset, end.offset)
+#
+#the parent of a declaration at global scope is the translation unit, whose tokens are those of the file
+#being parsed. a global declaration from an included header (a base class, say) is not among them, so
+#the tokens of its own file are read instead; it used to find no tag on it, and a reflected base class at
+#global scope in another header was never recorded as a parent.
+def GetParentTokens(parent, cursor) :
+    otherFile = None
+    if parent.kind == CursorKind.TRANSLATION_UNIT and cursor.location.file is not None :
+        name = cursor.location.file.name
+        if ResolvePath(name) != ResolvePath(parent.spelling) and os.path.exists(name) :
+            otherFile = cursor.location.file
+
+    if otherFile is not None :
+        key = (otherFile.name, 0, -1)
+    else :
+        start = parent.extent.start
+        end = parent.extent.end
+        key = (str(start.file), start.offset, end.offset)
+
     cache = TLS().TokenCache
     if key not in cache :
-        tokens = list(parent.get_tokens())
+        if otherFile is not None :
+            tu = cursor.translation_unit
+            extent = clang.cindex.SourceRange.from_locations(
+                clang.cindex.SourceLocation.from_offset(tu, otherFile, 0),
+                clang.cindex.SourceLocation.from_offset(tu, otherFile, os.path.getsize(otherFile.name)))
+            tokens = list(tu.get_tokens(extent=extent))
+        else :
+            tokens = list(parent.get_tokens())
         indexByOffset = {}
         for i, t in enumerate(tokens) :
             indexByOffset.setdefault(t.extent.start.offset, i)
@@ -97,7 +119,7 @@ def ParseComments(cursor, kind : str = EParseComments.BeforeDecl):
         preDeclComments = not kind in ParseCommentsMode or ParseCommentsMode[kind] == EParseComments.BeforeDecl
         parent = cursor.semantic_parent
 
-        tokens, tokenIndexByOffset = GetParentTokens(parent)
+        tokens, tokenIndexByOffset = GetParentTokens(parent, cursor)
         cursorTokens = list(cursor.get_tokens())
         if len(cursorTokens) == 0 :
             return {}
