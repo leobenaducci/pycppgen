@@ -404,5 +404,34 @@ class TestGeneratedCpp(TestCase) :
             }
             """)
 
+    def test_tagged_private_members_are_left_out(self) :
+        self.project.write("Private.h", """
+            #pragma once
+            //$[[pycppgen]]
+            class CPrivate
+            {
+            public:
+                //$[[pycppgen]]
+                int Public = 0;
+                //$[[pycppgen]]
+                void PublicFn() {}
+            private:
+                //$[[pycppgen]]
+                int Hidden = 0;
+                //$[[pycppgen]]
+                void HiddenFn() {}
+                //$[[pycppgen]]
+                static void HiddenStatic() {}
+            };
+            """)
+        self.project.run()
+        gen = self.project.read("Private.gen.h")
+        self.assertHasNot("Hidden", gen)
+        self.assertHas("PublicFn", gen)
+        self.compile("""
+            #include "pycppgen.gen.h"
+            bool Check(CPrivate* object) { return pycppgen<CPrivate>::call_function("PublicFn", object); }
+            """)
+
 if __name__ == "__main__" :
     unittest.main()

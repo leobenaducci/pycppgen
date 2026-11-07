@@ -914,6 +914,13 @@ def CodeGenOutputNode(node) :
 
     #class or structs
     if node[ENode.Kind] == EKind.Class or node[ENode.Kind] == EKind.ClassTemplate or node[ENode.Kind] == EKind.Struct :
+        #a private member cannot be reached from the derived pycppgen<T>. most of what follows skipped it, but
+        #the using-declarations, call_function and has_function did not, and the first two do not compile
+        node = dict(node)
+        for members in (ENode.Variables, ENode.StaticVariables, ENode.Functions, ENode.StaticFunctions) :
+            if members in node :
+                node[members] = { k : v for k, v in node[members].items() if v[ENode.Access] != str(AccessSpecifier.PRIVATE) }
+
         hppCode = CodeGenOutputHeaderDefines(hppCode, node)
         hppCode = CodeGenOutputMetaHeader(hppCode, node)
 
@@ -1625,6 +1632,8 @@ def CodeGenGlobal(path : str) :
     for _, node in TLS().NodeList.items() :
         if ENode.Cpp in node and node[ENode.Cpp] and (node[ENode.Kind] == EKind.Class or node[ENode.Kind] == EKind.Struct) and ENode.StaticFunctions in node :
             for _, func in node[ENode.StaticFunctions].items() :
+                if func[ENode.Access] == str(AccessSpecifier.PRIVATE) :
+                    continue
                 if (not ENode.Parameters in func or len(func[ENode.Parameters]) == 0) and (not ENode.ReturnType in func or func[ENode.ReturnType] == "void"):
                     code += f"\t\tpycppgen<{node[ENode.FullName]}>::call_function(funcName);\n"
     code += "\t}\n"
