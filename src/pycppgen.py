@@ -1781,6 +1781,21 @@ def ProcessFile(file : str, compilerOptions, cacheFileTime: float) :
     if isOutdated and "NodeList" not in PerFileData[file] :
         needsParseTU = True
 
+    # a header's node list depends on what it includes, not only on its own text: whether a base class is
+    # reflected, the value of an enumerator or an array size defined by a constant from elsewhere. a
+    # changed include used to regenerate the header's output from its cached node list, so a base whose
+    # tag was removed stayed a parent and a changed array size kept the old HLSL layout; now it re-parses.
+    # (pycppgen.h is skipped: every global step rewrites it, and it holds nothing a header's parse reads)
+    if not needsParseTU :
+        for f in PerFileData[file]["IncludedFiles"] :
+            if os.path.basename(f) == "pycppgen.h" :
+                continue
+            if not os.path.exists(f) or os.path.getmtime(f) > cacheFileTime :
+                needsParseTU = True
+                if not isOutdated :
+                    atomic_print(f"outdated include {f} in {file}")
+                break
+
     tu = None
     tmpFilePath = None
     if needsParseTU :
@@ -1791,15 +1806,7 @@ def ProcessFile(file : str, compilerOptions, cacheFileTime: float) :
             includedFiles.append(ResolvePath(f.include.name))
         PerFileData[file]["IncludedFiles"] = sorted(set(includedFiles))
 
-    for f in PerFileData[file]["IncludedFiles"] :
-        if not f.endswith("pycppgen.h") and (os.path.getmtime(f) > cacheFileTime) if os.path.exists(f) else True :
-            needsCodeGen = True
-            if not f in FilesToParse and FileContainsPyCppGenTag(f) :
-                FilesToParse.append(f)
-            if not isOutdated : 
-                atomic_print(f"outdated include {f} in {file}")
-
-    if needsParseTU : 
+    if needsParseTU :
         ParseTranslationUnit(tu, tmpFilePath)
         PerFileData[file]["NodeList"] = TLS().NodeList
 

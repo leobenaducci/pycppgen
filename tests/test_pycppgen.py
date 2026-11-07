@@ -195,5 +195,43 @@ class TestParents(TestCase) :
         gen = self.project.read("Derived.gen.h")
         self.assertHas("struct pycppgen<SDerived> : SDerived, virtual pycppgen<SBase>{", gen)
 
+class TestIncremental(TestCase) :
+    def touch_after_cache(self, relPath : str) :
+        future = os.path.getmtime(os.path.join(self.project.path, "pycppgen.cache")) + 10
+        os.utime(os.path.join(self.project.path, relPath), (future, future))
+
+    def test_a_changed_include_reparses_the_header(self) :
+        self.project.write("Base.h", """
+            #pragma once
+            namespace ns {
+            //$[[pycppgen]]
+            struct SBase { int A; };
+            }
+            """)
+        self.project.write("Derived.h", """
+            #pragma once
+            #include "Base.h"
+            namespace ns {
+            //$[[pycppgen]]
+            struct SDerived : SBase { int B; };
+            }
+            """)
+        self.project.run()
+        gen = self.project.read("Derived.gen.h")
+        self.assertHas("virtual pycppgen<ns::SBase>", gen)
+
+        #the base loses its tag; Derived.h itself does not change
+        self.project.write("Base.h", """
+            #pragma once
+            namespace ns {
+            //$[[pycppgen-include SOther]]
+            struct SBase { int A; };
+            }
+            """)
+        self.touch_after_cache("Base.h")
+        self.project.run()
+        self.assertHasNot("pycppgen<ns::SBase>", self.project.read("Derived.gen.h"))
+        self.assertHasNot("ns::SBase", self.project.read("pycppgen.gen.h"))
+
 if __name__ == "__main__" :
     unittest.main()
