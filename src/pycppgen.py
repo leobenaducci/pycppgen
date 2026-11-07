@@ -428,8 +428,10 @@ def ParseStruct(cursor, isHlslDecl : bool = False) :
 
         #member enum definitions
         if child.kind == CursorKind.ENUM_DECL :
+            #listed like any other enum: it used to go only into the struct's node, which nothing generates
+            #from, so a tagged enum inside a struct was silently not reflected
             if child.is_definition() :
-                ParseEnum(child, False)
+                ParseEnum(child, True)
             continue
 
         if child.kind == CursorKind.USING_DECLARATION :
@@ -502,6 +504,9 @@ def ParseEnum(cursor, isGlobal : bool = False) :
     PopNode()
 
     AppendToStackTop(node, ENode.Enums, isGlobal)
+
+    if "hlsl" in node.get(ENode.Attributes, {}) :
+        node[ENode.Hlsl] = True
 
 #append to list and recurse
 def ParseNamespace(cursor) :
@@ -586,10 +591,6 @@ def ParseCursor(cursor, forceInclude : bool = False)  -> None:
     if cursor.kind == CursorKind.ENUM_DECL :
         if cursor.is_definition() :
             ParseEnum(cursor, True)
-            if fullName in TLS().NodeList :
-                enumNode = TLS().NodeList[fullName]
-                if "hlsl" in enumNode.get(ENode.Attributes, {}) :
-                    enumNode[ENode.Hlsl] = True
         return
 
     if cursor.kind == CursorKind.VAR_DECL :

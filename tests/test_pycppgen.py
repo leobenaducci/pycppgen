@@ -533,6 +533,29 @@ class TestGeneratedCpp(TestCase) :
         if errors :
             self.fail("\n".join(errors[:10]))
 
+    def test_an_enum_inside_a_struct_is_reflected(self) :
+        self.project.write("Nested.h", """
+            #pragma once
+            namespace ns {
+            //$[[pycppgen]]
+            struct SOwner
+            {
+                //$[[pycppgen flags]]
+                enum class EMode : unsigned { A = 1, B = 2 };
+                //$[[pycppgen]]
+                EMode Mode = EMode::A;
+            };
+            }
+            """)
+        self.project.run()
+        self.assertHas("struct pycppgen<ns::SOwner::EMode>", self.project.read("Nested.gen.h"))
+        self.compile("""
+            #include "pycppgen.gen.h"
+            bool Check(ns::SOwner::EMode m) {
+                return pycppgen<ns::SOwner::EMode>::enum_to_string(m) == "A" && (m & ns::SOwner::EMode::B);
+            }
+            """)
+
     def test_enum_attributes_are_static(self) :
         self.project.write("E.h", """
             #pragma once
