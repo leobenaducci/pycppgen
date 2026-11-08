@@ -463,6 +463,57 @@ class TestHlslLayout(TestCase) :
             self.assertHas(f"float F{i};", push)
             self.assertHasNot(f"float F{i + 1};", push)
 
+class TestDependencyMoves(TestCase) :
+    #engine adbad8dd moved vkfw's Render/RenderPipeline to Render/RenderGraph; sample's pycppgen.gen.h kept
+    #including the old .gen.h path, because none of sample's own inputs changed and neither did the type list
+    def test_a_header_moved_in_a_dependency_moves_in_the_dependents_global_file(self) :
+        lib = Project(self.tmp, "lib")
+        lib.write("Old/Config.h", """
+            //$[[pycppgen]]
+            struct SConfig { int A; };
+            """)
+        self.project.write("App.h", """
+            //$[[pycppgen]]
+            struct SApp { int B; };
+            """)
+        lib.run()
+        self.project.run("--P../lib")
+        self.assertHas("../lib/Old/Config.gen.h", self.project.read("pycppgen.gen.h"))
+
+        os.makedirs(os.path.join(lib.path, "New"))
+        os.replace(os.path.join(lib.path, "Old", "Config.h"), os.path.join(lib.path, "New", "Config.h"))
+        lib.run()
+        self.assertTrue(lib.exists("New/Config.gen.h"))
+        self.project.run("--P../lib")
+        gen = self.project.read("pycppgen.gen.h")
+        self.assertHas("../lib/New/Config.gen.h", gen)
+        self.assertHasNot("Old/Config.gen.h", gen)
+
+    def test_a_run_with_nothing_changed_writes_nothing(self) :
+        lib = Project(self.tmp, "lib")
+        lib.write("Config.h", """
+            //$[[pycppgen]]
+            struct SConfig { int A; };
+            """)
+        self.project.write("App.h", """
+            //$[[pycppgen]]
+            struct SApp { int B; };
+            """)
+        lib.run()
+        self.project.run("--P../lib")
+        #the global files are never touched when unchanged, so an old time shows any write
+        outputs = ["pycppgen.gen.h", "pycppgen.h"]
+        for name in outputs :
+            os.utime(os.path.join(self.project.path, name), (1000, 1000))
+        appGen = os.path.getmtime(os.path.join(self.project.path, "App.gen.h"))
+        result = self.project.run("--P../lib")
+        self.assertNotIn("writing", result.stdout)
+        self.assertNotIn("skipping", result.stdout)
+        self.assertNotIn("global code gen step", result.stdout)
+        for name in outputs :
+            self.assertEqual(os.path.getmtime(os.path.join(self.project.path, name)), 1000, name)
+        self.assertEqual(os.path.getmtime(os.path.join(self.project.path, "App.gen.h")), appGen)
+
 class TestGlobalFiles(TestCase) :
     def test_pycppgen_h_is_not_rewritten_when_it_does_not_change(self) :
         self.project.write("A.h", """

@@ -1567,12 +1567,17 @@ namespace pycppgen_detail
 
     #rewritten only when it changes: every reflected header includes it, and writing it on every global
     #step recompiled the whole project each time a reflected type was added, removed or renamed
-    write_file_if_different(os.path.join(path, "pycppgen.h"), code, touch=False)
+    headerPath = os.path.join(path, "pycppgen.h")
+    if not IsFileDifferent(headerPath, code) :
+        return []
+    write_file_if_different(headerPath, code, touch=False)
+    return [headerPath]
 
-def CodeGenGlobal(path : str) :
+#writes pycppgen.h and pycppgen.gen.h where their text changed and returns the ones it wrote
+def CodeGenGlobal(path : str) -> list :
     global PerFileData
-    
-    CodeGenGlobalHeader(path)
+
+    written = CodeGenGlobalHeader(path)
 
     #pycppgen.gen.h
     code = ""
@@ -1749,8 +1754,12 @@ def CodeGenGlobal(path : str) :
 
     genPath = os.path.join(path, "pycppgen.gen.h")
     if IsFileDifferent(genPath, code) :
+        atomic_print(f"writing {genPath}")
         with open(genPath, mode="wt", encoding="utf-8") as file :
             file.write(code)
+        written.append(genPath)
+
+    return written
 
 def IsFileUpToDate(src : str | None, dst : str | None) :
     if src == None : return False
@@ -2079,11 +2088,15 @@ def main(args : list) :
         if "NodeList" in v :
             TLS().NodeList.update(v["NodeList"])
 
-    globalFilesMissing = not os.path.exists(os.path.join(ProjectPath, "pycppgen.gen.h")) or not os.path.exists(os.path.join(ProjectPath, "pycppgen.h"))
-    if globalFilesMissing or len(OutdatedFiles) > 0 or not "pycppgen.gen.h" in CachedPerFileData or CachedPerFileData["pycppgen.gen.h"] != TLS().NodeList :
-        atomic_print(f"global code gen step, outdated files -> {OutdatedFiles}")
-        FilesToParse.append(os.path.join(ProjectPath, "pycppgen.h"))
-        CodeGenGlobal(ProjectPath)
+    #generated on every run, and written only where the text changed. it used to run only when one of this
+    #project's headers was outdated or the merged type list changed, but pycppgen.gen.h also names every
+    #header's .gen.h by path, a dependency's included: when engine adbad8dd moved vkfw's Render/RenderPipeline
+    #to Render/RenderGraph, sample's own headers and the type list were unchanged, so its pycppgen.gen.h kept
+    #including the old paths. building the text is a few milliseconds even for the engine, and it cannot go
+    #stale on anything it is made of, a missing or edited file included
+    written = CodeGenGlobal(ProjectPath)
+    if written :
+        atomic_print(f"global code gen step, outdated files -> {sorted(OutdatedFiles)}")
     PerFileData["pycppgen.gen.h"] = TLS().NodeList
 
     #save cache
