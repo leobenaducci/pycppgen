@@ -176,7 +176,7 @@ def ParseComments(cursor, kind : str = EParseComments.BeforeDecl):
     oneMatch = False
     excluded = False
 
-    COMMENT_REGEX = re.compile(r".*\$\[\[pycppgen(?>(?>\s+((?>\s|\w|\W)*)\]\])|(?>\]\]))", flags=re.IGNORECASE | re.MULTILINE)    
+    COMMENT_REGEX = re.compile(r".*\$\[\[pycppgen(?>(?>[\s;]+((?>\s|\w|\W)*)\]\])|(?>\]\]))", flags=re.IGNORECASE | re.MULTILINE)
     for line in attribs.splitlines() :
         m = COMMENT_REGEX.match(line)
         if m == None : continue
