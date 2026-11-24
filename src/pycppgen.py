@@ -1612,6 +1612,21 @@ def CodeGenGlobal(path : str) -> list :
             code = CodeGenGlobalAddForEachTypeCall(code, node)
     code += "\t}\n\n"
 
+    #the same list cut into Parts consecutive slices, Part the one visited, so that a project can register its types from several
+    #files compiled in parallel (vkfw's build/CMakeLists.txt, add_vkfw_type_registration) instead of one that instantiates every
+    #type's registration by itself at the end of a build. Visiting parts 0..Parts-1 in turn is for_each_module_type, in its order.
+    #Each slice is a discarded if-constexpr branch outside its part, so a part instantiates its own types only.
+    moduleTypeNames = [node[ENode.FullName] for name, node in TLS().NodeList.items()
+                       if name in moduleTypes and ENode.Cpp in node and node[ENode.Cpp]
+                       and (node[ENode.Kind] == EKind.Class or node[ENode.Kind] == EKind.Struct)]
+    count = max(len(moduleTypeNames), 1)
+    code += "\ttemplate<int Part, int Parts>\n"
+    code += "\tstatic void for_each_module_type_part(auto visitor) {\n"
+    code += "\t\tstatic_assert(Parts > 0 && Part >= 0 && Part < Parts);\n"
+    for index, fullName in enumerate(moduleTypeNames) :
+        code += f"\t\tif constexpr ({index} * Parts / {count} == Part) visitor.template operator()<{fullName}>();\n"
+    code += "\t}\n\n"
+
     #type_hash -> transitive ancestor hashes. keyed by pycppgen_hash_name(full_name()) so the table
     #can be queried from a hash read back off disk, which typeid()-based ids cannot support.
     code += "\tinline const std::map<pycppgen_type_hash_t, std::vector<pycppgen_type_hash_t>>& type_ancestors()\n"
