@@ -1616,15 +1616,31 @@ def CodeGenGlobal(path : str) -> list :
     #files compiled in parallel (vkfw's build/CMakeLists.txt, add_vkfw_type_registration) instead of one that instantiates every
     #type's registration by itself at the end of a build. Visiting parts 0..Parts-1 in turn is for_each_module_type, in its order.
     #Each slice is a discarded if-constexpr branch outside its part, so a part instantiates its own types only.
-    moduleTypeNames = [node[ENode.FullName] for name, node in TLS().NodeList.items()
-                       if name in moduleTypes and ENode.Cpp in node and node[ENode.Cpp]
-                       and (node[ENode.Kind] == EKind.Class or node[ENode.Kind] == EKind.Struct)]
-    count = max(len(moduleTypeNames), 1)
+    #The slices are even in an estimate of the cost, not in count: a type's registration walks its reflected variables and its
+    #ancestors' (an entity's are SEntity's too), so its weight is 1 + those variables. Measured on vkfw (137 types, each compiled
+    #alone): an even count put the 17 entity types in one slice of 8, the slowest by far; this weight comes within 40% of a split
+    #by the measured costs themselves, which a generator cannot know.
+    moduleTypes_ = [node for name, node in TLS().NodeList.items()
+                    if name in moduleTypes and ENode.Cpp in node and node[ENode.Cpp]
+                    and (node[ENode.Kind] == EKind.Class or node[ENode.Kind] == EKind.Struct)]
+    def RegistrationWeight(node) :
+        weight = 1
+        for owner in [node[ENode.FullName]] + CollectAllParents(node[ENode.FullName]) :
+            ownerNode = TLS().NodeList.get(owner)
+            if ownerNode is not None and ENode.Variables in ownerNode :
+                weight += sum(1 for var in ownerNode[ENode.Variables].values()
+                              if var[ENode.Access] == str(AccessSpecifier.PROTECTED) or var[ENode.Access] == str(AccessSpecifier.PUBLIC))
+        return weight
+    weights = [RegistrationWeight(node) for node in moduleTypes_]
+    totalWeight = max(sum(weights), 1)
     code += "\ttemplate<int Part, int Parts>\n"
     code += "\tstatic void for_each_module_type_part(auto visitor) {\n"
     code += "\t\tstatic_assert(Parts > 0 && Part >= 0 && Part < Parts);\n"
-    for index, fullName in enumerate(moduleTypeNames) :
-        code += f"\t\tif constexpr ({index} * Parts / {count} == Part) visitor.template operator()<{fullName}>();\n"
+    before = 0
+    for node, weight in zip(moduleTypes_, weights) :
+        #the weight of the types ahead of it, of all of them: which slice it starts in
+        code += f"\t\tif constexpr ({before}ull * Parts / {totalWeight} == Part) visitor.template operator()<{node[ENode.FullName]}>();\n"
+        before += weight
     code += "\t}\n\n"
 
     #type_hash -> transitive ancestor hashes. keyed by pycppgen_hash_name(full_name()) so the table
