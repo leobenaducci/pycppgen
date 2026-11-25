@@ -437,6 +437,12 @@ def ParseStruct(cursor, isHlslDecl : bool = False) :
         if child.kind == CursorKind.USING_DECLARATION :
             name = str(child.spelling)
             attribs = ParseComments(child)
+            #a function attribute is compiled into the member's info, which is the declaring type's (for_each_var
+            #visits a base's members through the base), so an override here would never reach it: refused rather
+            #than silently ignored
+            for attrib in kFunctionAttributes :
+                if attrib in attribs :
+                    raise ValueError(f"pycppgen: {node.get(ENode.FullName, '?')}: {attrib}= on `using ...::{name};` is not supported; put it on {name}'s own declaration")
             if name in node[ENode.MemberAttributesOverride] :
                 node[ENode.MemberAttributesOverride][name].update(attribs)
             else :
@@ -882,9 +888,30 @@ def GenerateMemberVariableStructDefinition(node : dict, var : dict, infoName : s
     result += "\t" * tabs + "static constexpr bool is_enum() { return std::is_enum<type_t>::value; }\n"
     result += "\t" * tabs + "static constexpr bool is_signed() { return std::is_signed<type_t>::value; }\n"
     result += "\t" * tabs + "static constexpr bool is_unsigned() { return std::is_unsigned<type_t>::value; }\n"
+    result += GenerateAttributeFunctionPointers(node, var, infoName, tabs)
     tabs -= 1
     result += "\t" * tabs + "};\n"
 
+    return result
+
+#the attributes that name a member function of the owning type, each given to the member's info as a function returning a
+#pointer to it (`read_only=IsLocked` -> `static constexpr auto read_only_function() { return &<info>::IsLocked; }`). The info
+#derives from the owner, so a protected or inherited function is named as the owner's own code would name it. The type's
+#registration takes the pointer from here, which compiles one function per attribute; looking it up by name instead
+#(find_function_by_name, still generated for anything else that wants it) compiles the visitor against every reflected
+#function of the type, once per member, and that was most of vkfw.lib (#214).
+kFunctionAttributes = ("read_only", "hidden_if", "on_change")
+
+def GenerateAttributeFunctionPointers(node : dict, var : dict, infoName : str, tabs : int) -> str :
+    result = ""
+    attribs = var.get(ENode.Attributes, {})
+    for attrib in kFunctionAttributes :
+        if attrib not in attribs :
+            continue
+        target = str(attribs[attrib]).strip()
+        if re.fullmatch(r"[A-Za-z_][A-Za-z_0-9]*", target) is None :
+            raise ValueError(f"pycppgen: {node[ENode.FullName]}::{var[ENode.Name]}: {attrib}={target!r} must name a member function of the type")
+        result += "\t" * tabs + f"static constexpr auto {attrib}_function() {{ return &{infoName}::{target}; }}\n"
     return result
 
 def GenerateMemberFunctionInfo(node, func, infoName) :

@@ -183,6 +183,72 @@ class TestAttributes(TestCase) :
         self.assertHas('{ "tooltip", "0 is off; higher is \\"more\\"" }', gen)
         self.assertHas('{ "clamp_min", "0" }', gen)
 
+    #214: the registration binds these from the pointer, not by searching the type's functions by name; the search stays generated
+    def test_a_function_attribute_gives_the_member_info_a_pointer_to_the_function(self) :
+        self.project.write("a.h", """
+            #pragma once
+            //$[[pycppgen]]
+            struct SThing
+            {
+                //$[[pycppgen editable;read_only=IsLocked;hidden_if=IsHidden;on_change=OnLevelChanged]]
+                int Level;
+            protected:
+                //$[[pycppgen]]
+                bool IsLocked() const { return false; }
+                //$[[pycppgen]]
+                bool IsHidden() const { return false; }
+                //$[[pycppgen]]
+                void OnLevelChanged() {}
+            };
+            """)
+        self.project.run()
+        gen = self.project.read("a.gen.h")
+        self.assertHas("static constexpr auto read_only_function() { return &Level_info::IsLocked; }", gen)
+        self.assertHas("static constexpr auto hidden_if_function() { return &Level_info::IsHidden; }", gen)
+        self.assertHas("static constexpr auto on_change_function() { return &Level_info::OnLevelChanged; }", gen)
+        self.assertHas("static bool find_function_by_name(", gen)
+        #the pointers have the functions' own types, protected as they are
+        path = self.project.write("check.cpp", """
+            #include "pycppgen.gen.h"
+            using info_t = decltype(pycppgen<SThing>::get_Level_member_variable_info());
+            bool (SThing::* readOnly)() const = info_t::read_only_function();
+            bool (SThing::* hidden)() const = info_t::hidden_if_function();
+            void (SThing::* changed)() = info_t::on_change_function();
+            """)
+        self.assertEqual(CompileErrors(path, [self.project.path]), [])
+
+    def test_a_function_attribute_on_a_using_declaration_fails_the_run(self) :
+        self.project.write("a.h", """
+            //$[[pycppgen]]
+            struct SBase {
+                //$[[pycppgen editable]]
+                int Scale;
+                //$[[pycppgen]]
+                void OnScaleChanged() {}
+            };
+            //$[[pycppgen]]
+            struct SDerived : SBase {
+                //$[[pycppgen on_change=OnScaleChanged]]
+                using SBase::Scale;
+            };
+            """)
+        result = self.project.run(check=False)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertHas("on_change= on `using ...::Scale;` is not supported", result.stdout + result.stderr)
+
+    def test_a_function_attribute_that_is_not_a_name_fails_the_run(self) :
+        self.project.write("a.h", """
+            //$[[pycppgen]]
+            struct SThing
+            {
+                //$[[pycppgen read_only=Is Locked]]
+                int Level;
+            };
+            """)
+        result = self.project.run(check=False)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertHas("read_only='Is Locked' must name a member function of the type", result.stdout + result.stderr)
+
     def test_a_using_declaration_overrides_attributes_without_the_include_flag(self) :
         self.project.write("a.h", """
             //$[[pycppgen]]
